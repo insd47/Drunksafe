@@ -15,9 +15,8 @@
     </generated>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="bc11299c-007b-4997-8b36-815b551279bf" name="Changes" comment="chore: ESP32-S3-DEVKITC 보일러플레이트">
-      <change afterPath="$PROJECT_DIR$/.idea/editor.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="bc11299c-007b-4997-8b36-815b551279bf" name="Changes" comment="chore: 기타 프로젝트 설정">
+      <change beforePath="$PROJECT_DIR$/.idea/.name" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.name" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -125,12 +124,12 @@
   }
 }</component>
   <component name="RunManager">
-    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
       <method v="2">
-        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
       </method>
     </configuration>
-    <configuration name="PlatformIO" type="platformio" factoryName="PlatformIO Debug" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Drunksafe/firmware" TARGET_NAME="PlatformIO" CONFIG_NAME="PlatformIO">
+    <configuration name="PlatformIO" type="platformio" factoryName="PlatformIO Debug" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="Drunksafe Firmware" TARGET_NAME="PlatformIO" CONFIG_NAME="PlatformIO">
       <method v="2">
         <option name="PlatformioBuildBeforeRun" enabled="true" />
       </method>
@@ -160,7 +159,7 @@
       <workItem from="1777553723506" duration="47000" />
       <workItem from="1777553778812" duration="157000" />
       <workItem from="1777553944277" duration="108000" />
-      <workItem from="1777554060629" duration="12000" />
+      <workItem from="1777554060629" duration="193000" />
     </task>
     <task id="LOCAL-00001" summary="chore: ESP32-S3-DEVKITC 보일러플레이트">
       <option name="closed" value="true" />
@@ -170,7 +169,15 @@
       <option name="project" value="LOCAL" />
       <updated>1777553708857</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="chore: 기타 프로젝트 설정">
+      <option name="closed" value="true" />
+      <created>1777554240798</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1777554240798</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -189,6 +196,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="chore: ESP32-S3-DEVKITC 보일러플레이트" />
-    <option name="LAST_COMMIT_MESSAGE" value="chore: ESP32-S3-DEVKITC 보일러플레이트" />
+    <MESSAGE value="chore: 기타 프로젝트 설정" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: 기타 프로젝트 설정" />
   </component>
 </project>

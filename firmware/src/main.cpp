@@ -1,6 +1,7 @@
 #include <Arduino.h>
+
 void setup() {
-// write your initialization code here
+    std::cout << "Hello World!" << std::endl;
 }
 
 void loop() {

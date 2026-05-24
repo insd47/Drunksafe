@@ -17,15 +17,22 @@
 | 7 | 음주측정기 | ALC-2(정확한 전문가용), MP6000(50개) | 1 | 측정 데이터 타당성 확인용 장비 | https://smartstore.naver.com/alcoscan/products/4549708463?nl-ts-pid=jlFsudqWjGYx2ssd4Hl-462770&n_media=11068&n_query=%EC%9D%8C%EC%A3%BC%EC%B8%A1%EC%A0%95%EA%B8%B0&n_rank=1&n_ad_group=grp-a001-02-000000011651351&n_ad=nad-a001-02-000000067517721&n_campaign_type=2&n_mall_id=ncp_1ns1th_01&n_mall_pid=4549708463&n_ad_group_type=2&n_match=3&nl-au=b438409304644d50ad9cb80fbb591488&NaPm=ct%3Dmp9swtlg%7Cci%3DERee4969c5%2D51f2%2D11f1%2D9598%2D661c287b6218%7Ctr%3Dpla%7Chk%3D34d96b11653194ea64a9febb9362c02353576d10%7Cnacn%3DfD5BDoBah4adB | 162,250 | 무료배송 |
 | 8 | 알코올 센서 |  | 5 | 직접적인 알코올 농도 측정 | https://www.devicemart.co.kr/goods/view?no=1383953 | 6,160 |  |
 | 9 | 저항 키트 |  | 2 | mq-3 전압 분배 및 압력 센서 저항 사용 | https://www.devicemart.co.kr/goods/view?no=1381629 | 1,980  *행사 전 가격 | 
-| 10 | 전원 모듈 |  | 5 | 배터리 ups 모듈 | https://www.devicemart.co.kr/goods/view?no=16006626 | 4,950 | 해외배송 |
-| 11 | 필라멘트 | 색상:슬렌더 핑크 | 1 | 프로토타입 외관 제작용 | https://smartstore.naver.com/kexcelled/products/8101837111?NaPm=ct%3Dmp9ukxew%7Cci%3Dd0f5b5cb1f37a18997940eeefdb18716ccf9ffef%7Ctr%3Dslsl%7Csn%3D6463524%7Chk%3D66b34a16b7b048653aa588a0f47633790e18e42b&nl-au=1a8e27b838a740c791b7dc957640350b&nl-query=3d+%ED%94%84%EB%A6%B0%ED%84%B0%ED%95%84%EB%9D%BC%EB%A9%98%ED%8A%B8 | 19,800 | 3,000 국내배송비
-
+| 10 | 전원 모듈 |  | 10 | 배터리 ups 모듈 | https://www.devicemart.co.kr/goods/view?no=16006626 | 4,950 | 해외배송 |
+| 11 | 필라멘트 | 옵션:Gray | 1 | 프로토타입 외관 제작용 | https://www.devicemart.co.kr/goods/view?no=12383235 | 21,010 |  | 
+| 12 | 점퍼선 |  | 5 | 센서 연결용 | https://www.devicemart.co.kr/goods/view?no=1321196 | 935
+| 13 | 18650 배터리 |  | 5 | 웨어러블 전원용 | https://www.devicemart.co.kr/goods/view?no=15669309 | 9,350 |  |
+| 14 | 18650 홀더 |  | 5 | 배터리 장착용 | https://www.devicemart.co.kr/goods/view?no=12766763 | 2.090 |  | 
+| 15 | 리튬 폴리머 배터리 | 옵션:선택안함 | 5 | 스마트 컵홀더 전원용 배터리 | https://www.devicemart.co.kr/goods/view?no=12710300 | 4,840 |  | 
+| 16 | 브레드보드 |  | 5 | 테스트용 기반 | https://www.devicemart.co.kr/goods/view?no=1322408 | 1,540 |  |
+| 17 | 단선 케이블 | 옵션:흑색 | 1 | 브레드보드 회로 구성용 케이블 | https://www.devicemart.co.kr/goods/view?no=32431 | 9,240 |  |
+| 18 | 1.3인치 OLED 디스플레이 |  | 7 | 웨어러블 데이터 표시용 | https://www.devicemart.co.kr/goods/view?no=1378168 | 12,870 |  |
 ---
 
 
 ### - 묶음배송적용예정, 배송비 없음
 - 해외배송 비용 아슬아슬하게 걸려서 **Arduino Nano ESP32 with headers** 선정함
-- 배터리 선정, 측정방식에 따른 스위치 선정, 디스플레이 선정, 신체와 결합할 tie? 선정, etc..  
+- 측정방식에 따른 스위치(택트스위치) 선정, 신체와 결합할 tie? 선정, etc..  
+- 디스플레이 손상 대비해서 2개 여분 추가
 
 <br> 
 

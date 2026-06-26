@@ -11,10 +11,15 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 보일러플레이트를 Rust 기반으로 변경">
+    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="chore: 추가 세팅">
+      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/dictionaries/project.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/jsLibraryMappings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/prettier.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Drunksafe.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Drunksafe.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,7 +27,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="46422" />
+    <option name="cachedIndexableFilesCount" value="46320" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:dev" />
@@ -44,6 +49,16 @@
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/insd47/Drunksafe.git&quot;,
     &quot;accountId&quot;: &quot;009a8752-1223-435b-896d-46028a3e3188&quot;
+  },
+  &quot;recentNewPullRequestHead&quot;: {
+    &quot;server&quot;: {
+      &quot;useHttp&quot;: false,
+      &quot;host&quot;: &quot;github.com&quot;,
+      &quot;port&quot;: null,
+      &quot;suffix&quot;: null
+    },
+    &quot;owner&quot;: &quot;insd47&quot;,
+    &quot;repository&quot;: &quot;Drunksafe&quot;
   }
 }</component>
   <component name="MacroExpansionManager">
@@ -55,61 +70,61 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.092271438771132" />
-      <entry key="MS500" value="2.4475078490191873" />
-      <entry key="S2" value="6.595045563406293" />
-      <entry key="S5" value="12.747502029691482" />
-      <entry key="S10" value="19.666423731129267" />
-      <entry key="S30" value="29.64045604213526" />
-      <entry key="S60" value="33.436546576724815" />
-      <entry key="M2" value="35.61222456893753" />
-      <entry key="M5" value="37.018012416085895" />
-      <entry key="M10" value="37.5044019818778" />
-      <entry key="M15" value="37.668568708768724" />
-      <entry key="M30" value="37.833765664046844" />
-      <entry key="H1" value="37.916752710406335" />
-      <entry key="H2" value="37.95834376849282" />
-      <entry key="H4" value="37.97916373051945" />
-      <entry key="D1" value="37.99652615535899" />
-      <entry key="W1" value="37.99950370872362" />
+      <entry key="MS100" value="1.000000002457775" />
+      <entry key="MS500" value="1.0198832829865125" />
+      <entry key="S2" value="1.7232380220456154" />
+      <entry key="S5" value="3.670917553085198" />
+      <entry key="S10" value="6.607277377551678" />
+      <entry key="S30" value="15.607214402298407" />
+      <entry key="S60" value="22.121543413924282" />
+      <entry key="M2" value="27.90441928794978" />
+      <entry key="M5" value="34.28970497228034" />
+      <entry key="M10" value="39.4879642552925" />
+      <entry key="M15" value="43.27472150857336" />
+      <entry key="M30" value="54.619965747129044" />
+      <entry key="H1" value="80.33411428105974" />
+      <entry key="H2" value="116.8406145652344" />
+      <entry key="H4" value="149.742988019677" />
+      <entry key="D1" value="190.05322875583514" />
+      <entry key="W1" value="198.53461930437157" />
     </decayedCancelled>
     <decayedSelected>
-      <entry key="MS100" value="0.0" />
-      <entry key="MS500" value="0.0" />
-      <entry key="S2" value="0.0" />
-      <entry key="S5" value="0.0" />
-      <entry key="S10" value="0.0" />
-      <entry key="S30" value="0.0" />
-      <entry key="S60" value="0.0" />
-      <entry key="M2" value="0.0" />
-      <entry key="M5" value="0.0" />
-      <entry key="M10" value="0.0" />
-      <entry key="M15" value="0.0" />
-      <entry key="M30" value="0.0" />
-      <entry key="H1" value="0.0" />
-      <entry key="H2" value="0.0" />
-      <entry key="H4" value="0.0" />
-      <entry key="D1" value="0.0" />
-      <entry key="W1" value="0.0" />
+      <entry key="MS100" value="2.4835746092268113E-22" />
+      <entry key="MS500" value="4.7754625350128855E-5" />
+      <entry key="S2" value="0.08312924967198766" />
+      <entry key="S5" value="0.3697443481983202" />
+      <entry key="S10" value="0.608066072230905" />
+      <entry key="S30" value="0.8471954032738486" />
+      <entry key="S60" value="0.9204321828759839" />
+      <entry key="M2" value="0.9593915691082467" />
+      <entry key="M5" value="0.9835547685118218" />
+      <entry key="M10" value="0.9925774016046996" />
+      <entry key="M15" value="1.0053474515496266" />
+      <entry key="M30" value="1.1424587799516344" />
+      <entry key="H1" value="1.535507142522495" />
+      <entry key="H2" value="2.034555164344612" />
+      <entry key="H4" value="2.4382319980494156" />
+      <entry key="D1" value="2.8930101518974856" />
+      <entry key="W1" value="2.9843520430469814" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="1.0685637109451063" />
-      <entry key="MS500" value="2.4338655772800224" />
-      <entry key="S2" value="6.58412682023659" />
-      <entry key="S5" value="12.737701711576364" />
-      <entry key="S10" value="19.65849601644706" />
-      <entry key="S30" value="29.636400108968402" />
-      <entry key="S60" value="33.434253194998746" />
-      <entry key="M2" value="35.6110021045669" />
-      <entry key="M5" value="37.017503883568395" />
-      <entry key="M10" value="37.50414433722905" />
-      <entry key="M15" value="37.668396185714386" />
-      <entry key="M30" value="37.833679020215115" />
-      <entry key="H1" value="37.916709292475495" />
-      <entry key="H2" value="37.958322035468576" />
-      <entry key="H4" value="37.979152857985746" />
-      <entry key="D1" value="37.99652434243312" />
-      <entry key="W1" value="37.99950344971372" />
+      <entry key="MS100" value="4.889468858210915E-5" />
+      <entry key="MS500" value="0.154591069129691" />
+      <entry key="S2" value="1.3235314078749574" />
+      <entry key="S5" value="3.6755392909003217" />
+      <entry key="S10" value="6.9498314616470385" />
+      <entry key="S30" value="16.33342888112345" />
+      <entry key="S60" value="22.974203416096717" />
+      <entry key="M2" value="28.824622786291467" />
+      <entry key="M5" value="35.2540291522999" />
+      <entry key="M10" value="40.46980285340487" />
+      <entry key="M15" value="44.2724603484212" />
+      <entry key="M30" value="55.757578632131626" />
+      <entry key="H1" value="81.8658850372262" />
+      <entry key="H2" value="118.87247643591463" />
+      <entry key="H4" value="152.17953916291088" />
+      <entry key="D1" value="192.94589584412918" />
+      <entry key="W1" value="201.5189205297335" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -117,6 +132,9 @@
   &quot;fromUser&quot;: false
 }</component>
   <component name="ProjectId" id="3FesvMinLEzozOzlcrfloS8PxYj" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -135,39 +153,38 @@
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "cidr.known.project.marker": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "feature/insd47/rust",
+    "git-widget-placeholder": "feature/insd47/rn",
+    "javascript.nodejs.core.library.configured.version": "22.20.0",
+    "javascript.nodejs.core.library.typings.version": "22.20.0",
     "javascript.preferred.runtime.type.id": "node",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/Users/insd47/Developer/insd/Drunksafe",
     "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "npm.run ios.executor": "Run",
+    "npm.start.executor": "Run",
     "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
     "org.rust.first.attach.projects": "true",
-    "settings.editor.selected.configurable": "preferences.pluginManager"
+    "prettierjs.PrettierConfiguration.Package": "/Users/insd47/Developer/insd/Drunksafe/app/node_modules/prettier",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.0",
+    "settings.editor.selected.configurable": "settings.javascript.prettier",
+    "ts.external.directory.path": "/Users/insd47/Developer/insd/Drunksafe/app/node_modules/typescript/lib"
   }
 }]]></component>
-  <component name="RunManager" selected="Cargo.Run firmware">
-    <configuration name="Run firmware" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
-      <option name="command" value="run --package firmware --bin firmware" />
-      <option name="workingDirectory" value="file://$PROJECT_DIR$/firmware" />
-      <envs />
-      <option name="emulateTerminal" value="true" />
-      <option name="channel" value="DEFAULT" />
-      <option name="requiredFeatures" value="true" />
-      <option name="allFeatures" value="false" />
-      <option name="withSudo" value="false" />
-      <option name="buildTarget" value="REMOTE" />
-      <option name="backtrace" value="SHORT" />
-      <option name="isRedirectInput" value="false" />
-      <option name="redirectInputPath" value="" />
-      <method v="2">
-        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/app/src" />
+    </key>
+  </component>
+  <component name="RunManager" selected="npm.start">
+    <configuration name="run firmware" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="buildProfileId" value="dev" />
       <option name="command" value="run" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$/firmware" />
@@ -185,11 +202,21 @@
         <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
       </method>
     </configuration>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Cargo.Run firmware" />
-      </list>
-    </recent_temporary>
+    <configuration name="start" type="js.build_tools.npm">
+      <package-json value="$PROJECT_DIR$/app/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="expo" />
+      </scripts>
+      <arguments value="start --ios" />
+      <node-interpreter value="project" />
+      <envs />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Cargo.run firmware" />
+      <item itemvalue="npm.start" />
+    </list>
   </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
@@ -214,7 +241,8 @@
       <updated>1782447099143</updated>
       <workItem from="1782447101394" duration="3010000" />
       <workItem from="1782451875317" duration="603000" />
-      <workItem from="1782452504586" duration="1212000" />
+      <workItem from="1782452504586" duration="10187000" />
+      <workItem from="1782468913960" duration="324000" />
     </task>
     <task id="LOCAL-00001" summary="feat: 보일러플레이트를 Rust 기반으로 변경">
       <option name="closed" value="true" />
@@ -224,7 +252,15 @@
       <option name="project" value="LOCAL" />
       <updated>1782451922441</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="chore: 추가 세팅">
+      <option name="closed" value="true" />
+      <created>1782458435417</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1782458435417</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -233,9 +269,21 @@
   <component name="UnknownFeatures">
     <option featureType="com.intellij.fileTypeFactory" implementationName="sdkconfig.defaults" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="feat: 보일러플레이트를 Rust 기반으로 변경" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: 보일러플레이트를 Rust 기반으로 변경" />
+    <MESSAGE value="chore: 추가 세팅" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: 추가 세팅" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

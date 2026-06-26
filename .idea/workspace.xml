@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/firmware/Cargo.toml">
+      <package file="$PROJECT_DIR$/firmware">
+        <feature name="default" enabled="true" />
+      </package>
+    </cargoProject>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 보일러플레이트를 Rust 기반으로 변경">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.toml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="46422" />
+    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:dev" />
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;insd47&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/insd47/Drunksafe.git&quot;,
+    &quot;accountId&quot;: &quot;009a8752-1223-435b-896d-46028a3e3188&quot;
+  }
+}</component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="vkFDJXTm" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.092271438771132" />
+      <entry key="MS500" value="2.4475078490191873" />
+      <entry key="S2" value="6.595045563406293" />
+      <entry key="S5" value="12.747502029691482" />
+      <entry key="S10" value="19.666423731129267" />
+      <entry key="S30" value="29.64045604213526" />
+      <entry key="S60" value="33.436546576724815" />
+      <entry key="M2" value="35.61222456893753" />
+      <entry key="M5" value="37.018012416085895" />
+      <entry key="M10" value="37.5044019818778" />
+      <entry key="M15" value="37.668568708768724" />
+      <entry key="M30" value="37.833765664046844" />
+      <entry key="H1" value="37.916752710406335" />
+      <entry key="H2" value="37.95834376849282" />
+      <entry key="H4" value="37.97916373051945" />
+      <entry key="D1" value="37.99652615535899" />
+      <entry key="W1" value="37.99950370872362" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="1.0685637109451063" />
+      <entry key="MS500" value="2.4338655772800224" />
+      <entry key="S2" value="6.58412682023659" />
+      <entry key="S5" value="12.737701711576364" />
+      <entry key="S10" value="19.65849601644706" />
+      <entry key="S30" value="29.636400108968402" />
+      <entry key="S60" value="33.434253194998746" />
+      <entry key="M2" value="35.6110021045669" />
+      <entry key="M5" value="37.017503883568395" />
+      <entry key="M10" value="37.50414433722905" />
+      <entry key="M15" value="37.668396185714386" />
+      <entry key="M30" value="37.833679020215115" />
+      <entry key="H1" value="37.916709292475495" />
+      <entry key="H2" value="37.958322035468576" />
+      <entry key="H4" value="37.979152857985746" />
+      <entry key="D1" value="37.99652434243312" />
+      <entry key="W1" value="37.99950344971372" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3FesvMinLEzozOzlcrfloS8PxYj" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Cargo.Run firmware.executor": "Run",
+    "Cargo.Run.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "cidr.known.project.marker": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "feature/insd47/rust",
+    "javascript.preferred.runtime.type.id": "node",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/insd47/Developer/insd/Drunksafe",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.first.attach.projects": "true",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
+  }
+}]]></component>
+  <component name="RunManager" selected="Cargo.Run firmware">
+    <configuration name="Run firmware" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="run --package firmware --bin firmware" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$/firmware" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
+      <option name="buildProfileId" value="dev" />
+      <option name="command" value="run" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$/firmware" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Cargo.Run firmware" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-58e2ab36d051-intellij.indexing.shared.core-IU-262.7581.18" />
+        <option value="bundled-js-predefined-d6986cc7102b-64587f7adf9c-JavaScript-IU-262.7581.18" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SwiftProjectSettings">
+    <option name="detectedToolchain" value="true" />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="" />
+      <created>1782447099143</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1782447099143</updated>
+      <workItem from="1782447101394" duration="3010000" />
+      <workItem from="1782451875317" duration="603000" />
+      <workItem from="1782452504586" duration="1212000" />
+    </task>
+    <task id="LOCAL-00001" summary="feat: 보일러플레이트를 Rust 기반으로 변경">
+      <option name="closed" value="true" />
+      <created>1782451922441</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1782451922441</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="sdkconfig.defaults" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="feat: 보일러플레이트를 Rust 기반으로 변경" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: 보일러플레이트를 Rust 기반으로 변경" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>

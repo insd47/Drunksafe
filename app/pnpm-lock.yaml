@@ -1144,9 +1144,6 @@ packages:
   '@types/react-test-renderer@19.1.0':
     resolution: {integrity: sha512-XD0WZrHqjNrxA/MaR9O22w/RNidWR9YZmBdRGI7wcnWGrv/3dA8wKCJ8m63Sn+tLJhcjmuhOi629N66W6kgWzQ==}
 
-  '@types/react@19.1.17':
-    resolution: {integrity: sha512-Qec1E3mhALmaspIrhWt9jkQMNdw6bReVu64mjvhbhq2NFPftLPVr+l1SZgmw/66WwBNpDh7ao5AT6gF5v41PFA==}
-
   '@types/react@19.2.17':
     resolution: {integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==}
 
@@ -5435,7 +5432,9 @@ snapshots:
       metro-runtime: 0.84.4
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
   '@react-native/normalize-colors@0.85.3': {}
 
@@ -5505,11 +5504,7 @@ snapshots:
 
   '@types/react-test-renderer@19.1.0':
     dependencies:
-      '@types/react': 19.1.17
-
-  '@types/react@19.1.17':
-    dependencies:
-      csstype: 3.2.3
+      '@types/react': 19.2.17
 
   '@types/react@19.2.17':
     dependencies:

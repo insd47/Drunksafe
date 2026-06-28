@@ -57,9 +57,12 @@ graph TD
     <br>
 * **초기 3분 warm-up 단계 및 시각화**
     <br>
+
     * 센서에 전원이 인가된 후 사용자의 신체와 접촉하여 유효한 데이터를 얻기까지 필요한 임의의 시간이며, 이 시간동안 ```matplotlib.pyplot```을 통해 Time Domain과 Frequency Domain각각에 대해 실시간 파형을 제공합니다.
-    ![.docs\progress\progress_3.png](.docs\progress\progress_3.png)
+    
+![.docs/progress/progress_3.png](.docs/progress/progress_3.png)
     <br>
+
 * **2차 최적화 필터 및 AI 피처 보고**
     <br>
     * 20초간 모인 데이터가 5개 이상이면; ```bpm_20s_buffer > 5```; 표준편차가 가장 낮은 데이터 그룹을 선정해 BPM, 심박변이도 ```HRV_StdDev```, 신호강도 ```Peak_Magnitude``` 에 대한 피쳐를 도출하고 ```Stabilized = 1``` 플래그로 타임스탬프와 추후에 포함될 기능인 MQ3 측정값과 함께 csv 파일에 저장합니다.
@@ -69,26 +72,32 @@ graph TD
 
 
 ## 6. 3D 프린터 출력물 및 실착 예시 
-![.docs\3Dparts\3dprint.jpg](.docs\3Dparts\3dprint.jpg)
+![.docs/3Dparts/3dprint.jpg](.docs/3Dparts/3dprint.jpg)
 * Blender3.6을 이용해서 설계한 후 Cura를 통해 GCODE로 변환해서 출력했습니다.
 <br>
 
-![.docs\progress\progress_1.jpg](.docs\progress\progress_1.jpg)
-<img src=".docs\progress\progress_2.jpg" style="display: block; margin: 0 auto; height: 480px;" />
+![.docs/progress/progress_1.jpg](.docs/progress/progress_1.jpg)
+<img src=".docs/progress/progress_2.jpg" style="display: block; margin: 0 auto; height: 480px;">
 <br>
 
 ## 7. 미해결 과제
 
 * ```./sktech/esp32.ino```를 통해서 esp32의 3.3v 아날로그 신호 전압으로 ppg 센서를 이용하려 했지만 노이즈가 심해 사용하기 어려웠습니다. 이에 현재 구성된 5v 전원 및 신호를 이용하되 전압 분배 회로를 이용해서 esp32에서도 이용 가능하게 할 예정입니다.
 <br>
+
 * 임시로 사용할 ppg센서 부착용 출력물을 만들었지만 신체에 부착하기가 어렵고 밸크로를 고정할 방안이 제대로 마련되지 않아 개선이 필요합니다.
 <br>
+
 * 2회이상 ```bpm_20s_buffer > 5```를 만족하지 못하면 부저와 진동 모터를 이용해 사용자에게 알리는 매커니즘을 구현할 예정입니다.
 <br>
-* 생성된 csv 파일에 ```BPM_Delta_Feature```을 도입해 데이터 수집 주기별 차이값 피쳐를 도입해 모델의 정확도를 높입니다. 기존에 설정한 피처 외 추가로 활용할 다양한 파생 데이터를 고안할 필요가 있습니다.
+
+* 생성된 csv 파일에 `BPM_Delta_Feature`을 도입해 데이터 수집 주기별 차이값 피쳐를 도입해 모델의 정확도를 높입니다. 기존에 설정한 피처 외 추가로 활용할 다양한 파생 데이터를 고안할 필요가 있습니다.
 <br>
-* 데이터 수집 예외처리 관련 보완이 필요합니다. 첫 20초 데이터 수집 구간에서 유요한 데이터를 수집하지 못하면 임의로 설정된 값 ```75.0, 1.5, 1.0```이 기록됩니다. 초기에 발생한 오류에 대해 ```Stabilized = 0``` 플래그로 저장한 후 데이터 전처리 시 삭제할 예정입니다. 
+
+* 데이터 수집 예외처리 관련 보완이 필요합니다. 첫 20초 데이터 수집 구간에서 유요한 데이터를 수집하지 못하면 임의로 설정된 값 `75.0, 1.5, 1.0`이 기록됩니다. 초기에 발생한 오류에 대해 `Stabilized = 0` 플래그로 저장한 후 데이터 전처리 시 삭제할 예정입니다. 
 <br>
+
 * esp32 연결이 종료된 경우 과거의 값을 계속 기록하게 되므로, esp32로부터 새로 받은 데이터가 없다고 판단되는 경우 장치를 점검하도록 하는 코드를 작성할 예정입니다. 
 <br>
+
 * 전용 앱과 소통할 방법을 구현하지 않았습니다. 차후 논의를 통해 진행할 예정입니다.

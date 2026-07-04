@@ -24,12 +24,81 @@ const int BTN_BREATH      = 18;  // 알코올 센서 안내
 // 측정값이 저장될 변수
 // =====================================================
 float maxAlcoholValue = 0.0;  // 알코올 측정 최고값 저장
+int currentBpm = 0;  // 현재 심박수 저장
+
+unsigned long lastBpmSendTime = 0;          // 마지막 심박수 전송 시간
+const unsigned long BPM_SEND_INTERVAL = 500; // 0.5초
 
 // =====================================================
 // 프로그램 상태 변수
 // =====================================================
 bool deviceStarted = false;   // false면 최초 대기 상태
 int nextScreenIndex = 0;      // GPIO17을 누를 때마다 바뀌는 화면 번호
+
+// =====================================================
+// 현재 OLED에 표시 중인 화면 상태
+// =====================================================
+enum ScreenState {
+  SCREEN_HOME,
+  SCREEN_NORMAL,
+  SCREEN_ALCOHOL,
+  SCREEN_BPM,
+  SCREEN_BREATH,
+  SCREEN_RESET
+};
+
+ScreenState currentScreen = SCREEN_HOME;
+
+// =====================================================
+// 심박정보 전송 함수
+// 차후 통신방식 결정 후 추가 예정
+// =====================================================
+void sendHeartRateToServer(int bpm) {
+  /*
+    나중에 여기에 서버 전송 코드 추가
+
+    예시 후보:
+    - HTTP POST
+    - MQTT publish
+    - Firebase
+    - WebSocket
+    - BLE
+    - Serial 통신
+  */
+}
+
+// =====================================================
+// 심박정보 생성 및 전달함수
+// 랜덤상태이므로 차후 수정 필요
+// =====================================================
+//랜덤생성함수
+int generateRandomBpm() {
+  return 80 + (esp_random() % 21);
+}
+
+void updateBpmAndSend() {
+  // 기기가 시작되지 않았으면 아무것도 안 함
+  if (deviceStarted == false) {
+    return;
+  }
+
+  // 0.5초가 지났는지 확인
+  if (millis() - lastBpmSendTime >= BPM_SEND_INTERVAL) {
+    
+    currentBpm = generateRandomBpm(); //실제 계측값으로 수정필요(랜덤제거)
+
+    // 서버 전송 함수 호출
+    sendHeartRateToServer(currentBpm);
+
+    // 마지막 전송 시간 갱신
+    lastBpmSendTime = millis();
+
+    // 현재 OLED가 심박수 화면이면 즉시 화면도 갱신
+    if (currentScreen == SCREEN_BPM) {
+      showHeartRate();
+    }
+  }
+}
 
 // =====================================================
 // 버튼 입력 확인 함수
@@ -116,11 +185,13 @@ void showKorean3Lines(const char* line1, const char* line2, const char* line3) {
 // 각 화면 출력 함수
 // =====================================================
 void showNormalState() {
+  currentScreen = SCREEN_NORMAL;
   showKorean2Lines("지금 상태는", "양호입니다");
 }
 
 //알코올센서 측정값 출력용 함수
 void showAlcoholValue() {
+  currentScreen = SCREEN_ALCOHOL;
   char valueText[20];
 
   // 최고 알코올 값을 소수점 셋째 자리까지 문자열로 변환
@@ -129,11 +200,24 @@ void showAlcoholValue() {
   showKorean2Lines("알코올 측정량:", valueText);
 }
 
+//심박센서 측정값 화면 출력함수
 void showHeartRate() {
-  showKorean2Lines("심박수:", "150bpm");
+  currentScreen = SCREEN_BPM;
+  char bpmText[20];
+
+  // 아직 값이 없으면 하나 생성
+  if (currentBpm == 0) {
+    currentBpm = generateRandomBpm();
+  }
+
+  snprintf(bpmText, sizeof(bpmText), "%dbpm", currentBpm);
+
+  showKorean2Lines("심박수:", bpmText);
 }
+
 //알코올센서 측정값 화면 출력용 함수
 void showBreathMeasuringScreen(float currentValue, float maxValue) {
+  currentScreen = SCREEN_BREATH;
   oled.clearBuffer();
 
   oled.setFont(u8g2_font_unifont_t_korean2);
@@ -177,29 +261,28 @@ void showNextMeasurementScreen() {
 }
 
 // =====================================================
-// 랜덤 생성함수, 실제제품에는 수정 필요
+// 알코올센서 랜덤 생성함수, 실제제품에는 수정 필요
 // =====================================================
 void runAlcoholMeasurement() {
   unsigned long startTime = millis();
 
-  // 3초 동안 측정하는 척함
-  while (millis() - startTime < 3000) {
-    // 0.000 ~ 1.000 사이 난수 생성
-    float currentValue = (esp_random() % 1001) / 1000.0;
+  maxAlcoholValue = 0.0;
 
-    // 최고값만 저장
+  while (millis() - startTime < 3000) {
+    // 알코올 측정 중에도 심박수는 계속 전송
+    updateBpmAndSend();
+
+    float currentValue = (esp_random() % 1001) / 1000.0; //랜덤파트
+
     if (currentValue > maxAlcoholValue) {
       maxAlcoholValue = currentValue;
     }
 
-    // OLED에 현재값과 최고값 표시
     showBreathMeasuringScreen(currentValue, maxAlcoholValue);
 
-    // 너무 빠르게 바뀌면 보기 힘드니까 0.2초마다 갱신
     delay(200);
   }
 
-  // 측정 후 GPIO17 반복 순서를 알코올 측정량부터 시작
   nextScreenIndex = 0;
 }
 
@@ -223,6 +306,7 @@ void setup() {
   oled.enableUTF8Print();
 
   // 최초 실행 화면
+  currentScreen = SCREEN_HOME;
   showEnglishText("Drunksafe");
 }
 
@@ -234,6 +318,15 @@ void loop() {
   if (deviceStarted == false) {
     if (isButtonPressed(BTN_START_RESET)) {
       deviceStarted = true;
+
+      // 시작 시 심박수 초기 생성
+      currentBpm = generateRandomBpm();
+
+      // 지금부터 0.5초마다 전송되도록 기준 시간 설정
+      lastBpmSendTime = millis();
+
+      // 필요하면 시작 직후 1회 전송
+      sendHeartRateToServer(currentBpm);
 
       // GPIO16 입력이 들어오면 측정
       nextScreenIndex = 0;
@@ -251,6 +344,9 @@ void loop() {
   // GPIO18: 입김 안내 3초 출력
   // =====================================================
 
+  // 기기가 켜져 있는 동안 0.5초마다 심박수 전송
+  updateBpmAndSend();
+
   // GPIO16 입력: 초기화
   if (isButtonPressed(BTN_START_RESET)) {
     showResetMessage();
@@ -259,6 +355,7 @@ void loop() {
     deviceStarted = false;
     nextScreenIndex = 0;
     maxAlcoholValue = 0.0;
+    currentScreen = SCREEN_HOME;
     showEnglishText("Drunksafe");
     return;
   }

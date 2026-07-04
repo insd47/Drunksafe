@@ -40,12 +40,25 @@ int nextScreenIndex = 0;      // GPIO17을 누를 때마다 바뀌는 화면 번
 // =====================================================
 enum ScreenState {
   SCREEN_HOME,
-  SCREEN_NORMAL,
+  SCREEN_State,
   SCREEN_ALCOHOL,
   SCREEN_BPM,
   SCREEN_BREATH,
   SCREEN_RESET
 };
+
+// =====================================================
+// 사용자 상태 판정값
+// 현재는 테스트용 랜덤 상태
+// 차후 실제 알고리즘으로 교체 예정
+// =====================================================
+enum SafetyState {
+  SAFETY_GOOD,
+  SAFETY_CAUTION,
+  SAFETY_DANGER
+};
+
+SafetyState currentSafetyState = SAFETY_GOOD;
 
 ScreenState currentScreen = SCREEN_HOME;
 
@@ -97,6 +110,25 @@ void updateBpmAndSend() {
     if (currentScreen == SCREEN_BPM) {
       showHeartRate();
     }
+  }
+}
+
+// =====================================================
+// 상태 판정 함수
+// 현재는 테스트용으로 양호 / 주의 / 위험을 랜덤 생성
+// 차후 실제 알고리즘으로 교체 예정
+// =====================================================
+SafetyState judgeSafetyState() {
+  int randomValue = esp_random() % 3;
+
+  if (randomValue == 0) {
+    return SAFETY_GOOD;
+  }
+  else if (randomValue == 1) {
+    return SAFETY_CAUTION;
+  }
+  else {
+    return SAFETY_DANGER;
   }
 }
 
@@ -184,9 +216,24 @@ void showKorean3Lines(const char* line1, const char* line2, const char* line3) {
 // =====================================================
 // 각 화면 출력 함수
 // =====================================================
-void showNormalState() {
-  currentScreen = SCREEN_NORMAL;
-  showKorean2Lines("지금 상태는", "양호입니다");
+
+//상태판정 함수(랜덤)
+void showState() {
+  currentScreen = SCREEN_State;
+
+  // 현재는 랜덤으로 상태 판정
+  // 나중에 실제 상태 판정 알고리즘으로 교체 예정
+  currentSafetyState = judgeSafetyState();
+
+  if (currentSafetyState == SAFETY_GOOD) {
+    showKorean2Lines("지금 상태는", "양호입니다");
+  }
+  else if (currentSafetyState == SAFETY_CAUTION) {
+    showKorean2Lines("지금 상태는", "주의입니다");
+  }
+  else {
+    showKorean2Lines("지금 상태는", "위험입니다");
+  }
 }
 
 //알코올센서 측정값 출력용 함수
@@ -238,6 +285,7 @@ void showBreathMeasuringScreen(float currentValue, float maxValue) {
 }
 
 void showResetMessage() {
+  currentScreen = SCREEN_RESET;
   showKorean2Lines("기기를", "초기화합니다");
 }
 
@@ -255,7 +303,7 @@ void showNextMeasurementScreen() {
     nextScreenIndex = 0;
   }
   else {
-    showNormalState();
+    showState();
     nextScreenIndex = 1;
   }
 }

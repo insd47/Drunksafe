@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <U8g2lib.h>
+#include <esp_system.h> //테스트용 랜덤코드 생성용
 
 // =====================================================
 // OLED 설정
@@ -18,6 +19,11 @@ U8G2_SH1106_128X64_NONAME_F_HW_I2C oled(
 const int BTN_START_RESET = 16;  // 시작 / 초기화
 const int BTN_NEXT        = 17;  // 측정값 화면 넘기기
 const int BTN_BREATH      = 18;  // 알코올 센서 안내
+
+// =====================================================
+// 측정값이 저장될 변수
+// =====================================================
+float maxAlcoholValue = 0.0;  // 알코올 측정 최고값 저장
 
 // =====================================================
 // 프로그램 상태 변수
@@ -84,7 +90,7 @@ void drawCenteredUTF8(const char* text, int y) {
 void showKorean2Lines(const char* line1, const char* line2) {
   oled.clearBuffer();
 
-  oled.setFont(u8g2_font_unifont_t_korean1);
+  oled.setFont(u8g2_font_unifont_t_korean2);
   oled.enableUTF8Print();
 
   drawCenteredUTF8(line1, 25);
@@ -96,7 +102,7 @@ void showKorean2Lines(const char* line1, const char* line2) {
 void showKorean3Lines(const char* line1, const char* line2, const char* line3) {
   oled.clearBuffer();
 
-  oled.setFont(u8g2_font_unifont_t_korean1);
+  oled.setFont(u8g2_font_unifont_t_korean2);
   oled.enableUTF8Print();
 
   drawCenteredUTF8(line1, 16);
@@ -113,16 +119,38 @@ void showNormalState() {
   showKorean2Lines("지금 상태는", "양호입니다");
 }
 
+//알코올센서 측정값 출력용 함수
 void showAlcoholValue() {
-  showKorean2Lines("알코올 측정량:", "5%");
+  char valueText[20];
+
+  // 최고 알코올 값을 소수점 셋째 자리까지 문자열로 변환
+  snprintf(valueText, sizeof(valueText), "%.3f%%", maxAlcoholValue);
+
+  showKorean2Lines("알코올 측정량:", valueText);
 }
 
 void showHeartRate() {
   showKorean2Lines("심박수:", "150bpm");
 }
+//알코올센서 측정값 화면 출력용 함수
+void showBreathMeasuringScreen(float currentValue, float maxValue) {
+  oled.clearBuffer();
 
-void showBreathMessage() {
-  showKorean2Lines("알코올 센서에", "입김을 부세요!");
+  oled.setFont(u8g2_font_unifont_t_korean2);
+  oled.enableUTF8Print();
+
+  char currentText[20];
+  char maxText[20];
+
+  snprintf(currentText, sizeof(currentText), "현재: %.3f%%", currentValue);
+  snprintf(maxText, sizeof(maxText), "최고: %.3f%%", maxValue);
+
+  drawCenteredUTF8("알코올 센서에", 14);
+  drawCenteredUTF8("입김을 부세요!", 30);
+  drawCenteredUTF8(currentText, 46);
+  drawCenteredUTF8(maxText, 62);
+
+  oled.sendBuffer();
 }
 
 void showResetMessage() {
@@ -134,21 +162,49 @@ void showResetMessage() {
 // 알코올 → 심박수 → 양호 → 알코올 → ...
 // =====================================================
 void showNextMeasurementScreen() {
-  if (nextScreenIndex == 0) {
+  if (nextScreenIndex == 1) {
     showAlcoholValue();
-    nextScreenIndex = 1;
-  }
-  else if (nextScreenIndex == 1) {
-    showHeartRate();
     nextScreenIndex = 2;
+  }
+  else if (nextScreenIndex == 2) {
+    showHeartRate();
+    nextScreenIndex = 0;
   }
   else {
     showNormalState();
-    nextScreenIndex = 0;
+    nextScreenIndex = 1;
   }
 }
 
+// =====================================================
+// 랜덤 생성함수, 실제제품에는 수정 필요
+// =====================================================
+void runAlcoholMeasurement() {
+  unsigned long startTime = millis();
+
+  // 3초 동안 측정하는 척함
+  while (millis() - startTime < 3000) {
+    // 0.000 ~ 1.000 사이 난수 생성
+    float currentValue = (esp_random() % 1001) / 1000.0;
+
+    // 최고값만 저장
+    if (currentValue > maxAlcoholValue) {
+      maxAlcoholValue = currentValue;
+    }
+
+    // OLED에 현재값과 최고값 표시
+    showBreathMeasuringScreen(currentValue, maxAlcoholValue);
+
+    // 너무 빠르게 바뀌면 보기 힘드니까 0.2초마다 갱신
+    delay(200);
+  }
+
+  // 측정 후 GPIO17 반복 순서를 알코올 측정량부터 시작
+  nextScreenIndex = 0;
+}
+
 void setup() {
+  randomSeed(esp_random());//테스트용 랜덤 생성용
   // 버튼 입력 설정
   pinMode(BTN_START_RESET, INPUT_PULLUP);
   pinMode(BTN_NEXT, INPUT_PULLUP);
@@ -179,11 +235,10 @@ void loop() {
     if (isButtonPressed(BTN_START_RESET)) {
       deviceStarted = true;
 
-      // GPIO16 입력이 들어오면 양호 상태 출력
-      showNormalState();
-
-      // 이후 GPIO17 반복은 알코올 측정량부터 시작
+      // GPIO16 입력이 들어오면 측정
       nextScreenIndex = 0;
+      runAlcoholMeasurement();
+      showNextMeasurementScreen();
     }
 
     return;
@@ -203,19 +258,17 @@ void loop() {
 
     deviceStarted = false;
     nextScreenIndex = 0;
-
+    maxAlcoholValue = 0.0;
     showEnglishText("Drunksafe");
     return;
   }
 
-  // GPIO18 입력: 알코올 센서 안내
+  // GPIO18 입력: 알코올 입력 센서 안내
   if (isButtonPressed(BTN_BREATH)) {
-    showBreathMessage();
-    delay(3000);
-
-    // 이후 GPIO17 반복을 알코올 측정량부터 다시 시작
     nextScreenIndex = 0;
-    return;
+    runAlcoholMeasurement();
+    showNextMeasurementScreen();
+   return;
   }
 
   // GPIO17 입력: 측정값 화면 반복

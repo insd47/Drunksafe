@@ -28,10 +28,10 @@
 
 | 영역      | 기능                                                                       |
 |-----------|----------------------------------------------------------------------------|
-| 센서 연결 | MQ-3 알코올 센서와 보조 센서의 연결 상태를 앱에서 확인                     |
-| 측정 진행 | 사용자가 호흡 측정을 시작하면 진행률과 수집 중인 센서 값을 표시            |
-| 결과 분석 | BAC 추정값, 위험 단계, 심박수, 체온, 산소포화도, 손 떨림 등 보조 지표 표시 |
-| 해독 예상 | 개인 분해 능력과 현재 측정값을 기반으로 해독 예상 시간 제공                |
+| 센서 연결 | ZE29 C2H5OH 알코올 모듈과 MAX30102 심박/SpO2 센서 상태를 앱에서 확인       |
+| 측정 진행 | 보드 버튼으로 측정을 시작하고 앱에서 진행률과 호기/PPG 품질을 표시         |
+| 결과 분석 | ZE29 호기 알코올 농도, BAC 추정값, 위험 단계, 심박수, 산소포화도 표시      |
+| 해독 예상 | 개인 분해 경향과 최근 측정 히스토리를 기반으로 해독 예상 시간 제공         |
 | 히스토리  | 최근 측정 기록과 주간 추이 저장 및 표시                                    |
 | 개선 안내 | 고위험 패턴 사용자에게 절주 콘텐츠, 상담 기관, 클리닉 정보 추천            |
 
@@ -39,14 +39,18 @@
 
 ```mermaid
 flowchart LR
-    Sensors["Sensors\nMQ-3 / MAX30102 / MLX90614 / MPU-6050"] --> Firmware["ESP32 DevKitC V4\nesp-rs firmware"]
+    Sensors["Sensors\nZE29 C2H5OH / MAX30102"] --> Firmware["ESP32 DevKitC V4\nesp-rs firmware"]
     Firmware --> BLE["Bluetooth LE"]
     BLE --> App["React Native app"]
-    App --> Analysis["Alcohol metabolism analysis"]
-    Analysis --> Output["BAC / risk level / sober-time estimate / history / recommendations"]
+    App --> History["Local history and personalization context"]
+    History --> Firmware
+    App --> Analysis["Alcohol risk and sober-time analysis"]
+    Analysis --> Output["BrAC / BAC estimate / risk level / sober-time estimate / history"]
 ```
 
-서버를 전제로 하지 않는 구조입니다. 센서 디바이스가 Bluetooth LE로 앱에 데이터를 보내고, 앱은 측정 결과와 히스토리를 사용자 중심으로 표시합니다.
+서버를 전제로 하지 않는 구조입니다. 보드 버튼으로 측정을 시작하면 펌웨어가 Bluetooth LE로 앱에 측정 컨텍스트를 요청하고, 앱은 최근 측정 히스토리와 개인 기준값을 전달합니다. 펌웨어는 보정과 측정을 수행한 뒤 결과를 앱으로 전송하고, 앱은 결과와 히스토리를 사용자 중심으로 저장합니다.
+
+측정 컨텍스트, BLE 통신 모델, 저장 ERD는 [.docs/measurement-communication-model.md](.docs/measurement-communication-model.md)에 정리되어 있습니다.
 
 ## 기술 스택
 

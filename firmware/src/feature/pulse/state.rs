@@ -1,12 +1,8 @@
 use super::filter::StreamingButterworth;
 use super::model::{Analysis, Sample, Trend};
+use super::params::{TREND_1M_SAMPLES, TREND_20S_SAMPLES, TREND_5M_SAMPLES, WINDOW_SAMPLES};
 use crate::utils::math;
 use std::collections::VecDeque;
-
-const WINDOW_SAMPLES: usize = 500;
-const TREND_20S_SAMPLES: usize = 4;
-const TREND_1M_SAMPLES: usize = 12;
-const TREND_5M_SAMPLES: usize = 60;
 
 #[derive(Debug)]
 pub struct State {

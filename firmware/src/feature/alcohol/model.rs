@@ -15,27 +15,8 @@ impl Concentration {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Raw {
-    pub command: Command,
-    pub data: [u8; 6],
-}
-
-impl Raw {
-    pub const fn new(command: Command, data: [u8; 6]) -> Self {
-        Self { command, data }
-    }
-}
-
-impl From<ResponseFrame> for Raw {
-    fn from(frame: ResponseFrame) -> Self {
-        Self::new(frame.command(), *frame.data())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Status {
     pub code: u8,
-    pub raw: Raw,
 }
 
 impl TryFrom<ResponseFrame> for Status {
@@ -51,7 +32,6 @@ impl TryFrom<ResponseFrame> for Status {
 
         Ok(Self {
             code: frame.data()[0],
-            raw: frame.into(),
         })
     }
 }
@@ -59,7 +39,6 @@ impl TryFrom<ResponseFrame> for Status {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Sample {
     pub concentration: Concentration,
-    pub raw: Raw,
 }
 
 impl TryFrom<ResponseFrame> for Sample {
@@ -75,7 +54,6 @@ impl TryFrom<ResponseFrame> for Sample {
 
         Ok(Self {
             concentration: Concentration::new(frame.word(0)?),
-            raw: frame.into(),
         })
     }
 }

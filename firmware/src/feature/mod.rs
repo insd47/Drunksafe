@@ -1,11 +1,9 @@
-use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::sys::EspError;
 use std::time::Duration;
 
-#[allow(dead_code)]
 mod alcohol;
 mod ble;
-#[allow(dead_code)]
+mod pins;
 mod pulse;
 mod trigger;
 
@@ -14,9 +12,10 @@ const IDLE_POLL: Duration = Duration::from_millis(20);
 pub fn run() -> Result<()> {
     log::debug!("initializing firmware features");
 
-    let pins = Peripherals::take()?.pins;
-    let mut pulse = pulse::State::default();
-    let mut trigger = trigger::init(pins.gpio0)?;
+    let board = pins::take()?;
+    let _alcohol = alcohol::Device::new(board.alcohol);
+    let mut pulse = pulse::Device::new(board.pulse);
+    let mut trigger = trigger::init(board.trigger)?;
     let mut session_sequence = 0_u32;
 
     log::debug!("firmware features initialized");
@@ -26,7 +25,7 @@ pub fn run() -> Result<()> {
             match event {
                 trigger::Event::MeasurementRequested => {
                     let session_id = next_button_session_id(&mut session_sequence);
-                    pulse::reset(&mut pulse);
+                    pulse.reset();
 
                     let request = ble::session(session_id.clone());
 

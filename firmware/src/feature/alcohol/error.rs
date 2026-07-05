@@ -1,7 +1,11 @@
-#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+use esp_idf_svc::sys::EspError;
+
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("transport error")]
-    Transport,
+    #[error(transparent)]
+    Esp(#[from] EspError),
+    #[error("zero bytes written to alcohol sensor UART")]
+    WriteZero,
     #[error("timed out while reading alcohol sensor frame")]
     Timeout,
     #[error("invalid alcohol sensor frame start byte: expected 0xff, found {found:#04x}")]

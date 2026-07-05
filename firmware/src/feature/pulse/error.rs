@@ -1,5 +1,9 @@
+use esp_idf_svc::sys::EspError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    Esp(#[from] EspError),
     #[error(
         "pulse sample timestamp moved backwards: previous {previous_ms}ms, current {current_ms}ms"
     )]

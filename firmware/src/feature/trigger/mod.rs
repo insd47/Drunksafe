@@ -7,7 +7,7 @@ mod state;
 
 const DEBOUNCE: Duration = Duration::from_millis(40);
 
-pub fn init(pin: Gpio0<'static>) -> core::result::Result<State, EspError> {
+pub fn init(pin: Gpio0<'static>) -> Result<State, EspError> {
     log::debug!("initializing trigger feature state");
     let button = PinDriver::input(pin, Pull::Up)?;
     Ok(State::new(button))

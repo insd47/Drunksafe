@@ -9,7 +9,7 @@ The current hardware scope is:
 
 The measurement flow, BLE protocol model, and storage ERD are documented in [../.docs/measurement-communication-model.md](../.docs/measurement-communication-model.md).
 
-Feature modules keep their public surface narrow. `main.rs` initializes logging and then hands control to `feature::run()`. Runtime orchestration lives under `feature/`, while sensor code exposes focused handles such as `alcohol::Device` and `pulse::State` plus `pulse::sample(...)`.
+Feature modules keep their public surface narrow. `main.rs` initializes logging and then hands control to `feature::run()`. Runtime orchestration and board pin mapping live under `feature/`, while sensor code exposes focused handles such as `alcohol::Device` and `pulse::Device`.
 
 ## Prerequisites
 

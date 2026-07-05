@@ -65,10 +65,6 @@ impl ResponseFrame {
         &self.data
     }
 
-    pub const fn bytes(&self) -> &[u8; FRAME_LEN] {
-        &self.bytes
-    }
-
     pub fn word(&self, offset: usize) -> Result<u16> {
         if offset + 1 >= self.data.len() {
             return Err(Error::InvalidPayload);

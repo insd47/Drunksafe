@@ -11,10 +11,9 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 앱 개요 문서화">
+    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 테스트 코드 생성">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -23,7 +22,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="53" />
+    <option name="cachedIndexableFilesCount" value="61" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:dev" />
@@ -66,61 +65,61 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="2.362321681319354" />
-      <entry key="MS500" value="7.132380554229507" />
-      <entry key="S2" value="15.682529664385989" />
-      <entry key="S5" value="19.58069061908772" />
-      <entry key="S10" value="21.194237978374524" />
-      <entry key="S30" value="22.37593832360255" />
-      <entry key="S60" value="22.743874624069203" />
-      <entry key="M2" value="23.413739470828776" />
-      <entry key="M5" value="25.269781752063484" />
-      <entry key="M10" value="27.65872279458247" />
-      <entry key="M15" value="31.495981043841432" />
-      <entry key="M30" value="49.416688695534994" />
-      <entry key="H1" value="88.30534234458769" />
-      <entry key="H2" value="147.31119255525337" />
-      <entry key="H4" value="209.27396354902157" />
-      <entry key="D1" value="297.9339461704225" />
-      <entry key="W1" value="318.40020414343206" />
+      <entry key="MS100" value="1.0572532845756333" />
+      <entry key="MS500" value="2.136263399287153" />
+      <entry key="S2" value="5.0190974880460235" />
+      <entry key="S5" value="7.314329202705961" />
+      <entry key="S10" value="8.498701928506037" />
+      <entry key="S30" value="9.45901542106577" />
+      <entry key="S60" value="9.724062187406076" />
+      <entry key="M2" value="9.862653302760279" />
+      <entry key="M5" value="10.541525911347595" />
+      <entry key="M10" value="14.225335043721872" />
+      <entry key="M15" value="19.021776151062713" />
+      <entry key="M30" value="36.4660372895274" />
+      <entry key="H1" value="74.63087466709597" />
+      <entry key="H2" value="136.02884289895272" />
+      <entry key="H4" value="203.56806626905598" />
+      <entry key="D1" value="304.0852373670774" />
+      <entry key="W1" value="327.80934256372586" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
-      <entry key="MS500" value="2.3384927370595266E-284" />
-      <entry key="S2" value="1.2366135655139682E-71" />
-      <entry key="S5" value="4.334046859110257E-29" />
-      <entry key="S10" value="6.5833478254686334E-15" />
-      <entry key="S30" value="1.8741985624209618E-5" />
-      <entry key="S60" value="0.0043292014996082" />
-      <entry key="M2" value="0.0657966735721797" />
-      <entry key="M5" value="0.3372346925912959" />
-      <entry key="M10" value="0.6029721469702075" />
-      <entry key="M15" value="0.7790076350947485" />
-      <entry key="M30" value="1.1853355033497488" />
-      <entry key="H1" value="1.822028825707125" />
-      <entry key="H2" value="2.6933411200504875" />
-      <entry key="H4" value="3.5482266928463484" />
-      <entry key="D1" value="4.69895742311416" />
-      <entry key="W1" value="4.955235659407342" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="1.460386143E-315" />
+      <entry key="S5" value="1.1635554426166806E-126" />
+      <entry key="S10" value="1.078682271392592E-63" />
+      <entry key="S30" value="1.0255681233264562E-21" />
+      <entry key="S60" value="3.2024492553770005E-11" />
+      <entry key="M2" value="5.659019184281303E-6" />
+      <entry key="M5" value="0.007975301993391295" />
+      <entry key="M10" value="0.0927266771024272" />
+      <entry key="M15" value="0.22360422812096706" />
+      <entry key="M30" value="0.6350536861298126" />
+      <entry key="H1" value="1.3336437001641828" />
+      <entry key="H2" value="2.3042715022244566" />
+      <entry key="H4" value="3.2819540952796187" />
+      <entry key="D1" value="4.638259404915778" />
+      <entry key="W1" value="4.946040564910378" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="2.3113658690627075" />
-      <entry key="MS500" value="7.098221790940504" />
-      <entry key="S2" value="15.664155899391847" />
-      <entry key="S5" value="19.571631992109648" />
-      <entry key="S10" value="21.189359049585562" />
-      <entry key="S30" value="22.37422040865432" />
-      <entry key="S60" value="22.745796277489184" />
-      <entry key="M2" value="23.46934858238746" />
-      <entry key="M5" value="25.588181007892498" />
-      <entry key="M10" value="28.245346719761603" />
-      <entry key="M15" value="32.26124185149366" />
-      <entry key="M30" value="50.592249208286994" />
-      <entry key="H1" value="90.12048827518561" />
-      <entry key="H2" value="149.99977094060793" />
-      <entry key="H4" value="212.81915656466597" />
-      <entry key="D1" value="302.63225007094064" />
-      <entry key="W1" value="323.3553417063541" />
+      <entry key="MS100" value="1.035491370869291" />
+      <entry key="MS500" value="2.1271034804492306" />
+      <entry key="S2" value="5.013614313542385" />
+      <entry key="S5" value="7.311108608858405" />
+      <entry key="S10" value="8.496824359517523" />
+      <entry key="S30" value="9.458317030046757" />
+      <entry key="S60" value="9.723702961051922" />
+      <entry key="M2" value="9.862475886277215" />
+      <entry key="M5" value="10.548982261241822" />
+      <entry key="M10" value="14.315510785967097" />
+      <entry key="M15" value="19.241409929426403" />
+      <entry key="M30" value="37.09584162963976" />
+      <entry key="H1" value="75.95947423719205" />
+      <entry key="H2" value="138.32903659276" />
+      <entry key="H4" value="206.8472128058137" />
+      <entry key="D1" value="308.72285143445293" />
+      <entry key="W1" value="332.7552851775077" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -135,48 +134,48 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Cargo.Run firmware.executor": "Run",
-    "Cargo.Run.executor": "Run",
-    "Cargo.run firmware.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "cidr.known.project.marker": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "feature/insd47/bpm-test",
-    "javascript.nodejs.core.library.configured.version": "22.20.0",
-    "javascript.nodejs.core.library.typings.version": "22.20.0",
-    "javascript.preferred.runtime.type.id": "node",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "/Users/insd47/Developer/insd/Drunksafe",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.jshint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.jshint": "",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "npm.expo ios.executor": "Run",
-    "npm.expo run.executor": "Run",
-    "npm.run ios.executor": "Run",
-    "npm.start.executor": "Run",
-    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
-    "org.rust.first.attach.projects": "true",
-    "prettierjs.PrettierConfiguration.Package": "/Users/insd47/Developer/insd/Drunksafe/app/node_modules/prettier",
-    "project.structure.last.edited": "Modules",
-    "project.structure.proportion": "0.0",
-    "project.structure.side.proportion": "0.0",
-    "settings.editor.selected.configurable": "ml.llm.AcpAgentsConfigurable",
-    "ts.external.directory.path": "/Users/insd47/Developer/insd/Drunksafe/app/node_modules/typescript/lib"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Cargo.Run firmware.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.run firmware.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;feature/insd47/bpm-test&quot;,
+    &quot;javascript.nodejs.core.library.configured.version&quot;: &quot;22.20.0&quot;,
+    &quot;javascript.nodejs.core.library.typings.version&quot;: &quot;22.20.0&quot;,
+    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/insd47/Developer/insd/Drunksafe&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.jshint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.jshint&quot;: &quot;&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.expo ios.executor&quot;: &quot;Run&quot;,
+    &quot;npm.expo run.executor&quot;: &quot;Run&quot;,
+    &quot;npm.run ios.executor&quot;: &quot;Run&quot;,
+    &quot;npm.start.executor&quot;: &quot;Run&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.first.attach.projects&quot;: &quot;true&quot;,
+    &quot;prettierjs.PrettierConfiguration.Package&quot;: &quot;/Users/insd47/Developer/insd/Drunksafe/app/node_modules/prettier&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.0&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;ml.llm.AcpAgentsConfigurable&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/Users/insd47/Developer/insd/Drunksafe/app/node_modules/typescript/lib&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/app/src" />
@@ -188,11 +187,6 @@
       <item itemvalue="npm.expo ios" />
       <item itemvalue="npm.expo android" />
     </list>
-    <recent_temporary>
-      <list>
-        <item itemvalue="Cargo.Run firmware" />
-      </list>
-    </recent_temporary>
   </component>
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
@@ -224,7 +218,8 @@
       <workItem from="1782540417199" duration="29000" />
       <workItem from="1782540461776" duration="1882000" />
       <workItem from="1782711832368" duration="581000" />
-      <workItem from="1782986837122" duration="6255000" />
+      <workItem from="1782986837122" duration="10748000" />
+      <workItem from="1783222032899" duration="814000" />
     </task>
     <task id="LOCAL-00001" summary="feat: 보일러플레이트를 Rust 기반으로 변경">
       <option name="closed" value="true" />
@@ -266,7 +261,15 @@
       <option name="project" value="LOCAL" />
       <updated>1782475708803</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="feat: 테스트 코드 생성">
+      <option name="closed" value="true" />
+      <created>1782993264394</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1782993264394</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -292,7 +295,8 @@
     <MESSAGE value="feat: 어플리케이션을 Expo Router 보일러플레이트로 교체" />
     <MESSAGE value="chore: 사용되지 않는 파일 제거" />
     <MESSAGE value="feat: 앱 개요 문서화" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: 앱 개요 문서화" />
+    <MESSAGE value="feat: 테스트 코드 생성" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: 테스트 코드 생성" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

@@ -29,6 +29,8 @@ static void resetDevice();
 static void startDevice();
 
 static void updateBpmAndSend() {
+  updateBpmSensor();
+
   if (!deviceStarted) {
     return;
   }
@@ -128,6 +130,7 @@ void setupDevice() {
   randomSeed(esp_random());
 
   initButtons();
+  initBpmSensor();
   initDisplay();
 
   currentScreen = SCREEN_HOME;
@@ -135,6 +138,8 @@ void setupDevice() {
 }
 
 void loopDevice() {
+  updateBpmSensor();
+
   if (!deviceStarted) {
     if (isButtonPressed(BTN_START_RESET)) {
       startDevice();

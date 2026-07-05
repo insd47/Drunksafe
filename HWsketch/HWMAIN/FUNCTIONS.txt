@@ -1,0 +1,149 @@
+HWMAIN 함수 설명
+
+이 문서는 HWsketch/HWMAIN 폴더에 있는 메인 Arduino 코드의 주요 함수 역할을 정리한 파일입니다.
+
+
+1. HWMAIN.ino
+
+setup()
+- Arduino 보드가 켜지거나 리셋될 때 한 번 실행됩니다.
+- 실제 초기화 작업은 setupDevice()에서 처리합니다.
+
+loop()
+- setup() 이후 계속 반복 실행됩니다.
+- 실제 반복 동작은 loopDevice()에서 처리합니다.
+
+
+2. buttons.cpp
+
+initButtons()
+- 시작/리셋 버튼, 다음 화면 버튼, 음주 측정 버튼을 INPUT_PULLUP 입력으로 설정합니다.
+
+isButtonPressed(int pin)
+- 지정한 버튼이 눌렸는지 확인합니다.
+- 버튼 튐을 줄이고, 버튼에서 손을 뗄 때까지 기다린 뒤 true를 반환합니다.
+
+
+3. comms.cpp
+
+sendHeartRateToServer(int bpm)
+- 심박수 값을 서버나 다른 장치로 보내기 위한 자리입니다.
+- 현재는 실제 통신 없이 값만 받는 형태입니다.
+
+
+4. device.cpp
+
+updateBpmAndSend()
+- updateBpmSensor()를 호출해 PPG 심박 측정 로직이 계속 돌도록 합니다.
+- 장치가 시작된 뒤 일정 시간이 지나면 Bpm()에서 최신 BPM 값을 가져옵니다.
+- 가져온 BPM 값을 sendHeartRateToServer()로 전달하고, 현재 화면이 심박 화면이면 OLED도 갱신합니다.
+
+showNextMeasurementScreen()
+- 다음 버튼을 눌렀을 때 결과 화면을 순서대로 바꿉니다.
+- 판별 상태, 알코올 최대값, 심박수 화면을 번갈아 표시합니다.
+
+runAlcoholMeasurement()
+- 음주 측정 버튼을 눌렀을 때 알코올 측정을 진행합니다.
+- 측정 중에도 updateBpmAndSend()를 호출해서 심박 측정이 멈추지 않게 합니다.
+
+resetDevice()
+- 장치 상태를 초기화합니다.
+- 알코올 측정값, 심박수 표시값, 화면 순서, 시작 상태를 초기값으로 되돌립니다.
+
+startDevice()
+- 장치를 처음 시작할 때 실행됩니다.
+- 현재 BPM 값을 읽고, 알코올 측정을 진행한 뒤 첫 결과 화면을 표시합니다.
+
+setupDevice()
+- 버튼, BPM 센서, OLED를 초기화합니다.
+- initBpmSensor()를 호출해서 PPG 기반 심박 측정을 준비합니다.
+
+loopDevice()
+- 메인 반복 처리 함수입니다.
+- 매 반복마다 updateBpmSensor()를 호출해 PPG 샘플을 계속 수집합니다.
+- 버튼 입력에 따라 시작, 리셋, 음주 측정, 화면 전환을 처리합니다.
+
+
+5. display.cpp
+
+drawCenteredUTF8(const char* text, int y)
+- UTF-8 문자열을 OLED 가로 중앙에 맞춰 출력하는 내부 보조 함수입니다.
+
+initDisplay()
+- I2C와 OLED를 초기화하고 UTF-8 출력 모드를 켭니다.
+
+showEnglishText(const char* text)
+- 영어 문장을 OLED 중앙에 한 줄로 표시합니다.
+
+showKorean2Lines(const char* line1, const char* line2)
+- 한글 문장 두 줄을 OLED에 표시합니다.
+
+showStateScreen(SafetyState safetyState)
+- 현재 판별 결과를 OLED에 표시합니다.
+
+showAlcoholValueScreen(float maxAlcoholValue)
+- 최대 알코올 측정값을 OLED에 표시합니다.
+
+showHeartRateScreen(int currentBpm)
+- 현재 BPM 값을 OLED에 표시합니다.
+
+showBreathMeasuringScreen(float currentValue, float maxValue)
+- 알코올 측정 중 현재값과 최대값을 OLED에 표시합니다.
+
+showResetMessageScreen()
+- 초기화 안내 화면을 OLED에 표시합니다.
+
+
+6. sensors.cpp
+
+initBpmSensor()
+- PPG 심박 센서를 사용하기 위한 ADC 설정을 초기화합니다.
+
+updateBpmSensor()
+- delay 없이 millis() 기준으로 0.01초마다 PPG 값을 측정합니다.
+- 측정값을 보정하고 5초 분량의 버퍼에 저장합니다.
+- 초기 10초가 지난 뒤 5초 단위로 BPM 계산을 갱신합니다.
+- 이 함수가 자주 호출되어야 Bpm()이 최신 값을 반환할 수 있습니다.
+
+measurePpg()
+- PPG 센서 원본 ADC 값을 4번 읽고 평균값을 반환합니다.
+
+correctPpg(int rawValue)
+- 원본 PPG 값을 저역 통과와 고역 통과 필터로 보정합니다.
+- 보정된 값은 심박 피크를 찾는 데 사용됩니다.
+
+saveCorrectedPpg(float correctedValue, unsigned long sampleTime)
+- 보정된 PPG 값과 측정 시간을 순환 버퍼에 저장합니다.
+
+findPpgPeaks(int peakIndexes[], int &peakCount)
+- 보정된 PPG 파형에서 심박 피크 후보를 찾습니다.
+
+calculateBpmFromPeaks(int peakIndexes[], int peakCount)
+- 피크 사이 시간 간격을 이용해 BPM을 계산합니다.
+- 측정 간격이 너무 불안정하면 최신 BPM 값을 갱신하지 않습니다.
+
+updateBpmCalculation()
+- 저장된 PPG 버퍼에서 피크를 찾고 BPM 계산을 실행합니다.
+
+Bpm()
+- 기존 랜덤 BPM 대신 PPG 기반으로 계산된 최신 BPM 값을 반환합니다.
+- 아직 안정적인 BPM이 계산되지 않았으면 0을 반환합니다.
+
+alcohol()
+- 현재는 테스트용 랜덤 알코올 값을 반환합니다.
+- 실제 알코올 센서 로직은 나중에 이 함수 내부를 교체하면 됩니다.
+
+judgeSafetyState(float maxAlcoholValue, int currentBpm)
+- 현재는 테스트용 랜덤 판별 결과를 반환합니다.
+- 실제 판별 기준이 정해지면 알코올 값과 BPM 값을 이용하도록 수정하면 됩니다.
+
+
+전체 실행 흐름
+
+1. setup()이 setupDevice()를 호출합니다.
+2. setupDevice()가 버튼, BPM 센서, OLED를 초기화합니다.
+3. loop()가 loopDevice()를 계속 호출합니다.
+4. loopDevice()는 매 반복마다 updateBpmSensor()를 호출해 PPG 측정을 계속 진행합니다.
+5. updateBpmSensor()는 0.01초마다 측정/보정/저장을 수행합니다.
+6. 10초 준비 시간이 지난 뒤, 5초 단위로 BPM이 계산됩니다.
+7. 화면이나 전송에서 Bpm()을 호출하면 최신 BPM 값이 사용됩니다.

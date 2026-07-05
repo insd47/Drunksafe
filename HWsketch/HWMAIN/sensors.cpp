@@ -37,6 +37,27 @@ float lastValidIbiStdev = 0.0;
 float lastValidPeakAmp = 0.0;
 bool bpmReady = false;
 
+// 추가된 특징값 관련 변수들
+int time_counter = 0;
+float current_bpm_val = 0.0;
+float current_ibi_stdev_val = 0.0;
+float current_peak_amp_val = 0.0;
+int stabilized_val = 1;
+
+const int Q_20S_SIZE = 4;
+const int Q_1M_SIZE = 12;
+const int Q_5M_SIZE = 60;
+float q_20s[4];
+float q_1m[12];
+float q_5m[60];
+int q_20s_count = 0, q_1m_count = 0, q_5m_count = 0;
+int head_20s = 0, head_1m = 0, head_5m = 0;
+float sum_20s = 0.0, sum_1m = 0.0, sum_5m = 0.0;
+float prev_bpm_20s = 0.0, prev_bpm_1m = 0.0, prev_bpm_5m = 0.0;
+float bpm_20s_val = 0.0, bpm_20s_d_val = 0.0;
+float bpm_1m_val = 0.0, bpm_1m_d_val = 0.0;
+float bpm_5m_val = 0.0, bpm_5m_d_val = 0.0;
+
 float calculateLowpassAlpha(float cutoffHz) {
   const float dt = 1.0 / PPG_SAMPLE_RATE_HZ;
   const float rc = 1.0 / (2.0 * PI * cutoffHz);
@@ -90,40 +111,30 @@ int orderedIndex(int index) {
   if (bufferCount < PPG_WINDOW_SIZE) {
     return index;
   }
-
   return (bufferIndex + index) % PPG_WINDOW_SIZE;
 }
 
 float calculateMean(float values[], int count) {
-  if (count == 0) {
-    return 0.0;
-  }
-
+  if (count == 0) return 0.0;
   float sum = 0.0;
   for (int i = 0; i < count; i++) {
     sum += values[i];
   }
-
   return sum / count;
 }
 
 float calculateStdev(float values[], int count, float mean) {
-  if (count == 0) {
-    return 0.0;
-  }
-
+  if (count == 0) return 0.0;
   float sumSquares = 0.0;
   for (int i = 0; i < count; i++) {
     float diff = values[i] - mean;
     sumSquares += diff * diff;
   }
-
   return sqrt(sumSquares / count);
 }
 
 void findPpgPeaks(int peakIndexes[], int &peakCount) {
   peakCount = 0;
-
   for (int i = 1; i < PPG_WINDOW_SIZE - 1; i++) {
     int prevIdx = orderedIndex(i - 1);
     int currentIdx = orderedIndex(i);
@@ -149,6 +160,20 @@ void findPpgPeaks(int peakIndexes[], int &peakCount) {
       }
     }
   }
+}
+
+void push_trend(float bpm, float* q, int size, int& count, int& head, float& sum, float& out_bpm, float& out_bpm_d, float& prev_bpm) {
+    if (count == size) { sum -= q[head]; } else { count++; }
+    q[head] = bpm;
+    sum += bpm;
+    head = (head + 1) % size;
+    if (count == size) {
+        out_bpm = sum / size;
+        out_bpm_d = (prev_bpm > 0.0) ? (out_bpm - prev_bpm) : 0.0;
+        prev_bpm = out_bpm;
+    } else {
+        out_bpm = 0.0; out_bpm_d = 0.0;
+    }
 }
 
 void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
@@ -181,11 +206,23 @@ void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
 
   lastValidIbiStdev = currentIbiStdev;
   lastValidPeakAmp = currentPeakAmp;
+  
+  current_bpm_val = currentBpm;
+  current_ibi_stdev_val = currentIbiStdev;
+  current_peak_amp_val = currentPeakAmp;
+  stabilized_val = unstable ? 1 : 0;
 
   if (!unstable) {
     latestBpm = (int)(currentBpm + 0.5);
     bpmReady = true;
   }
+
+  // 이동평균 갱신
+  push_trend(currentBpm, q_20s, Q_20S_SIZE, q_20s_count, head_20s, sum_20s, bpm_20s_val, bpm_20s_d_val, prev_bpm_20s);
+  push_trend(currentBpm, q_1m, Q_1M_SIZE, q_1m_count, head_1m, sum_1m, bpm_1m_val, bpm_1m_d_val, prev_bpm_1m);
+  push_trend(currentBpm, q_5m, Q_5M_SIZE, q_5m_count, head_5m, sum_5m, bpm_5m_val, bpm_5m_d_val, prev_bpm_5m);
+
+  time_counter += 5;
 }
 
 void updateBpmCalculation() {
@@ -198,6 +235,12 @@ void updateBpmCalculation() {
   findPpgPeaks(peakIndexes, peakCount);
   calculateBpmFromPeaks(peakIndexes, peakCount);
 }
+
+const int RAW_BUFFER_SIZE = 100; 
+int raw_vals[RAW_BUFFER_SIZE];
+unsigned long raw_times[RAW_BUFFER_SIZE];
+int raw_head = 0;
+int raw_tail = 0;
 }  // namespace
 
 void initBpmSensor() {
@@ -213,6 +256,14 @@ void updateBpmSensor() {
   lastSampleTime = now;
 
   int rawValue = measurePpg();
+  
+  int next_head = (raw_head + 1) % RAW_BUFFER_SIZE;
+  if (next_head != raw_tail) {
+      raw_vals[raw_head] = rawValue;
+      raw_times[raw_head] = now;
+      raw_head = next_head;
+  }
+
   float correctedValue = correctPpg(rawValue);
   saveCorrectedPpg(correctedValue, now);
 
@@ -230,6 +281,40 @@ void updateBpmSensor() {
 
 int Bpm() {
   return bpmReady ? latestBpm : 0;
+}
+
+int getRawDataAvailable() {
+    return (raw_head >= raw_tail) ? (raw_head - raw_tail) : (RAW_BUFFER_SIZE - raw_tail + raw_head);
+}
+
+int popRawDataBatch(unsigned long& out_start_t, int* out_values, int max_count) {
+    int available = getRawDataAvailable();
+    if (available == 0) return 0;
+    
+    int to_pop = (available > max_count) ? max_count : available;
+    out_start_t = raw_times[raw_tail];
+    for (int i = 0; i < to_pop; i++) {
+        out_values[i] = raw_vals[raw_tail];
+        raw_tail = (raw_tail + 1) % RAW_BUFFER_SIZE;
+    }
+    return to_pop;
+}
+
+PpgFeatures getLatestPpgFeatures() {
+    PpgFeatures f;
+    f.t = millis();
+    f.time_counter = time_counter;
+    f.current_bpm = current_bpm_val;
+    f.current_ibi_stdev = current_ibi_stdev_val;
+    f.current_peak_amp = current_peak_amp_val;
+    f.bpm_20s = bpm_20s_val;
+    f.bpm_20s_d = bpm_20s_d_val;
+    f.bpm_1m = bpm_1m_val;
+    f.bpm_1m_d = bpm_1m_d_val;
+    f.bpm_5m = bpm_5m_val;
+    f.bpm_5m_d = bpm_5m_d_val;
+    f.stabilized = stabilized_val;
+    return f;
 }
 
 float alcohol() {

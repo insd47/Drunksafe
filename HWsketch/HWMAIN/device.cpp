@@ -28,19 +28,95 @@ static void runAlcoholMeasurement();
 static void resetDevice();
 static void startDevice();
 
+// 진동 및 부저 알림 관련 변수 및 함수
+static int patternState = 0; 
+static unsigned long patternTimer = 0;
+
+static void beep(int type) {
+    switch (type) {
+        case 1: digitalWrite(SPEAKER_PIN, HIGH); break;
+        case 2: digitalWrite(SPEAKER_PIN, LOW); break;
+        default: digitalWrite(SPEAKER_PIN, HIGH); break;
+    }
+}
+
+static void vibe(int type) {
+    switch (type) {
+        case 1: digitalWrite(VIBRATION_PIN, LOW); break;
+        case 2: digitalWrite(VIBRATION_PIN, HIGH); break;
+        default: digitalWrite(VIBRATION_PIN, LOW); break;
+    }
+}
+
+static void updateAlertPattern() {
+    switch (patternState) {
+      case 1: // 첫 번째 ON (100ms 대기)
+        if (millis() - patternTimer >= 100) {
+          patternState = 2;        
+          patternTimer = millis(); 
+          beep(1); vibe(1); // OFF
+        }
+        break;
+      case 2: // 중간 OFF (50ms 대기)
+        if (millis() - patternTimer >= 50) {
+          patternState = 3;        
+          patternTimer = millis();
+          beep(2); vibe(2);        
+        }
+        break;
+      case 3: // 두 번째 ON 종료
+        if (millis() - patternTimer >= 100) {
+          patternState = 0;        
+          beep(1); vibe(1); // 완전 OFF
+        }
+        break;
+    }
+}
+
+static void triggerAlert() {
+    if (patternState == 0) {
+        patternState = 1;        
+        patternTimer = millis(); 
+        beep(2); vibe(2); // ON
+    }
+}
+
+void runBackgroundTasks() {
+    updateBpmSensor();
+    updateAlertPattern();
+
+    if (deviceStarted) {
+        if (getRawDataAvailable() >= 40) {
+            unsigned long start_t;
+            int batch[40];
+            int popped = popRawDataBatch(start_t, batch, 40);
+            if (popped > 0) {
+                sendRawDataToApp(start_t, batch, popped);
+            }
+        }
+    }
+}
+
 static void updateBpmAndSend() {
-  updateBpmSensor();
+  runBackgroundTasks();
 
   if (!deviceStarted) {
     return;
   }
+
+  // runBackgroundTasks()에서 처리하므로 삭제
+  // if (getRawDataAvailable() >= 40) { ... }
 
   if (millis() - lastBpmSendTime < BPM_SEND_INTERVAL_MS) {
     return;
   }
 
   currentBpm = Bpm();
-  sendHeartRateToServer(currentBpm);
+  
+  // 변경점: 기존 sendHeartRateToServer() 대신 최신 특징값과 함께 JSON 형태로 앱에 전송
+  PpgFeatures features = getLatestPpgFeatures();
+  sendDataToApp(features, maxAlcoholValue);
+
   lastBpmSendTime = millis();
 
   // 심박수 화면을 보고 있을 때만 OLED 값을 즉시 갱신한다.
@@ -93,7 +169,12 @@ static void runAlcoholMeasurement() {
     }
 
     showBreathMeasuringScreen(currentValue, maxAlcoholValue);
-    delay(ALCOHOL_SCREEN_REFRESH_MS);
+    
+    unsigned long waitStart = millis();
+    while (millis() - waitStart < ALCOHOL_SCREEN_REFRESH_MS) {
+      runBackgroundTasks();
+      delay(1);
+    }
   }
 
   nextScreenIndex = 0;
@@ -119,7 +200,8 @@ static void startDevice() {
   currentBpm = Bpm();
   lastBpmSendTime = millis();
 
-  sendHeartRateToServer(currentBpm);
+  PpgFeatures features = getLatestPpgFeatures();
+  sendDataToApp(features, maxAlcoholValue);
 
   nextScreenIndex = 0;
   runAlcoholMeasurement();
@@ -132,6 +214,14 @@ void setupDevice() {
   initButtons();
   initBpmSensor();
   initDisplay();
+  
+  // 알림(진동/부저) 핀 초기화
+  pinMode(SPEAKER_PIN, OUTPUT);
+  pinMode(VIBRATION_PIN, OUTPUT);
+  beep(1); vibe(1); // 초기 상태 (OFF)
+  
+  // 통신 모듈(BLE) 초기화
+  initComms();
 
   currentScreen = SCREEN_HOME;
   showEnglishText("Drunksafe");
@@ -139,6 +229,7 @@ void setupDevice() {
 
 void loopDevice() {
   updateBpmSensor();
+  updateAlertPattern();
 
   if (!deviceStarted) {
     if (isButtonPressed(BTN_START_RESET)) {

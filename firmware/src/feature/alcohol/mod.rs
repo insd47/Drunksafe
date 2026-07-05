@@ -1,35 +1,16 @@
-use std::time::Duration;
-
+pub use error::{Error, Result};
+pub use model::{Sample, Status};
 use protocol::FRAME_LEN;
+use std::time::Duration;
+pub use transport::Transport;
+
+mod command;
+mod error;
+mod model;
+mod protocol;
+mod transport;
 
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_millis(100);
-
-pub fn init() -> SharedState {
-    log::debug!("initializing alcohol feature state");
-    state::init()
-}
-
-pub fn attach<T: Transport>(transport: T) -> Result<Device<T>> {
-    let mut device = Device::new(transport);
-    device.init()?;
-    Ok(device)
-}
-
-pub fn sample<T: Transport>(state: &SharedState, device: &mut Device<T>) -> Result<Sample> {
-    let sample = device.sample()?;
-    state.lock().map_err(|_| Error::State)?.set_sample(sample);
-    Ok(sample)
-}
-
-pub fn status<T: Transport>(state: &SharedState, device: &mut Device<T>) -> Result<Status> {
-    let status = device.status()?;
-    state.lock().map_err(|_| Error::State)?.set_status(status);
-    Ok(status)
-}
-
-pub fn snapshot(state: &SharedState) -> Result<Snapshot> {
-    Ok(state.lock().map_err(|_| Error::State)?.snapshot())
-}
 
 pub struct Device<T> {
     transport: T,
@@ -37,6 +18,12 @@ pub struct Device<T> {
 }
 
 impl<T: Transport> Device<T> {
+    pub fn attach(transport: T) -> Result<Self> {
+        let mut device = Self::new(transport);
+        device.status()?;
+        Ok(device)
+    }
+
     pub const fn new(transport: T) -> Self {
         Self {
             transport,
@@ -49,10 +36,6 @@ impl<T: Transport> Device<T> {
             transport,
             read_timeout,
         }
-    }
-
-    pub fn init(&mut self) -> Result<Status> {
-        self.status()
     }
 
     pub fn sample(&mut self) -> Result<Sample> {
@@ -91,15 +74,3 @@ impl<T: Transport> Device<T> {
         protocol::ResponseFrame::parse(bytes)
     }
 }
-
-pub use error::{Error, Result};
-pub use model::{Sample, Status};
-pub use state::{SharedState, Snapshot};
-pub use transport::Transport;
-
-mod command;
-mod error;
-mod model;
-mod protocol;
-mod state;
-mod transport;

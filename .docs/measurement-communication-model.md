@@ -8,8 +8,8 @@
 - 확정되지 않은 데이터는 BLE 공통 모델에 미리 넣지 않는다.
 - `main.rs`는 logger 초기화 후 `feature::run()`만 호출한다.
 - `feature::run()`은 peripherals 획득, feature state 생성, runtime loop를 닫아 가진다.
-- feature state는 `Arc<Mutex<_>>`로 공유하고, 오류는 `thiserror`로 명확히 표현한다.
-- 측정 세션 상태는 `feature::runtime`이 소유한다. BLE 모델에는 transport DTO만 둔다.
+- 현재 runtime은 단일 루프이므로 feature state는 plain mutable state로 유지한다. task/thread 공유가 실제로 필요해지는 시점에만 shared state를 도입한다.
+- 측정 세션 sequence는 `feature::run()`의 runtime loop가 로컬 상태로 소유한다. BLE 모델에는 transport DTO만 둔다.
 - snapshot은 필요할 때 사용처에서 각 feature를 직접 호출한다. `feature::Snapshot` 같은 집계 모델은 두지 않는다.
 
 ## Trigger Feature
@@ -19,16 +19,10 @@
 공개 액션:
 
 - `trigger::init(pin)`: BOOT 버튼 GPIO를 input pull-up으로 설정하고 trigger state를 만든다.
-- `trigger::poll(&state)`: debounce state machine을 진행하고 측정 시작 이벤트를 optional로 반환한다.
+- `trigger::poll(&mut state)`: debounce state machine을 진행하고 측정 시작 이벤트를 optional로 반환한다.
 
 버튼은 지금은 유일한 측정 시작 입력이지만, 앱 시작/자동 재측정 같은 입력이 생기면 trigger feature가 event source를 확장한다.
 `poll()`은 블로킹하지 않으므로 같은 runtime loop에 BLE context 수신이나 센서 tick을 추가할 수 있다.
-
-## Runtime State
-
-위치: `firmware/src/feature/runtime.rs`
-
-runtime state는 측정 세션 sequence를 소유한다. 버튼 이벤트가 들어오면 `runtime::begin_button_session()`이 새 세션 ID를 만들고 반환한다. 이후 phone context, progress, report 처리가 실제로 붙을 때 active session 상태를 추가한다.
 
 ## Alcohol Feature
 
@@ -36,11 +30,9 @@ runtime state는 측정 세션 sequence를 소유한다. 버튼 이벤트가 들
 
 공개 액션:
 
-- `alcohol::init()`: alcohol feature state를 만든다.
-- `alcohol::attach(transport)`: ZE29 transport를 device handle로 감싼다.
-- `alcohol::sample(&state, &mut device)`: `0x86` read test results 명령으로 현재 알코올 샘플을 읽고 state를 갱신한다.
-- `alcohol::status(&state, &mut device)`: `0x85` query module status 명령으로 모듈 상태를 읽고 state를 갱신한다.
-- `alcohol::snapshot(&state)`: 외부 mutation 없이 현재 상태 요약만 읽는다.
+- `alcohol::Device::attach(transport)`: ZE29 transport를 device handle로 감싸고 초기 status를 조회한다.
+- `device.sample()`: `0x86` read test results 명령으로 현재 알코올 샘플을 읽는다.
+- `device.status()`: `0x85` query module status 명령으로 모듈 상태를 읽는다.
 
 구조:
 
@@ -48,7 +40,6 @@ runtime state는 측정 세션 sequence를 소유한다. 버튼 이벤트가 들
 - `protocol`: 9 byte request/response frame과 checksum
 - `transport`: UART 등 실제 I/O 추상화
 - `model`: `Sample`, `Status`, `Concentration`, raw response
-- `state`: 마지막 status와 sample을 보관하는 shared state
 
 SOLID 관점:
 
@@ -57,7 +48,6 @@ SOLID 관점:
 - `model`은 도메인 데이터만 담당한다.
 - `Device<T>`는 transport trait에만 의존하므로 실제 UART, mock, buffered transport로 쉽게 교체할 수 있다.
 - `Transport::read()`는 timeout을 인터페이스에 포함하므로 실제 UART 구현도 block-free 계약을 지켜야 한다.
-- shared state는 action 함수 바깥으로 노출되지만 mutation은 feature action 안에서 일어난다.
 
 ## Pulse Feature
 
@@ -65,13 +55,20 @@ SOLID 관점:
 
 공개 액션:
 
-- `pulse::init()`: pulse feature state를 만든다.
-- `pulse::reset(&state)`: 새 측정 세션 시작 시 filter와 sample buffer를 초기화한다.
-- `pulse::sample(&state, elapsed_ms, raw_12bit)`: MAX30102 raw PPG 값을 스트리밍 Butterworth 필터에 통과시키고 5초 분석 주기마다 optional analysis를 반환한다.
+- `pulse::State::default()`: pulse feature state를 만든다.
+- `pulse::reset(&mut state)`: 새 측정 세션 시작 시 filter와 sample buffer를 초기화한다.
+- `pulse::sample(&mut state, elapsed_ms, raw_12bit)`: MAX30102 raw PPG 값을 스트리밍 Butterworth 필터에 통과시키고 5초 분석 주기마다 optional analysis를 반환한다.
 - `pulse::analyze(&state)`: 마지막 analysis를 조회한다.
-- `pulse::snapshot(&state)`: 외부 mutation 없이 현재 상태 요약만 읽는다.
 
 `origin/modules`와 `origin/modules-fixed`의 `ppg_processor.py`는 동일하다. 적용 기준은 더 명시적인 `origin/modules-fixed`로 둔다. 핵심은 100Hz PPG 입력에 대한 0.7-3.5Hz 2차 Butterworth band-pass streaming filter, 10초 시작 지연 후 5초마다 분석, peak threshold 50, 최소 peak distance 300ms, IBI 표준편차 200ms 초과 시 불안정 처리, 20초/1분/5분 이동평균 feature다. peak distance 충돌은 더 큰 peak를 남기고, sample cadence jitter는 warning으로만 기록한다. 세션이 바뀔 때는 `pulse::reset()`을 먼저 호출한다.
+
+구조:
+
+- `params`: sampling cadence, warm-up, peak threshold, trend window 같은 튜닝 값
+- `algorithm`: peak detection, IBI/BPM/stability 계산
+- `filter`: origin/modules-fixed 기준 Butterworth streaming filter
+- `state`: filter, sample window, moving average, last analysis
+- `crate::utils::math`: 평균, 표준편차, 반올림 같은 순수 유틸리티
 
 ## ZE29 Protocol
 
@@ -109,8 +106,7 @@ SOLID 관점:
 
 공개 액션:
 
-- `ble::init()`: BLE feature state를 만든다.
-- `ble::snapshot(&state)`: protocol version 등 transport 상태 요약을 읽는다.
+- `ble::session(session_id)`: 보드 버튼으로 시작된 측정 세션 요청 DTO를 만든다.
 
 BLE 모델은 다음 정도만 가진다.
 

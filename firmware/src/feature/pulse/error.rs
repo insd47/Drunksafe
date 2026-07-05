@@ -1,8 +1,5 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("pulse state lock poisoned")]
-    State,
-
     #[error(
         "pulse sample timestamp moved backwards: previous {previous_ms}ms, current {current_ms}ms"
     )]

@@ -1,8 +1,7 @@
-use serde::{Deserialize, Serialize};
-
 use super::command::Command;
 use super::error::{Error, Result};
 use super::protocol::ResponseFrame;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Concentration {

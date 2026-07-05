@@ -1,7 +1,7 @@
-mod error;
 mod feature;
+mod utils;
 
-fn main() -> error::Result<()> {
+fn main() -> feature::Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 

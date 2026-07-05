@@ -1,8 +1,7 @@
-use std::collections::VecDeque;
-
 use super::filter::StreamingButterworth;
 use super::model::{Analysis, Sample, Trend};
-use crate::feature::state::{shared, Shared};
+use crate::utils::math;
+use std::collections::VecDeque;
 
 const WINDOW_SAMPLES: usize = 500;
 const TREND_20S_SAMPLES: usize = 4;
@@ -23,12 +22,6 @@ pub struct State {
     trend_1m: MovingAverage,
     trend_5m: MovingAverage,
     last_analysis: Option<Analysis>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct Snapshot {
-    pub sample_count: usize,
-    pub has_analysis: bool,
 }
 
 #[derive(Debug)]
@@ -57,8 +50,13 @@ impl MovingAverage {
             return Trend::default();
         }
 
-        let average = round2(self.values.iter().sum::<f32>() / self.capacity as f32);
-        let delta = self.previous.map(|previous| round2(average - previous));
+        let average = math::round(
+            self.values.iter().sum::<f32>() / self.values.len() as f32,
+            2,
+        );
+        let delta = self
+            .previous
+            .map(|previous| math::round(average - previous, 2));
         self.previous = Some(average);
 
         Trend {
@@ -88,11 +86,11 @@ impl Default for State {
 }
 
 impl State {
-    pub fn filter(&mut self, raw_12bit: u16) -> f32 {
+    pub(super) fn filter(&mut self, raw_12bit: u16) -> f32 {
         self.filter.push(f32::from(raw_12bit))
     }
 
-    pub fn push(&mut self, sample: Sample) {
+    pub(super) fn push(&mut self, sample: Sample) {
         if self.window.len() == WINDOW_SAMPLES {
             self.window.pop_front();
         }
@@ -102,35 +100,35 @@ impl State {
         self.samples_since_analysis += 1;
     }
 
-    pub fn reset(&mut self) {
+    pub(super) fn reset(&mut self) {
         *self = Self::default();
     }
 
-    pub fn window(&self) -> &VecDeque<Sample> {
+    pub(super) fn window(&self) -> &VecDeque<Sample> {
         &self.window
     }
 
-    pub const fn total_samples(&self) -> usize {
+    pub(super) const fn total_samples(&self) -> usize {
         self.total_samples
     }
 
-    pub const fn samples_since_analysis(&self) -> usize {
+    pub(super) const fn samples_since_analysis(&self) -> usize {
         self.samples_since_analysis
     }
 
-    pub fn mark_analyzed(&mut self) {
+    pub(super) fn mark_analyzed(&mut self) {
         self.samples_since_analysis = 0;
     }
 
-    pub const fn first_stable_found(&self) -> bool {
+    pub(super) const fn first_stable_found(&self) -> bool {
         self.first_stable_found
     }
 
-    pub fn mark_first_stable(&mut self) {
+    pub(super) fn mark_first_stable(&mut self) {
         self.first_stable_found = true;
     }
 
-    pub const fn last_values(&self) -> (f32, f32, f32) {
+    pub(super) const fn last_values(&self) -> (f32, f32, f32) {
         (
             self.last_bpm,
             self.last_ibi_stddev_ms,
@@ -138,13 +136,13 @@ impl State {
         )
     }
 
-    pub fn set_last_values(&mut self, bpm: f32, ibi_stddev_ms: f32, peak_amplitude: f32) {
+    pub(super) fn set_last_values(&mut self, bpm: f32, ibi_stddev_ms: f32, peak_amplitude: f32) {
         self.last_bpm = bpm;
         self.last_ibi_stddev_ms = ibi_stddev_ms;
         self.last_peak_amplitude = peak_amplitude;
     }
 
-    pub fn push_trends(&mut self, bpm: f32) -> (Trend, Trend, Trend) {
+    pub(super) fn push_trends(&mut self, bpm: f32) -> (Trend, Trend, Trend) {
         (
             self.trend_20s.push(bpm),
             self.trend_1m.push(bpm),
@@ -152,28 +150,11 @@ impl State {
         )
     }
 
-    pub fn set_analysis(&mut self, analysis: Analysis) {
+    pub(super) fn set_analysis(&mut self, analysis: Analysis) {
         self.last_analysis = Some(analysis);
     }
 
-    pub const fn last_analysis(&self) -> Option<Analysis> {
+    pub(super) const fn last_analysis(&self) -> Option<Analysis> {
         self.last_analysis
     }
-
-    pub const fn snapshot(&self) -> Snapshot {
-        Snapshot {
-            sample_count: self.total_samples,
-            has_analysis: self.last_analysis.is_some(),
-        }
-    }
-}
-
-pub type SharedState = Shared<State>;
-
-pub fn init() -> SharedState {
-    shared(State::default())
-}
-
-fn round2(value: f32) -> f32 {
-    (value * 100.0).round() / 100.0
 }

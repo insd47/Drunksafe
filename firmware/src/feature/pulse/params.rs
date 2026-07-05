@@ -1,0 +1,8 @@
+pub const SAMPLE_RATE_HZ: usize = 100;
+pub const SAMPLE_PERIOD_MS: u32 = 10;
+pub const SAMPLE_PERIOD_TOLERANCE_MS: u32 = 2;
+pub const START_DELAY_SAMPLES: usize = 10 * SAMPLE_RATE_HZ;
+pub const ANALYSIS_INTERVAL_SAMPLES: usize = 5 * SAMPLE_RATE_HZ;
+pub const PEAK_THRESHOLD: f32 = 50.0;
+pub const MIN_PEAK_DISTANCE_MS: u32 = 300;
+pub const IBI_STDEV_UNSTABLE_MS: f32 = 200.0;

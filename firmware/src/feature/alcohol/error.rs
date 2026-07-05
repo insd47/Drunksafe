@@ -1,8 +1,5 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum Error {
-    #[error("alcohol state lock poisoned")]
-    State,
-
     #[error("transport error")]
     Transport,
     #[error("timed out while reading alcohol sensor frame")]

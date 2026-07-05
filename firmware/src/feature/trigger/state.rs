@@ -1,8 +1,5 @@
 use esp_idf_svc::hal::gpio::{Input, PinDriver};
-
 use std::time::{Duration, Instant};
-
-use crate::feature::state::{shared, Shared};
 
 pub struct State {
     button: PinDriver<'static, Input>,
@@ -57,10 +54,4 @@ enum Phase {
     DebouncingPress(Instant),
     Pressed,
     DebouncingRelease(Instant),
-}
-
-pub type SharedState = Shared<State>;
-
-pub fn init(button: PinDriver<'static, Input>) -> SharedState {
-    shared(State::new(button))
 }

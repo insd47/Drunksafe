@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
-
 use crate::feature::{alcohol, pulse};
+use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_VERSION: u8 = 5;
 

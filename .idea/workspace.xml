@@ -11,9 +11,11 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 테스트 코드 생성">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 통신 모델을 펌웨어 기준으로 변경">
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -65,61 +67,61 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0572532845756333" />
-      <entry key="MS500" value="2.136263399287153" />
-      <entry key="S2" value="5.0190974880460235" />
-      <entry key="S5" value="7.314329202705961" />
-      <entry key="S10" value="8.498701928506037" />
-      <entry key="S30" value="9.45901542106577" />
-      <entry key="S60" value="9.724062187406076" />
-      <entry key="M2" value="9.862653302760279" />
-      <entry key="M5" value="10.541525911347595" />
-      <entry key="M10" value="14.225335043721872" />
-      <entry key="M15" value="19.021776151062713" />
-      <entry key="M30" value="36.4660372895274" />
-      <entry key="H1" value="74.63087466709597" />
-      <entry key="H2" value="136.02884289895272" />
-      <entry key="H4" value="203.56806626905598" />
-      <entry key="D1" value="304.0852373670774" />
-      <entry key="W1" value="327.80934256372586" />
+      <entry key="MS100" value="1.0000019766465653" />
+      <entry key="MS500" value="1.1149642579700836" />
+      <entry key="S2" value="3.2677232992994916" />
+      <entry key="S5" value="7.576012474023801" />
+      <entry key="S10" value="12.250888538179074" />
+      <entry key="S30" value="18.326149787796666" />
+      <entry key="S60" value="20.48683794425242" />
+      <entry key="M2" value="21.69747996880657" />
+      <entry key="M5" value="23.04615238335483" />
+      <entry key="M10" value="26.921022094323128" />
+      <entry key="M15" value="31.770590792685027" />
+      <entry key="M30" value="49.25291925984158" />
+      <entry key="H1" value="87.4286408302887" />
+      <entry key="H2" value="148.85075957317804" />
+      <entry key="H4" value="216.43668539176718" />
+      <entry key="D1" value="317.05283688272726" />
+      <entry key="W1" value="340.80435973792885" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
       <entry key="MS500" value="0.0" />
-      <entry key="S2" value="1.460386143E-315" />
-      <entry key="S5" value="1.1635554426166806E-126" />
-      <entry key="S10" value="1.078682271392592E-63" />
-      <entry key="S30" value="1.0255681233264562E-21" />
-      <entry key="S60" value="3.2024492553770005E-11" />
-      <entry key="M2" value="5.659019184281303E-6" />
-      <entry key="M5" value="0.007975301993391295" />
-      <entry key="M10" value="0.0927266771024272" />
-      <entry key="M15" value="0.22360422812096706" />
-      <entry key="M30" value="0.6350536861298126" />
-      <entry key="H1" value="1.3336437001641828" />
-      <entry key="H2" value="2.3042715022244566" />
-      <entry key="H4" value="3.2819540952796187" />
-      <entry key="D1" value="4.638259404915778" />
-      <entry key="W1" value="4.946040564910378" />
+      <entry key="S2" value="1.602924E-317" />
+      <entry key="S5" value="1.914102450413098E-127" />
+      <entry key="S10" value="4.375045657376731E-64" />
+      <entry key="S30" value="7.591498837728093E-22" />
+      <entry key="S60" value="2.75526747117738E-11" />
+      <entry key="M2" value="5.2490646316927285E-6" />
+      <entry key="M5" value="0.007738974910433379" />
+      <entry key="M10" value="0.09134249030253552" />
+      <entry key="M15" value="0.22137340505581987" />
+      <entry key="M30" value="0.6318778883743676" />
+      <entry key="H1" value="1.3303048556266466" />
+      <entry key="H2" value="2.30138526443605" />
+      <entry key="H4" value="3.2798980294042015" />
+      <entry key="D1" value="4.637774985323732" />
+      <entry key="W1" value="4.9459667667154275" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="1.035491370869291" />
-      <entry key="MS500" value="2.1271034804492306" />
-      <entry key="S2" value="5.013614313542385" />
-      <entry key="S5" value="7.311108608858405" />
-      <entry key="S10" value="8.496824359517523" />
-      <entry key="S30" value="9.458317030046757" />
-      <entry key="S60" value="9.723702961051922" />
-      <entry key="M2" value="9.862475886277215" />
-      <entry key="M5" value="10.548982261241822" />
-      <entry key="M10" value="14.315510785967097" />
-      <entry key="M15" value="19.241409929426403" />
-      <entry key="M30" value="37.09584162963976" />
-      <entry key="H1" value="75.95947423719205" />
-      <entry key="H2" value="138.32903659276" />
-      <entry key="H4" value="206.8472128058137" />
-      <entry key="D1" value="308.72285143445293" />
-      <entry key="W1" value="332.7552851775077" />
+      <entry key="MS100" value="0.9794222335546886" />
+      <entry key="MS500" value="1.1103282828376433" />
+      <entry key="S2" value="3.2641055476103764" />
+      <entry key="S5" value="7.572536113342654" />
+      <entry key="S10" value="12.248055000017853" />
+      <entry key="S30" value="18.32473303175178" />
+      <entry key="S60" value="20.486045776284595" />
+      <entry key="M2" value="21.697064899192718" />
+      <entry key="M5" value="23.053285343098196" />
+      <entry key="M10" value="27.00980012784709" />
+      <entry key="M15" value="31.987998873754016" />
+      <entry key="M30" value="49.87955676752498" />
+      <entry key="H1" value="88.75390553047686" />
+      <entry key="H2" value="151.14806780741046" />
+      <entry key="H4" value="219.71377545610423" />
+      <entry key="D1" value="321.6899662369142" />
+      <entry key="W1" value="345.7502285034039" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -219,7 +221,7 @@
       <workItem from="1782540461776" duration="1882000" />
       <workItem from="1782711832368" duration="581000" />
       <workItem from="1782986837122" duration="10748000" />
-      <workItem from="1783222032899" duration="814000" />
+      <workItem from="1783222032899" duration="2909000" />
     </task>
     <task id="LOCAL-00001" summary="feat: 보일러플레이트를 Rust 기반으로 변경">
       <option name="closed" value="true" />
@@ -269,7 +271,15 @@
       <option name="project" value="LOCAL" />
       <updated>1782993264394</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="feat: 통신 모델을 펌웨어 기준으로 변경">
+      <option name="closed" value="true" />
+      <created>1783222894182</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1783222894182</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -296,7 +306,8 @@
     <MESSAGE value="chore: 사용되지 않는 파일 제거" />
     <MESSAGE value="feat: 앱 개요 문서화" />
     <MESSAGE value="feat: 테스트 코드 생성" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: 테스트 코드 생성" />
+    <MESSAGE value="feat: 통신 모델을 펌웨어 기준으로 변경" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: 통신 모델을 펌웨어 기준으로 변경" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

@@ -1,6 +1,15 @@
 # Drunksafe Firmware
 
-Rust firmware boilerplate for an ESP32 DevKitC V4 using the esp-rs ESP-IDF stack.
+Rust firmware for an ESP32 DevKitC V4 using the esp-rs ESP-IDF stack.
+
+The current hardware scope is:
+
+- ZE29 C2H5OH alcohol module over UART.
+- MAX30102 heart-rate / SpO2 sensor over I2C.
+
+The measurement flow, BLE protocol model, and storage ERD are documented in [../.docs/measurement-communication-model.md](../.docs/measurement-communication-model.md).
+
+Feature modules expose simple action-style functions. For the ZE29 alcohol module, use `alchol::init(...)`, `alchol::sample(...)`, and `alchol::status(...)`.
 
 ## Prerequisites
 

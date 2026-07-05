@@ -4,10 +4,7 @@ use esp_idf_svc::hal::gpio::{Input, PinDriver, Pull};
 use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::sys::EspError;
 
-use feature::ble::{
-    ContextRequest, DeviceToPhoneMessage, MeasurementSessionRequest, MeasurementStartSource,
-    PhoneContextField, PROTOCOL_VERSION,
-};
+use feature::ble::{DeviceToPhone, Session, Source, PROTOCOL_VERSION};
 
 mod feature;
 
@@ -35,20 +32,13 @@ fn wait_for_button_release(button: &PinDriver<'_, Input>) {
     std::thread::sleep(Duration::from_millis(BUTTON_DEBOUNCE_MS));
 }
 
-fn build_session_request(session_id: String) -> DeviceToPhoneMessage {
-    DeviceToPhoneMessage::MeasurementSessionRequest(MeasurementSessionRequest {
+fn build_session(session_id: String) -> DeviceToPhone {
+    DeviceToPhone::Session(Session {
         v: PROTOCOL_VERSION,
         session_id,
-        source: MeasurementStartSource::BoardButton,
-        context_request: ContextRequest {
-            requested_history_limit: 5,
-            requested_fields: vec![
-                PhoneContextField::RecentMeasurements,
-                PhoneContextField::UserBaseline,
-                PhoneContextField::LastCalibration,
-                PhoneContextField::TimeSync,
-            ],
-        },
+        source: Source::BoardButton,
+        history_limit: 8,
+        sync_time: true,
     })
 }
 
@@ -71,7 +61,7 @@ fn main() -> Result<(), EspError> {
 
         session_sequence = session_sequence.wrapping_add(1);
         let session_id = format!("button-{session_sequence}");
-        let request = build_session_request(session_id);
+        let request = build_session(session_id);
 
         log::info!("measurement session requested: {request:?}");
         log::info!("waiting for phone measurement context before calibration");

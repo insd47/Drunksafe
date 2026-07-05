@@ -3,31 +3,21 @@
 
 #include <Arduino.h>
 
-// =====================================================
-// OLED 설정
-// SH1106 128x64 I2C OLED
-// 제품 설명의 0x78은 8-bit 주소이고, U8g2에는 8-bit 주소를 넣는다.
-// 7-bit 주소 0x3C를 U8g2 형식으로 변환하면 0x3C * 2가 된다.
-// =====================================================
+// OLED: SH1106 128x64 I2C
 const int OLED_SDA_PIN = 21;
 const int OLED_SCL_PIN = 22;
 const int OLED_WIDTH = 128;
 const int OLED_I2C_ADDRESS = 0x3C * 2;
 
-// =====================================================
-// 버튼 핀 설정
-// INPUT_PULLUP 방식이므로 버튼을 누르면 LOW가 된다.
-// =====================================================
-const int BTN_START_RESET = 16;  // 시작 / 초기화
-const int BTN_NEXT = 17;         // 측정값 화면 넘기기
-const int BTN_BREATH = 18;       // 알코올 측정 시작
+// Buttons use INPUT_PULLUP. Pressed state is LOW.
+// GPIO16/GPIO17 are reserved for ZE-29A RX2/TX2, so buttons moved to 32/33.
+const int BTN_START_RESET = 32;
+const int BTN_NEXT = 33;
+const int BTN_BREATH = 18;
 
-const int SPEAKER_PIN = 25;      // 부저(스피커) 모듈 핀 (기존 23에서 변경)
-const int VIBRATION_PIN = 26;    // 진동 모터 핀 (기존 22에서 변경 - OLED 통신 핀 22와 충돌 방지)
+const int SPEAKER_PIN = 25;
+const int VIBRATION_PIN = 26;
 
-// =====================================================
-// 시간 설정
-// =====================================================
 const unsigned long DEBOUNCE_DELAY_MS = 30;
 const unsigned long BUTTON_RELEASE_CHECK_MS = 5;
 const unsigned long BPM_SEND_INTERVAL_MS = 500;

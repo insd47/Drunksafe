@@ -1,0 +1,88 @@
+HWMAIN 핀 배선 정리
+
+기준 코드
+- ZE-29A: 68209cc0da97b0b1f12d95121771ac90204ac8ca / ZE29A_Button_Code.ino
+- HWMAIN: 83c8a9685991ae5ecbab11c50f64301919b5b7cb / HWsketch/HWMAIN
+
+
+1. 전원 기준
+
+5V 사용 부품
+- 부저
+- 진동모터
+- ZE-29A
+
+3.3V 사용 부품
+- OLED
+- 펄스센서
+
+모든 부품의 GND는 ESP32 GND와 공통으로 연결한다.
+
+
+2. ESP32 핀 배선표
+
+OLED
+- VCC -> ESP32 3.3V
+- GND -> ESP32 GND
+- SDA -> GPIO21
+- SCL -> GPIO22
+
+펄스센서
+- VCC -> ESP32 3.3V
+- GND -> ESP32 GND
+- Signal -> GPIO36
+
+ZE-29A
+- VIN / 빨간선 -> ESP32 5V 또는 VIN
+- GND / 검은선 -> ESP32 GND
+- TXD / 노란선 -> ESP32 GPIO16 RX2
+- RXD / 초록선 -> ESP32 GPIO17 TX2
+
+부저
+- VCC -> ESP32 5V
+- GND -> ESP32 GND
+- I/O -> GPIO25
+
+진동모터
+- VCC -> ESP32 5V
+- GND -> ESP32 GND
+- IN -> GPIO26
+
+푸시버튼
+- 시작/초기화 버튼: GPIO32 <-> GND
+- 다음 화면 버튼: GPIO33 <-> GND
+- 음주 측정 버튼: GPIO18 <-> GND
+
+버튼은 INPUT_PULLUP 방식이다. 버튼을 누르면 LOW로 읽힌다.
+
+
+3. 핀 변경 사유
+
+기존 HWMAIN 버튼 핀은 다음과 같았다.
+- 시작/초기화 버튼: GPIO16
+- 다음 화면 버튼: GPIO17
+- 음주 측정 버튼: GPIO18
+
+하지만 ZE-29A UART 통신에서 GPIO16, GPIO17을 사용한다.
+- GPIO16: ESP32 RX2
+- GPIO17: ESP32 TX2
+
+따라서 버튼 핀과 ZE-29A 통신 핀이 충돌한다.
+이 충돌을 피하기 위해 버튼 핀을 아래처럼 변경했다.
+- 시작/초기화 버튼: GPIO16 -> GPIO32
+- 다음 화면 버튼: GPIO17 -> GPIO33
+- 음주 측정 버튼: GPIO18 유지
+
+
+4. 전압 주의사항
+
+ESP32 GPIO 입력은 3.3V 기준이다.
+ZE-29A TXD 신호가 5V로 출력되는 모델이면 GPIO16으로 바로 넣지 말고 3.3V로 감압한다.
+
+권장 감압 예시
+- ZE-29A TXD -> 10k 저항 -> GPIO16
+- GPIO16 -> 20k 저항 -> GND
+
+ESP32 GPIO17 TX2에서 ZE-29A RXD로 나가는 3.3V 신호는 일반적으로 입력으로 인식될 가능성이 높다.
+
+GPIO0은 부팅 모드에 영향을 줄 수 있으므로 최종 배선에서는 버튼 핀으로 사용하지 않는다.

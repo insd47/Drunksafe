@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/firmware/Cargo.toml">
+      <package file="$PROJECT_DIR$/firmware">
+        <feature name="default" enabled="true" />
+      </package>
+    </cargoProject>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="chore: 사용되지 않는 파일 제거">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/pnpm-lock.yaml" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="51" />
+    <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:dev" />
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="main" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;insd47&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/insd47/Drunksafe.git&quot;,
+    &quot;accountId&quot;: &quot;009a8752-1223-435b-896d-46028a3e3188&quot;
+  },
+  &quot;recentNewPullRequestHead&quot;: {
+    &quot;server&quot;: {
+      &quot;useHttp&quot;: false,
+      &quot;host&quot;: &quot;github.com&quot;,
+      &quot;port&quot;: null,
+      &quot;suffix&quot;: null
+    },
+    &quot;owner&quot;: &quot;insd47&quot;,
+    &quot;repository&quot;: &quot;Drunksafe&quot;
+  }
+}</component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="vkFDJXTm" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0" />
+      <entry key="S2" value="1.000000054933983" />
+      <entry key="S5" value="1.0017935475741848" />
+      <entry key="S10" value="1.0764971946815316" />
+      <entry key="S30" value="2.5036874539865788" />
+      <entry key="S60" value="5.14200954587942" />
+      <entry key="M2" value="8.747970050576477" />
+      <entry key="M5" value="15.469521858227669" />
+      <entry key="M10" value="26.06559651293956" />
+      <entry key="M15" value="35.41516380123861" />
+      <entry key="M30" value="58.78298078062526" />
+      <entry key="H1" value="95.52328845469738" />
+      <entry key="H2" value="145.24462193834532" />
+      <entry key="H4" value="193.3830177331433" />
+      <entry key="D1" value="257.3806496546969" />
+      <entry key="W1" value="271.53160624531694" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="1.0634662166546823E-234" />
+      <entry key="S10" value="1.031244983820373E-117" />
+      <entry key="S30" value="1.0103083670449481E-39" />
+      <entry key="S60" value="3.178534830774938E-20" />
+      <entry key="M2" value="1.782844589630553E-10" />
+      <entry key="M5" value="1.2602177264618806E-4" />
+      <entry key="M10" value="0.011235383507441224" />
+      <entry key="M15" value="0.05068333608480025" />
+      <entry key="M30" value="0.256516346424835" />
+      <entry key="H1" value="0.7275939746498532" />
+      <entry key="H2" value="1.4005160691910132" />
+      <entry key="H4" value="2.0229462314322952" />
+      <entry key="D1" value="2.8043669690713755" />
+      <entry key="W1" value="2.97111404168105" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.9526379980439373" />
+      <entry key="MS500" value="0.9903428719330246" />
+      <entry key="S2" value="0.9975769800843443" />
+      <entry key="S5" value="1.000822138381852" />
+      <entry key="S10" value="1.075981319356378" />
+      <entry key="S30" value="2.503313991014922" />
+      <entry key="S60" value="5.141618075954593" />
+      <entry key="M2" value="8.74762675869647" />
+      <entry key="M5" value="15.46941690370486" />
+      <entry key="M10" value="26.076539798615734" />
+      <entry key="M15" value="35.465313944862416" />
+      <entry key="M30" value="59.03828729489564" />
+      <entry key="H1" value="96.24902394178204" />
+      <entry key="H2" value="146.64322921435246" />
+      <entry key="H4" value="195.40453853269707" />
+      <entry key="D1" value="260.18467836892364" />
+      <entry key="W1" value="274.50266886518784" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3FesvMinLEzozOzlcrfloS8PxYj" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Cargo.Run firmware.executor": "Run",
+    "Cargo.Run.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "cidr.known.project.marker": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "feature/insd47/docs",
+    "javascript.nodejs.core.library.configured.version": "22.20.0",
+    "javascript.nodejs.core.library.typings.version": "22.20.0",
+    "javascript.preferred.runtime.type.id": "node",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/insd47/Developer/insd/Drunksafe",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "npm.expo ios.executor": "Run",
+    "npm.expo run.executor": "Run",
+    "npm.run ios.executor": "Run",
+    "npm.start.executor": "Run",
+    "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
+    "org.rust.first.attach.projects": "true",
+    "prettierjs.PrettierConfiguration.Package": "/Users/insd47/Developer/insd/Drunksafe/app/node_modules/prettier",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.0",
+    "settings.editor.selected.configurable": "settings.javascript.prettier",
+    "ts.external.directory.path": "/Users/insd47/Developer/insd/Drunksafe/app/node_modules/typescript/lib"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/app/src" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="Run firmware" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="run --package firmware --bin firmware" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$/firmware" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="run firmware" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="buildProfileId" value="dev" />
+      <option name="command" value="run" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$/firmware" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="expo android" type="js.build_tools.npm">
+      <package-json value="$PROJECT_DIR$/app/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="expo" />
+      </scripts>
+      <arguments value="run:android" />
+      <node-interpreter value="project" />
+      <envs />
+      <method v="2" />
+    </configuration>
+    <configuration name="expo ios" type="js.build_tools.npm">
+      <package-json value="$PROJECT_DIR$/app/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="expo" />
+      </scripts>
+      <arguments value="run:ios" />
+      <node-interpreter value="project" />
+      <envs />
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Cargo.run firmware" />
+      <item itemvalue="Cargo.Run firmware" />
+      <item itemvalue="npm.expo ios" />
+      <item itemvalue="npm.expo android" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Cargo.Run firmware" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-58e2ab36d051-intellij.indexing.shared.core-IU-262.7581.18" />
+        <option value="bundled-js-predefined-d6986cc7102b-64587f7adf9c-JavaScript-IU-262.7581.18" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SwiftProjectSettings">
+    <option name="detectedToolchain" value="true" />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="" />
+      <created>1782447099143</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1782447099143</updated>
+      <workItem from="1782447101394" duration="3010000" />
+      <workItem from="1782451875317" duration="603000" />
+      <workItem from="1782452504586" duration="10187000" />
+      <workItem from="1782468913960" duration="3224000" />
+      <workItem from="1782474405769" duration="1265000" />
+    </task>
+    <task id="LOCAL-00001" summary="feat: 보일러플레이트를 Rust 기반으로 변경">
+      <option name="closed" value="true" />
+      <created>1782451922441</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1782451922441</updated>
+    </task>
+    <task id="LOCAL-00002" summary="chore: 추가 세팅">
+      <option name="closed" value="true" />
+      <created>1782458435417</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1782458435417</updated>
+    </task>
+    <task id="LOCAL-00003" summary="feat: 어플리케이션을 Expo Router 보일러플레이트로 교체">
+      <option name="closed" value="true" />
+      <created>1782469417458</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1782469417458</updated>
+    </task>
+    <task id="LOCAL-00004" summary="chore: 사용되지 않는 파일 제거">
+      <option name="closed" value="true" />
+      <created>1782469495080</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1782469495080</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="sdkconfig.defaults" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="feat: 보일러플레이트를 Rust 기반으로 변경" />
+    <MESSAGE value="chore: 추가 세팅" />
+    <MESSAGE value="feat: 어플리케이션을 Expo Router 보일러플레이트로 교체" />
+    <MESSAGE value="chore: 사용되지 않는 파일 제거" />
+    <option name="LAST_COMMIT_MESSAGE" value="chore: 사용되지 않는 파일 제거" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>

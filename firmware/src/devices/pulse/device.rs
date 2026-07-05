@@ -6,14 +6,14 @@ use esp_idf_svc::hal::i2c::I2cDriver;
 
 /// MAX30102 pulse 센서와 pulse 분석 상태를 함께 소유하는 device handle이다.
 ///
-/// I2C driver는 `feature::pins`에서 보드 배선에 맞게 구성해 전달한다. 이
-/// 타입은 FIFO sample 읽기와 분석 상태 갱신을 하나의 흐름으로 묶는다.
-pub struct Device<'d> {
+/// I2C driver는 `devices::init()`에서 보드 배선에 맞게 구성해 전달한다.
+/// 이 타입은 FIFO sample 읽기와 분석 상태 갱신을 하나의 흐름으로 묶는다.
+pub struct PulseDevice<'d> {
     bus: I2cDriver<'d>,
     state: State,
 }
 
-impl<'d> Device<'d> {
+impl<'d> PulseDevice<'d> {
     /// 구성된 I2C driver로 pulse device handle을 만든다.
     pub fn new(bus: I2cDriver<'d>) -> Self {
         Self {

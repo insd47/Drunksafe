@@ -1,9 +1,10 @@
-pub use error::{Error, Result};
 use esp_idf_svc::hal::delay::TickType;
 use esp_idf_svc::hal::uart::UartDriver;
-pub use model::{Sample, Status};
 use protocol::FRAME_LEN;
 use std::time::Duration;
+
+pub use error::{Error, Result};
+pub use model::{Sample, Status};
 
 mod command;
 mod error;
@@ -14,13 +15,13 @@ const DEFAULT_READ_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// ZE29 알코올 센서를 다루는 device handle이다.
 ///
-/// UART driver는 `feature::pins`에서 보드 배선에 맞게 구성해 전달한다. 이
-/// 타입은 ZE29 request/response frame을 만들고 해석하는 책임만 가진다.
-pub struct Device<'d> {
+/// UART driver는 `devices::init()`에서 보드 배선에 맞게 구성해 전달한다.
+/// 이 타입은 ZE29 request/response frame을 만들고 해석하는 책임만 가진다.
+pub struct AlcoholDevice<'d> {
     uart: UartDriver<'d>,
 }
 
-impl<'d> Device<'d> {
+impl<'d> AlcoholDevice<'d> {
     /// 구성된 UART driver로 ZE29 device handle을 만든다.
     pub const fn new(uart: UartDriver<'d>) -> Self {
         Self { uart }

@@ -2,36 +2,35 @@
 
 현재 모델링 원칙은 단순하다.
 
-- 센서별 세부 모델은 각 feature 안에 둔다.
+- 센서별 세부 모델은 `devices` 안에 둔다.
 - BLE는 transport envelope 역할만 한다.
-- 간단한 동작은 `feature::action()` 형태의 한 단어 함수로 노출한다.
+- 간단한 동작은 소유 모듈에서 한 단어 함수로 노출한다.
 - 확정되지 않은 데이터는 BLE 공통 모델에 미리 넣지 않는다.
 - `main.rs`는 logger 초기화 후 `feature::run()`만 호출한다.
-- `feature::run()`은 peripherals 획득, feature state 생성, runtime loop를 닫아 가진다.
-- 보드 배선은 `feature::pins`가 소유하고, 센서 feature는 custom transport나 핀 tuple이 아니라 concrete HAL driver를 받는다.
-- 현재 runtime은 단일 루프이므로 feature state는 plain mutable state로 유지한다. task/thread 공유가 실제로 필요해지는 시점에만 shared state를 도입한다.
+- `feature::run()`은 device 초기화와 runtime loop를 닫아 가진다.
+- 보드 배선은 `devices::init()`이 소유하고, 각 device는 custom transport나 핀 tuple이 아니라 concrete HAL driver를 받는다.
+- 현재 runtime은 단일 루프이므로 device state는 plain mutable state로 유지한다. task/thread 공유가 실제로 필요해지는 시점에만 shared state를 도입한다.
 - 측정 세션 sequence는 `feature::run()`의 runtime loop가 로컬 상태로 소유한다. BLE 모델에는 transport DTO만 둔다.
-- snapshot은 필요할 때 사용처에서 각 feature를 직접 호출한다. `feature::Snapshot` 같은 집계 모델은 두지 않는다.
+- snapshot은 필요할 때 사용처에서 각 device를 직접 호출한다. `feature::Snapshot` 같은 집계 모델은 두지 않는다.
 
-## Trigger Feature
+## Trigger Device
 
-위치: `firmware/src/feature/trigger/`
-
-공개 액션:
-
-- `trigger::init(pin)`: BOOT 버튼 GPIO를 input pull-up으로 설정하고 trigger state를 만든다.
-- `trigger::poll(&mut state)`: debounce state machine을 진행하고 측정 시작 이벤트를 optional로 반환한다.
-
-버튼은 지금은 유일한 측정 시작 입력이지만, 앱 시작/자동 재측정 같은 입력이 생기면 trigger feature가 event source를 확장한다.
-`poll()`은 블로킹하지 않으므로 같은 runtime loop에 BLE context 수신이나 센서 tick을 추가할 수 있다.
-
-## Alcohol Feature
-
-위치: `firmware/src/feature/alcohol/`
+위치: `firmware/src/devices/trigger/`
 
 공개 액션:
 
-- `alcohol::Device::new(uart)`: `feature::pins`가 구성한 9600 8N1 UART driver를 ZE29 device handle로 감싼다.
+- `TriggerDevice::new(pin)`: BOOT 버튼 GPIO를 input pull-up으로 설정한다.
+- `trigger.pressed()`: 버튼이 새로 눌린 순간에만 `true`를 반환한다.
+
+버튼 trigger는 테스트용 입력이다. 프로덕션 흐름은 주기적 pulse 측정 중 위험 신호가 확인되면 디스플레이와 BLE를 통해 알코올 측정 필요 알림을 보내는 방향으로 확장한다.
+
+## Alcohol Device
+
+위치: `firmware/src/devices/alcohol/`
+
+공개 액션:
+
+- `AlcoholDevice::new(uart)`: `devices::init()`이 구성한 9600 8N1 UART driver를 ZE29 device handle로 감싼다.
 - `device.sample()`: `0x86` read test results 명령으로 현재 알코올 샘플을 읽는다.
 - `device.status()`: `0x85` query module status 명령으로 모듈 상태를 읽는다.
 
@@ -45,16 +44,16 @@ SOLID 관점:
 
 - `protocol`은 frame encode/decode만 담당한다.
 - `model`은 도메인 데이터만 담당한다.
-- `Device`는 concrete `UartDriver`를 소유하므로 ZE29 read/write 호출과 frame 처리 책임이 alcohol feature 안에 머문다.
-- UART peripheral/TX/RX 핀 배선과 baudrate 설정은 `feature::pins`에서 관리한다.
+- `AlcoholDevice`는 concrete `UartDriver`를 소유하므로 ZE29 read/write 호출과 frame 처리 책임이 alcohol device 안에 머문다.
+- UART peripheral/TX/RX 핀 배선과 baudrate 설정은 `devices::init()`에서 관리한다.
 
-## Pulse Feature
+## Pulse Device
 
-위치: `firmware/src/feature/pulse/`
+위치: `firmware/src/devices/pulse/`
 
 공개 액션:
 
-- `pulse::Device::new(i2c)`: `feature::pins`가 구성한 400kHz I2C driver와 pulse algorithm state를 묶는다.
+- `PulseDevice::new(i2c)`: `devices::init()`이 구성한 400kHz I2C driver와 pulse algorithm state를 묶는다.
 - `device.reset()`: 새 측정 세션 시작 시 filter와 sample buffer를 초기화한다.
 - `device.sample(elapsed_ms)`: MAX30102 FIFO에서 PPG 값을 읽고 5초 분석 주기마다 optional analysis를 반환한다.
 - `device.analyze()`: 마지막 analysis를 조회한다.
@@ -102,7 +101,7 @@ SOLID 관점:
 
 ## BLE Model
 
-위치: `firmware/src/feature/ble/model.rs`
+위치: `../firmware/src/features/ble/model.rs`
 
 공개 액션:
 
@@ -133,7 +132,7 @@ BLE 모델이 직접 소유하지 않는 것:
 | `sober_alcohol_mg_l_x1000` | 0 근처 baseline 판단 |
 | `elimination_mg_l_per_hour_x1000` | 개인화된 sober-time 계산 |
 
-MAX30102 모델은 `pulse` feature가 소유하고, BLE `Report`는 해당 feature 모델을 optional로 참조한다.
+MAX30102 모델은 `PulseDevice`가 소유하고, BLE `Report`는 해당 device 모델을 optional로 참조한다.
 
 ## ERD
 

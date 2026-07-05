@@ -1,4 +1,4 @@
-pub use device::Device;
+pub use device::PulseDevice;
 pub use error::{Error, Result};
 pub use model::Analysis;
 

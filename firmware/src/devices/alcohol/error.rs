@@ -45,5 +45,5 @@ pub enum Error {
     InvalidPayload,
 }
 
-/// alcohol feature에서 사용하는 결과 타입이다.
+/// alcohol device에서 사용하는 결과 타입이다.
 pub type Result<T> = core::result::Result<T, Error>;

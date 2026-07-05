@@ -8,6 +8,7 @@ The current hardware scope is:
 - MAX30102 heart-rate / SpO2 sensor over I2C.
 
 The measurement flow, BLE protocol model, and storage ERD are documented in [../.docs/measurement-communication-model.md](../.docs/measurement-communication-model.md).
+Firmware 공개 표면은 [../.docs/firmware-public-surface.md](../.docs/firmware-public-surface.md)에 한국어로 정리되어 있다.
 
 Feature modules keep their public surface narrow. `main.rs` initializes logging and then hands control to `feature::run()`. Runtime orchestration and board pin mapping live under `feature/`, while sensor code exposes focused handles such as `alcohol::Device` and `pulse::Device`.
 

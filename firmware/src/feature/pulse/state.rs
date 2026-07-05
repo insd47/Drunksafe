@@ -5,7 +5,7 @@ use crate::utils::math;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
-pub struct State {
+pub(super) struct State {
     filter: StreamingButterworth,
     window: VecDeque<Sample>,
     total_samples: usize,

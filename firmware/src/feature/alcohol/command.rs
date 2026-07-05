@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[repr(u8)]
-pub enum Command {
+pub(super) enum Command {
     Status = 0x85,
     Result = 0x86,
     Work = 0x87,
@@ -15,11 +15,11 @@ pub enum Command {
 }
 
 impl Command {
-    pub const fn byte(self) -> u8 {
+    pub(super) const fn byte(self) -> u8 {
         self as u8
     }
 
-    pub const fn from(byte: u8) -> Option<Self> {
+    pub(super) const fn from(byte: u8) -> Option<Self> {
         match byte {
             0x85 => Some(Self::Status),
             0x86 => Some(Self::Result),

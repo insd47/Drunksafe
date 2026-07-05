@@ -1,24 +1,24 @@
 use super::command::Command;
 use super::error::{Error, Result};
 
-pub const FRAME_LEN: usize = 9;
-pub const START: u8 = 0xFF;
-pub const ADDRESS: u8 = 0x01;
+pub(super) const FRAME_LEN: usize = 9;
+const START: u8 = 0xFF;
+const ADDRESS: u8 = 0x01;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct RequestFrame {
+pub(super) struct RequestFrame {
     bytes: [u8; FRAME_LEN],
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ResponseFrame {
+pub(super) struct ResponseFrame {
     command: Command,
     data: [u8; 6],
     bytes: [u8; FRAME_LEN],
 }
 
 impl RequestFrame {
-    pub fn new(command: Command, payload: [u8; 5]) -> Self {
+    pub(super) fn new(command: Command, payload: [u8; 5]) -> Self {
         let mut bytes = [0; FRAME_LEN];
         bytes[0] = START;
         bytes[1] = ADDRESS;
@@ -29,13 +29,13 @@ impl RequestFrame {
         Self { bytes }
     }
 
-    pub const fn bytes(&self) -> &[u8; FRAME_LEN] {
+    pub(super) const fn bytes(&self) -> &[u8; FRAME_LEN] {
         &self.bytes
     }
 }
 
 impl ResponseFrame {
-    pub fn parse(bytes: [u8; FRAME_LEN]) -> Result<Self> {
+    pub(super) fn parse(bytes: [u8; FRAME_LEN]) -> Result<Self> {
         if bytes[0] != START {
             return Err(Error::InvalidStart { found: bytes[0] });
         }
@@ -57,15 +57,15 @@ impl ResponseFrame {
         })
     }
 
-    pub const fn command(&self) -> Command {
+    pub(super) const fn command(&self) -> Command {
         self.command
     }
 
-    pub const fn data(&self) -> &[u8; 6] {
+    pub(super) const fn data(&self) -> &[u8; 6] {
         &self.data
     }
 
-    pub fn word(&self, offset: usize) -> Result<u16> {
+    pub(super) fn word(&self, offset: usize) -> Result<u16> {
         if offset + 1 >= self.data.len() {
             return Err(Error::InvalidPayload);
         }
@@ -77,7 +77,7 @@ impl ResponseFrame {
     }
 }
 
-pub fn checksum(bytes: &[u8; FRAME_LEN]) -> u8 {
+fn checksum(bytes: &[u8; FRAME_LEN]) -> u8 {
     bytes[1..8]
         .iter()
         .fold(0_u8, |sum, byte| sum.wrapping_add(*byte))

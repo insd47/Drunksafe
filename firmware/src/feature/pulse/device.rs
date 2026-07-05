@@ -4,12 +4,17 @@ use super::{algorithm, params, Error, Result};
 use esp_idf_svc::hal::delay::TickType;
 use esp_idf_svc::hal::i2c::I2cDriver;
 
+/// MAX30102 pulse 센서와 pulse 분석 상태를 함께 소유하는 device handle이다.
+///
+/// I2C driver는 `feature::pins`에서 보드 배선에 맞게 구성해 전달한다. 이
+/// 타입은 FIFO sample 읽기와 분석 상태 갱신을 하나의 흐름으로 묶는다.
 pub struct Device<'d> {
     bus: I2cDriver<'d>,
     state: State,
 }
 
 impl<'d> Device<'d> {
+    /// 구성된 I2C driver로 pulse device handle을 만든다.
     pub fn new(bus: I2cDriver<'d>) -> Self {
         Self {
             bus,
@@ -17,16 +22,23 @@ impl<'d> Device<'d> {
         }
     }
 
+    /// 새 측정 세션을 시작하기 전에 pulse 분석 상태를 초기화한다.
     pub fn reset(&mut self) {
         self.state.reset();
     }
 
+    /// MAX30102 FIFO에서 sample을 읽고 pulse 분석 상태에 반영한다.
+    ///
+    /// `elapsed_ms`는 현재 측정 세션 시작 이후 흐른 시간이다. 분석 주기가
+    /// 되지 않았거나 안정적인 pulse가 아직 확인되지 않으면 `Ok(None)`을
+    /// 반환한다.
     #[allow(dead_code)]
     pub fn sample(&mut self, elapsed_ms: u32) -> Result<Option<Analysis>> {
         let raw_12bit = self.read_ir_sample()?;
         self.push(elapsed_ms, raw_12bit)
     }
 
+    /// 마지막으로 계산된 pulse 분석 결과를 반환한다.
     #[allow(dead_code)]
     pub fn analyze(&self) -> Option<Analysis> {
         self.state.last_analysis()

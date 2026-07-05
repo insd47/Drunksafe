@@ -3,7 +3,7 @@ use super::{params, state};
 use crate::utils::math;
 use std::collections::VecDeque;
 
-pub fn calculate(state: &mut state::State) -> Option<Analysis> {
+pub(super) fn calculate(state: &mut state::State) -> Option<Analysis> {
     let peaks = find_peaks(state.window());
     let (mut bpm, mut ibi_stddev_ms, mut peak_amplitude, stable) = if peaks.len() >= 2 {
         let ibis = intervals(&peaks);

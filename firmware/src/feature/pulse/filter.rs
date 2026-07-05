@@ -3,16 +3,16 @@
 use super::params;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct StreamingButterworth {
+pub(super) struct StreamingButterworth {
     z: [f32; 4],
 }
 
 impl StreamingButterworth {
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self { z: [0.0; 4] }
     }
 
-    pub fn push(&mut self, sample: f32) -> f32 {
+    pub(super) fn push(&mut self, sample: f32) -> f32 {
         let y = params::FILTER_B[0] * sample + self.z[0];
 
         self.z[0] = params::FILTER_B[1] * sample - params::FILTER_A[1] * y + self.z[1];

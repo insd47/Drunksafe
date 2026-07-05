@@ -13,7 +13,7 @@ pub(super) struct RequestFrame {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct ResponseFrame {
     command: Command,
-    data: [u8; 6],
+    payload: [u8; 6],
     bytes: [u8; FRAME_LEN],
 }
 
@@ -35,44 +35,42 @@ impl RequestFrame {
 }
 
 impl ResponseFrame {
-    pub(super) fn parse(bytes: [u8; FRAME_LEN]) -> Result<Self> {
+    pub(super) fn parse(command: Command, bytes: [u8; FRAME_LEN]) -> Result<Self> {
         if bytes[0] != START {
             return Err(Error::InvalidStart { found: bytes[0] });
         }
 
+        command.expect(bytes[1])?;
+
         let expected = checksum(&bytes);
         let actual = bytes[8];
-        if actual != expected {
+
+        if expected != actual {
             return Err(Error::InvalidChecksum { expected, actual });
         }
 
-        let command = Command::from(bytes[1]).ok_or(Error::UnknownCommand { command: bytes[1] })?;
-        let mut data = [0; 6];
-        data.copy_from_slice(&bytes[2..8]);
+        let mut payload = [0; 6];
+        payload.copy_from_slice(&bytes[2..8]);
 
         Ok(Self {
             command,
-            data,
+            payload,
             bytes,
         })
     }
 
-    pub(super) const fn command(&self) -> Command {
-        self.command
-    }
-
-    pub(super) const fn data(&self) -> &[u8; 6] {
-        &self.data
+    pub(super) const fn payload(&self) -> &[u8; 6] {
+        &self.payload
     }
 
     pub(super) fn word(&self, offset: usize) -> Result<u16> {
-        if offset + 1 >= self.data.len() {
+        if offset + 1 >= self.payload.len() {
             return Err(Error::InvalidPayload);
         }
 
         Ok(u16::from_be_bytes([
-            self.data[offset],
-            self.data[offset + 1],
+            self.payload[offset],
+            self.payload[offset + 1],
         ]))
     }
 }

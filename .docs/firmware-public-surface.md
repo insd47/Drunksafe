@@ -46,10 +46,15 @@
 
 - `AlcoholDevice::new(uart) -> AlcoholDevice`
   - `devices::init()`이 구성한 UART driver를 ZE29 device handle로 감싼다.
-- `device.sample() -> alcohol device Result<AlcoholSample>`
+- `device.sample() -> alcohol device Result<AlcoholConcentration>`
   - ZE29 `0x86` read test results 명령으로 현재 알코올 측정값을 읽는다.
-- `AlcoholSample`
-  - `concentration`: mg/L x1000 정수로 표현한 호기 알코올 농도다.
+- `device.status() -> alcohol device Result<u8>`
+  - ZE29 `0x85` query module status 명령으로 모듈 상태 코드를 읽는다.
+- `device.set_wake(wake) -> alcohol device Result<()>`
+  - ZE29 `0x87` switch module working status 명령으로 센서 모듈의 wake 상태를 전환한다.
+  - 공개 매뉴얼의 payload 정의가 상세하지 않아 현재 firmware에서는 `true`를 `0x01`, `false`를 `0x00`으로 캡슐화한다.
+- `AlcoholConcentration`
+  - `mg_l_x1000`: mg/L x1000 정수로 표현한 호기 알코올 농도다.
 
 ## Pulse
 

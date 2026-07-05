@@ -30,19 +30,21 @@
 공개 액션:
 
 - `AlcoholDevice::new(uart)`: `devices::init()`이 구성한 9600 8N1 UART driver를 ZE29 device handle로 감싼다.
-- `device.sample()`: `0x86` read test results 명령으로 현재 알코올 샘플을 읽는다.
-- `device.status()`: `0x85` query module status 명령으로 모듈 상태를 읽는다.
+- `device.sample()`: `0x86` read test results 명령으로 현재 알코올 농도를 읽는다.
+- `device.status()`: `0x85` query module status 명령으로 모듈 상태 코드를 읽는다.
+- `device.set_wake(wake)`: `0x87` switch module working status 명령으로 센서 모듈의 wake 상태를 전환한다. 공개 매뉴얼의 payload 정의가 상세하지 않아 현재 firmware에서는 `true`를 `0x01`, `false`를 `0x00`으로 캡슐화한다.
 
 구조:
 
-- `command`: ZE29 명령 코드
+- `command`: ZE29 명령 코드와 command별 request payload factory
 - `protocol`: 9 byte request/response frame과 checksum
-- `model`: `Sample`, `Status`, `Concentration`
+- `model`: 공통 `Response`, `Concentration`
 
 SOLID 관점:
 
 - `protocol`은 frame encode/decode만 담당한다.
-- `model`은 도메인 데이터만 담당한다.
+- `model::Response`는 command별 response struct를 만들지 않고 공통 payload 해석을 담당한다.
+- `model::Concentration`은 BLE와 측정 결과에 넘길 도메인 데이터만 담당한다.
 - `AlcoholDevice`는 concrete `UartDriver`를 소유하므로 ZE29 read/write 호출과 frame 처리 책임이 alcohol device 안에 머문다.
 - UART peripheral/TX/RX 핀 배선과 baudrate 설정은 `devices::init()`에서 관리한다.
 

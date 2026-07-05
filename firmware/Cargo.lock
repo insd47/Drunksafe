@@ -684,6 +684,7 @@ dependencies = [
  "esp-idf-svc",
  "log",
  "serde",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

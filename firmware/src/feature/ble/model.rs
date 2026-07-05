@@ -2,17 +2,17 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::feature::alchol;
+use crate::feature::{alcohol, pulse};
 
-pub const PROTOCOL_VERSION: u8 = 4;
+pub const PROTOCOL_VERSION: u8 = 5;
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Source {
     BoardButton,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     Idle,
@@ -22,7 +22,7 @@ pub enum State {
     Error,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Risk {
     Safe,
@@ -30,7 +30,7 @@ pub enum Risk {
     Danger,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Status {
     pub v: u8,
     pub state: State,
@@ -38,7 +38,7 @@ pub struct Status {
     pub battery_percent: Option<u8>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Session {
     pub v: u8,
     pub session_id: String,
@@ -47,7 +47,7 @@ pub struct Session {
     pub sync_time: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct History {
     pub measured_at_unix_ms: u64,
     pub alcohol_mg_l_x1000: u16,
@@ -55,7 +55,7 @@ pub struct History {
     pub confidence_percent: u8,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Context {
     pub v: u8,
     pub session_id: String,
@@ -65,7 +65,7 @@ pub struct Context {
     pub elimination_mg_l_per_hour_x1000: Option<u16>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Progress {
     pub v: u8,
     pub session_id: String,
@@ -73,19 +73,50 @@ pub struct Progress {
     pub percent: u8,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Alcohol {
+    pub mg_l_x1000: u16,
+}
+
+impl From<alcohol::Sample> for Alcohol {
+    fn from(sample: alcohol::Sample) -> Self {
+        Self {
+            mg_l_x1000: sample.concentration.mg_l_x1000,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Pulse {
+    pub bpm: f32,
+    pub stable: bool,
+    pub confidence_percent: u8,
+}
+
+impl From<pulse::Analysis> for Pulse {
+    fn from(analysis: pulse::Analysis) -> Self {
+        Self {
+            bpm: analysis.bpm,
+            stable: analysis.stable,
+            confidence_percent: analysis.confidence_percent,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Report {
     pub v: u8,
     pub session_id: String,
     pub measured_at_unix_ms: Option<u64>,
-    pub alcohol: alchol::Sample,
+    pub alcohol: Alcohol,
+    pub pulse: Option<Pulse>,
     pub bac_milli_percent: Option<u16>,
     pub sober_time_minutes: Option<u16>,
     pub risk: Risk,
     pub confidence_percent: u8,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "cmd")]
 pub enum PhoneToDevice {
     Context(Context),
@@ -94,7 +125,7 @@ pub enum PhoneToDevice {
     Ack { session_id: String },
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "event")]
 pub enum DeviceToPhone {
     Status(Status),

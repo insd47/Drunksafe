@@ -11,9 +11,19 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 통신 모델을 펌웨어 기준으로 변경">
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: ZE29 센서 연동 모듈 작성">
+      <change beforePath="$PROJECT_DIR$/.docs/measurement-communication-model.md" beforeDir="false" afterPath="$PROJECT_DIR$/.docs/measurement-communication-model.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/command.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/error.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/mod.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/model.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/protocol.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/transport.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/ble/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/ble/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/feature/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/main.rs" afterDir="false" />
@@ -67,61 +77,61 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0000019766465653" />
-      <entry key="MS500" value="1.1149642579700836" />
-      <entry key="S2" value="3.2677232992994916" />
-      <entry key="S5" value="7.576012474023801" />
-      <entry key="S10" value="12.250888538179074" />
-      <entry key="S30" value="18.326149787796666" />
-      <entry key="S60" value="20.48683794425242" />
-      <entry key="M2" value="21.69747996880657" />
-      <entry key="M5" value="23.04615238335483" />
-      <entry key="M10" value="26.921022094323128" />
-      <entry key="M15" value="31.770590792685027" />
-      <entry key="M30" value="49.25291925984158" />
-      <entry key="H1" value="87.4286408302887" />
-      <entry key="H2" value="148.85075957317804" />
-      <entry key="H4" value="216.43668539176718" />
-      <entry key="D1" value="317.05283688272726" />
-      <entry key="W1" value="340.80435973792885" />
+      <entry key="MS100" value="1.0076134243594435" />
+      <entry key="MS500" value="1.5813546488142083" />
+      <entry key="S2" value="2.948301392747026" />
+      <entry key="S5" value="4.08566284038617" />
+      <entry key="S10" value="5.070129578067641" />
+      <entry key="S30" value="6.200123610453878" />
+      <entry key="S60" value="6.575956248926146" />
+      <entry key="M2" value="6.7816087942485765" />
+      <entry key="M5" value="7.051178825101155" />
+      <entry key="M10" value="9.054676325019555" />
+      <entry key="M15" value="12.769273959207814" />
+      <entry key="M30" value="28.02776692429264" />
+      <entry key="H1" value="64.13891362136621" />
+      <entry key="H2" value="127.33865081537799" />
+      <entry key="H4" value="201.6079141258209" />
+      <entry key="D1" value="318.484788407896" />
+      <entry key="W1" value="346.9428332860992" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
       <entry key="MS500" value="0.0" />
-      <entry key="S2" value="1.602924E-317" />
-      <entry key="S5" value="1.914102450413098E-127" />
-      <entry key="S10" value="4.375045657376731E-64" />
-      <entry key="S30" value="7.591498837728093E-22" />
-      <entry key="S60" value="2.75526747117738E-11" />
-      <entry key="M2" value="5.2490646316927285E-6" />
-      <entry key="M5" value="0.007738974910433379" />
-      <entry key="M10" value="0.09134249030253552" />
-      <entry key="M15" value="0.22137340505581987" />
-      <entry key="M30" value="0.6318778883743676" />
-      <entry key="H1" value="1.3303048556266466" />
-      <entry key="H2" value="2.30138526443605" />
-      <entry key="H4" value="3.2798980294042015" />
-      <entry key="D1" value="4.637774985323732" />
-      <entry key="W1" value="4.9459667667154275" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="2.105415056394084E-260" />
+      <entry key="S10" value="1.4510048436838807E-130" />
+      <entry key="S30" value="5.254801163438055E-44" />
+      <entry key="S60" value="2.292335307811255E-22" />
+      <entry key="M2" value="1.5140461376137303E-11" />
+      <entry key="M5" value="4.706589422429955E-5" />
+      <entry key="M10" value="0.00712335003375044" />
+      <entry key="M15" value="0.040407911451010144" />
+      <entry key="M30" value="0.2699626219239041" />
+      <entry key="H1" value="0.8695336950997116" />
+      <entry key="H2" value="1.8606168421691154" />
+      <entry key="H4" value="2.9491315943501664" />
+      <entry key="D1" value="4.556331444810426" />
+      <entry key="W1" value="4.933464402512859" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="0.9794222335546886" />
-      <entry key="MS500" value="1.1103282828376433" />
-      <entry key="S2" value="3.2641055476103764" />
-      <entry key="S5" value="7.572536113342654" />
-      <entry key="S10" value="12.248055000017853" />
-      <entry key="S30" value="18.32473303175178" />
-      <entry key="S60" value="20.486045776284595" />
-      <entry key="M2" value="21.697064899192718" />
-      <entry key="M5" value="23.053285343098196" />
-      <entry key="M10" value="27.00980012784709" />
-      <entry key="M15" value="31.987998873754016" />
-      <entry key="M30" value="49.87955676752498" />
-      <entry key="H1" value="88.75390553047686" />
-      <entry key="H2" value="151.14806780741046" />
-      <entry key="H4" value="219.71377545610423" />
-      <entry key="D1" value="321.6899662369142" />
-      <entry key="W1" value="345.7502285034039" />
+      <entry key="MS100" value="0.9868250868174272" />
+      <entry key="MS500" value="1.5737884741439676" />
+      <entry key="S2" value="2.9443451506092466" />
+      <entry key="S5" value="4.083398146415325" />
+      <entry key="S10" value="5.068701467018354" />
+      <entry key="S30" value="6.199534077768308" />
+      <entry key="S60" value="6.575642576066224" />
+      <entry key="M2" value="6.781446782498501" />
+      <entry key="M5" value="7.05115609739083" />
+      <entry key="M10" value="9.061566409037667" />
+      <entry key="M15" value="12.808935834549162" />
+      <entry key="M30" value="28.295479511105903" />
+      <entry key="H1" value="65.00514731752583" />
+      <entry key="H2" value="129.1959686825067" />
+      <entry key="H4" value="204.5545195331952" />
+      <entry key="D1" value="323.04048532679616" />
+      <entry key="W1" value="351.876199901862" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -221,7 +231,7 @@
       <workItem from="1782540461776" duration="1882000" />
       <workItem from="1782711832368" duration="581000" />
       <workItem from="1782986837122" duration="10748000" />
-      <workItem from="1783222032899" duration="2909000" />
+      <workItem from="1783222032899" duration="5574000" />
     </task>
     <task id="LOCAL-00001" summary="feat: 보일러플레이트를 Rust 기반으로 변경">
       <option name="closed" value="true" />
@@ -279,7 +289,15 @@
       <option name="project" value="LOCAL" />
       <updated>1783222894182</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="feat: ZE29 센서 연동 모듈 작성">
+      <option name="closed" value="true" />
+      <created>1783225103299</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1783225103299</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -307,7 +325,8 @@
     <MESSAGE value="feat: 앱 개요 문서화" />
     <MESSAGE value="feat: 테스트 코드 생성" />
     <MESSAGE value="feat: 통신 모델을 펌웨어 기준으로 변경" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: 통신 모델을 펌웨어 기준으로 변경" />
+    <MESSAGE value="feat: ZE29 센서 연동 모듈 작성" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: ZE29 센서 연동 모듈 작성" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

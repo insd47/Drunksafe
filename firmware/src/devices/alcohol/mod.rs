@@ -32,7 +32,7 @@ impl<'d> AlcoholDevice<'d> {
     ///
     /// ZE29 `0x86` read test results 명령을 사용한다.
     #[allow(dead_code)]
-    pub fn sample(&mut self) -> Result<Concentration> {
+    pub fn test(&mut self) -> Result<Concentration> {
         let res = self.channel.request(Command::Result, [0; 5])?;
         Ok(Concentration::new(res.word(0)?))
     }
@@ -50,7 +50,7 @@ impl<'d> AlcoholDevice<'d> {
     ///
     /// ZE29 `0x87` switch module working status 명령을 사용한다.
     #[allow(dead_code)]
-    pub fn wake(&mut self, wake: bool) -> Result<()> {
+    pub fn work(&mut self, wake: bool) -> Result<()> {
         self.channel
             .request(Command::Work, [wake as u8, 0, 0, 0, 0])?;
 

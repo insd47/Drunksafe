@@ -5,22 +5,19 @@
 
 ## Runtime
 
-위치: `../firmware/src/features/mod.rs`
+위치: `firmware/src/main.rs`
 
-- `feature::run() -> feature::Result<()>`
-  - 보드 디바이스를 초기화하고 runtime loop를 시작한다.
+- `main() -> Result<(), EspError>`
+  - logger와 보드 디바이스를 초기화하고 runtime loop를 시작한다.
   - 현재 runtime loop는 버튼 측정 요청을 감지하고, 새 session ID를 만들고, pulse 상태를 초기화한 뒤 BLE session DTO를 만든다.
-- `feature::Error`
-  - feature runtime에서 위로 올리는 오류다.
-  - 현재는 ESP-IDF HAL/service 오류를 감싼다.
 
 ## Devices
 
 위치: `firmware/src/devices/mod.rs`
 
-- `devices::init() -> Result<devices::Device, EspError>`
+- `devices::init() -> Result<devices::Devices, EspError>`
   - `Peripherals::take()`를 한 번 호출하고 보드 배선에 맞는 HAL driver와 device handle을 구성한다.
-- `devices::Device`
+- `devices::Devices`
   - `trigger`: 테스트용 측정 시작 버튼인 `TriggerDevice`.
   - `alcohol`: ZE29용 `AlcoholDevice`.
   - `pulse`: MAX30102용 `PulseDevice`.

@@ -6,12 +6,11 @@
 - BLE는 transport envelope 역할만 한다.
 - 간단한 동작은 소유 모듈에서 한 단어 함수로 노출한다.
 - 확정되지 않은 데이터는 BLE 공통 모델에 미리 넣지 않는다.
-- `main.rs`는 logger 초기화 후 `feature::run()`만 호출한다.
-- `feature::run()`은 device 초기화와 runtime loop를 닫아 가진다.
+- `main.rs`는 logger와 device를 초기화한 뒤 runtime loop를 직접 닫아 가진다.
 - 보드 배선은 `devices::init()`이 소유하고, 각 device는 custom transport나 핀 tuple이 아니라 concrete HAL driver를 받는다.
 - 현재 runtime은 단일 루프이므로 device state는 plain mutable state로 유지한다. task/thread 공유가 실제로 필요해지는 시점에만 shared state를 도입한다.
-- 측정 세션 sequence는 `feature::run()`의 runtime loop가 로컬 상태로 소유한다. BLE 모델에는 transport DTO만 둔다.
-- snapshot은 필요할 때 사용처에서 각 device를 직접 호출한다. `feature::Snapshot` 같은 집계 모델은 두지 않는다.
+- 측정 세션 sequence는 `main.rs`의 runtime loop가 로컬 상태로 소유한다. BLE 모델에는 transport DTO만 둔다.
+- snapshot은 필요할 때 사용처에서 각 device를 직접 호출한다. 별도 `Snapshot` 집계 모델은 두지 않는다.
 
 ## Trigger Device
 
@@ -66,7 +65,7 @@ SOLID 관점:
 - `algorithm`: peak detection, IBI/BPM/stability 계산
 - `filter`: origin/modules-fixed 기준 Butterworth streaming filter
 - `state`: filter, sample window, moving average, last analysis
-- `device`: MAX30102 I2C bus, FIFO sample read, algorithm state handle
+- `mod.rs`: MAX30102 I2C bus, FIFO sample read, algorithm state handle
 - `crate::utils::math`: 평균, 표준편차, 반올림 같은 순수 유틸리티
 
 ## ZE29 Protocol

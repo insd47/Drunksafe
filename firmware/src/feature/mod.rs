@@ -1,26 +1,64 @@
-pub mod alcohol;
-pub mod ble;
-pub mod pulse;
-pub mod runtime;
-pub mod state;
-pub mod trigger;
-
+use esp_idf_svc::hal::peripherals::Peripherals;
+use esp_idf_svc::sys::EspError;
 use std::time::Duration;
 
-use esp_idf_svc::hal::peripherals::Peripherals;
+#[allow(dead_code)]
+mod alcohol;
+mod ble;
+#[allow(dead_code)]
+mod pulse;
+mod runtime;
+mod state;
+mod trigger;
 
 const IDLE_POLL: Duration = Duration::from_millis(20);
 
-pub struct Features {
-    pub alcohol: alcohol::SharedState,
-    pub ble: ble::SharedState,
-    pub pulse: pulse::SharedState,
-    pub runtime: runtime::SharedState,
-    pub trigger: trigger::SharedState,
+pub fn run() -> Result<()> {
+    log::debug!("initializing firmware features");
+
+    let pins = Peripherals::take()?.pins;
+    let alcohol = alcohol::init();
+    let ble = ble::init();
+    let pulse = pulse::init();
+    let runtime = runtime::init();
+    let trigger = trigger::init(pins.gpio0)?;
+
+    log::debug!("firmware features initialized");
+
+    let alcohol = alcohol::snapshot(&alcohol)?;
+    let ble = ble::snapshot(&ble)?;
+
+    log::debug!(
+        "feature state snapshot: protocol_version={}, alcohol_sample={}",
+        ble.protocol_version,
+        alcohol.has_sample
+    );
+
+    loop {
+        if let Some(event) = trigger::poll(&trigger)? {
+            match event {
+                trigger::Event::MeasurementRequested => {
+                    let session = runtime::begin_button_session(&runtime)?;
+                    pulse::reset(&pulse)?;
+
+                    let request = ble::session(session.id.clone());
+
+                    log::info!("measurement session requested: {request:?}");
+                    log::debug!("active measurement session: {}", session.id);
+                    log::info!("waiting for phone measurement context before calibration");
+                }
+            }
+        }
+
+        std::thread::sleep(IDLE_POLL);
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    Esp(#[from] EspError),
+
     #[error(transparent)]
     Alcohol(#[from] alcohol::Error),
 
@@ -38,53 +76,3 @@ pub enum Error {
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
-
-pub fn init(peripherals: Peripherals) -> Result<Features> {
-    log::debug!("initializing firmware features");
-
-    let pins = peripherals.pins;
-    let alcohol = alcohol::init()?;
-    let ble = ble::init()?;
-    let pulse = pulse::init()?;
-    let runtime = runtime::init()?;
-    let trigger = trigger::init(pins.gpio0)?;
-
-    log::debug!("firmware features initialized");
-    Ok(Features {
-        alcohol,
-        ble,
-        pulse,
-        runtime,
-        trigger,
-    })
-}
-
-pub fn run(features: Features) -> Result<()> {
-    let alcohol = alcohol::snapshot(&features.alcohol)?;
-    let ble = ble::snapshot(&features.ble)?;
-    log::debug!(
-        "feature state snapshot: protocol_version={}, alcohol_sample={}",
-        ble.protocol_version,
-        alcohol.has_sample
-    );
-
-    loop {
-        if let Some(event) = trigger::poll(&features.trigger)? {
-            match event {
-                trigger::Event::MeasurementRequested => {
-                    let session = runtime::begin_button_session(&features.runtime)?;
-                    pulse::reset(&features.pulse)?;
-
-                    let request = ble::session(session.id);
-                    let active_session_id = runtime::active_session_id(&features.runtime)?;
-
-                    log::info!("measurement session requested: {request:?}");
-                    log::debug!("active measurement session: {active_session_id:?}");
-                    log::info!("waiting for phone measurement context before calibration");
-                }
-            }
-        }
-
-        std::thread::sleep(IDLE_POLL);
-    }
-}

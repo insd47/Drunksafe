@@ -11,21 +11,17 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: ZE29 센서 연동 모듈 작성">
+    <list default="true" id="0c74621a-bb4c-4af5-bdc3-fa82d55cdc08" name="Changes" comment="feat: 최종 펌웨어 구조 설계">
       <change beforePath="$PROJECT_DIR$/.docs/measurement-communication-model.md" beforeDir="false" afterPath="$PROJECT_DIR$/.docs/measurement-communication-model.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/Cargo.lock" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/Cargo.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/command.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/error.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/mod.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/model.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/protocol.rs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alchol/transport.rs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/error.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/error.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/alcohol/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/alcohol/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/feature/ble/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/ble/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/ble/model.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/feature/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/pulse/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/pulse/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/runtime.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/runtime.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/firmware/src/feature/trigger/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/feature/trigger/mod.rs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/firmware/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/firmware/src/main.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -77,61 +73,61 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0076134243594435" />
-      <entry key="MS500" value="1.5813546488142083" />
-      <entry key="S2" value="2.948301392747026" />
-      <entry key="S5" value="4.08566284038617" />
-      <entry key="S10" value="5.070129578067641" />
-      <entry key="S30" value="6.200123610453878" />
-      <entry key="S60" value="6.575956248926146" />
-      <entry key="M2" value="6.7816087942485765" />
-      <entry key="M5" value="7.051178825101155" />
-      <entry key="M10" value="9.054676325019555" />
-      <entry key="M15" value="12.769273959207814" />
-      <entry key="M30" value="28.02776692429264" />
-      <entry key="H1" value="64.13891362136621" />
-      <entry key="H2" value="127.33865081537799" />
-      <entry key="H4" value="201.6079141258209" />
-      <entry key="D1" value="318.484788407896" />
-      <entry key="W1" value="346.9428332860992" />
+      <entry key="MS100" value="1.0000002045302157" />
+      <entry key="MS500" value="1.0773206147210772" />
+      <entry key="S2" value="3.0823029111947444" />
+      <entry key="S5" value="7.76952796781193" />
+      <entry key="S10" value="12.899918942624435" />
+      <entry key="S30" value="20.420575343959435" />
+      <entry key="S60" value="23.374974232555456" />
+      <entry key="M2" value="25.093249376982453" />
+      <entry key="M5" value="26.21538464605546" />
+      <entry key="M10" value="26.762199889170738" />
+      <entry key="M15" value="27.599438839657694" />
+      <entry key="M30" value="34.16306793776183" />
+      <entry key="H1" value="59.658579216010935" />
+      <entry key="H2" value="117.92479543423741" />
+      <entry key="H4" value="197.37499012804884" />
+      <entry key="D1" value="336.67651302752" />
+      <entry key="W1" value="372.5555860696311" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
       <entry key="MS500" value="0.0" />
       <entry key="S2" value="0.0" />
-      <entry key="S5" value="2.105415056394084E-260" />
-      <entry key="S10" value="1.4510048436838807E-130" />
-      <entry key="S30" value="5.254801163438055E-44" />
-      <entry key="S60" value="2.292335307811255E-22" />
-      <entry key="M2" value="1.5140461376137303E-11" />
-      <entry key="M5" value="4.706589422429955E-5" />
-      <entry key="M10" value="0.00712335003375044" />
-      <entry key="M15" value="0.040407911451010144" />
-      <entry key="M30" value="0.2699626219239041" />
-      <entry key="H1" value="0.8695336950997116" />
-      <entry key="H2" value="1.8606168421691154" />
-      <entry key="H4" value="2.9491315943501664" />
-      <entry key="D1" value="4.556331444810426" />
-      <entry key="W1" value="4.933464402512859" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="9.04882452718558E-236" />
+      <entry key="S30" value="4.489493931449552E-79" />
+      <entry key="S60" value="6.7003685954204085E-40" />
+      <entry key="M2" value="2.5885072458290892E-20" />
+      <entry key="M5" value="1.4651106476515313E-8" />
+      <entry key="M10" value="1.256800488121035E-4" />
+      <entry key="M15" value="0.002738552727670264" />
+      <entry key="M30" value="0.07027987641399827" />
+      <entry key="H1" value="0.4436598129382912" />
+      <entry key="H2" value="1.329042245295485" />
+      <entry key="H4" value="2.4924994478045126" />
+      <entry key="D1" value="4.430357734629304" />
+      <entry key="W1" value="4.913743665492169" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="0.9868250868174272" />
-      <entry key="MS500" value="1.5737884741439676" />
-      <entry key="S2" value="2.9443451506092466" />
-      <entry key="S5" value="4.083398146415325" />
-      <entry key="S10" value="5.068701467018354" />
-      <entry key="S30" value="6.199534077768308" />
-      <entry key="S60" value="6.575642576066224" />
-      <entry key="M2" value="6.781446782498501" />
-      <entry key="M5" value="7.05115609739083" />
-      <entry key="M10" value="9.061566409037667" />
-      <entry key="M15" value="12.808935834549162" />
-      <entry key="M30" value="28.295479511105903" />
-      <entry key="H1" value="65.00514731752583" />
-      <entry key="H2" value="129.1959686825067" />
-      <entry key="H4" value="204.5545195331952" />
-      <entry key="D1" value="323.04048532679616" />
-      <entry key="W1" value="351.876199901862" />
+      <entry key="MS100" value="0.9862329048144038" />
+      <entry key="MS500" value="1.074231119362037" />
+      <entry key="S2" value="3.079389098289846" />
+      <entry key="S5" value="7.766280378572782" />
+      <entry key="S10" value="12.897159067254602" />
+      <entry key="S30" value="20.4191082099811" />
+      <entry key="S60" value="23.37413409535056" />
+      <entry key="M2" value="25.092798404046007" />
+      <entry key="M5" value="26.21519620463856" />
+      <entry key="M10" value="26.762225839358795" />
+      <entry key="M15" value="27.60206277390023" />
+      <entry key="M30" value="34.232729871022485" />
+      <entry key="H1" value="60.10053914599324" />
+      <entry key="H2" value="119.25147313849924" />
+      <entry key="H4" value="199.86535049305496" />
+      <entry key="D1" value="341.10625310582384" />
+      <entry key="W1" value="377.46923224299104" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -231,7 +227,7 @@
       <workItem from="1782540461776" duration="1882000" />
       <workItem from="1782711832368" duration="581000" />
       <workItem from="1782986837122" duration="10748000" />
-      <workItem from="1783222032899" duration="5574000" />
+      <workItem from="1783222032899" duration="6660000" />
     </task>
     <task id="LOCAL-00001" summary="feat: 보일러플레이트를 Rust 기반으로 변경">
       <option name="closed" value="true" />
@@ -297,7 +293,15 @@
       <option name="project" value="LOCAL" />
       <updated>1783225103299</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="feat: 최종 펌웨어 구조 설계">
+      <option name="closed" value="true" />
+      <created>1783228605826</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1783228605826</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -326,7 +330,8 @@
     <MESSAGE value="feat: 테스트 코드 생성" />
     <MESSAGE value="feat: 통신 모델을 펌웨어 기준으로 변경" />
     <MESSAGE value="feat: ZE29 센서 연동 모듈 작성" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: ZE29 센서 연동 모듈 작성" />
+    <MESSAGE value="feat: 최종 펌웨어 구조 설계" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: 최종 펌웨어 구조 설계" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />

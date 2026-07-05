@@ -1,14 +1,3 @@
-#![allow(dead_code)]
-
-pub mod error;
-mod filter;
-pub mod model;
-pub mod state;
-
-pub use error::{Error, Result};
-pub use model::{Analysis, Sample};
-pub use state::{SharedState, Snapshot};
-
 use std::collections::VecDeque;
 
 const SAMPLE_RATE_HZ: usize = 100;
@@ -20,9 +9,9 @@ const PEAK_THRESHOLD: f32 = 50.0;
 const MIN_PEAK_DISTANCE_MS: u32 = 300;
 const IBI_STDEV_UNSTABLE_MS: f32 = 200.0;
 
-pub fn init() -> Result<SharedState> {
+pub fn init() -> SharedState {
     log::debug!("initializing pulse feature state");
-    Ok(state::init())
+    state::init()
 }
 
 pub fn sample(state: &SharedState, elapsed_ms: u32, raw_12bit: u16) -> Result<Option<Analysis>> {
@@ -243,3 +232,12 @@ fn round2(value: f32) -> f32 {
 fn round3(value: f32) -> f32 {
     (value * 1_000.0).round() / 1_000.0
 }
+
+pub use error::{Error, Result};
+pub use model::{Analysis, Sample};
+pub use state::{SharedState, Snapshot};
+
+mod error;
+mod filter;
+mod model;
+mod state;

@@ -6,8 +6,8 @@
 - BLE는 transport envelope 역할만 한다.
 - 간단한 동작은 `feature::action()` 형태의 한 단어 함수로 노출한다.
 - 확정되지 않은 데이터는 BLE 공통 모델에 미리 넣지 않는다.
-- boot 과정에서는 `feature::init()`이 모든 feature state를 만든다.
-- runtime loop는 `feature::run()`에 둔다. `main.rs`는 logger, peripherals, init, run만 담당한다.
+- `main.rs`는 logger 초기화 후 `feature::run()`만 호출한다.
+- `feature::run()`은 peripherals 획득, feature state 생성, runtime loop를 닫아 가진다.
 - feature state는 `Arc<Mutex<_>>`로 공유하고, 오류는 `thiserror`로 명확히 표현한다.
 - 측정 세션 상태는 `feature::runtime`이 소유한다. BLE 모델에는 transport DTO만 둔다.
 - snapshot은 필요할 때 사용처에서 각 feature를 직접 호출한다. `feature::Snapshot` 같은 집계 모델은 두지 않는다.
@@ -28,7 +28,7 @@
 
 위치: `firmware/src/feature/runtime.rs`
 
-runtime state는 현재 측정 세션 ID와 세션 sequence를 소유한다. 버튼 이벤트가 들어오면 `runtime::begin_button_session()`이 새 세션을 만들고 active session으로 저장한다. 이 ID를 기준으로 이후 phone context, progress, report를 같은 측정 흐름에 묶는다.
+runtime state는 측정 세션 sequence를 소유한다. 버튼 이벤트가 들어오면 `runtime::begin_button_session()`이 새 세션 ID를 만들고 반환한다. 이후 phone context, progress, report 처리가 실제로 붙을 때 active session 상태를 추가한다.
 
 ## Alcohol Feature
 

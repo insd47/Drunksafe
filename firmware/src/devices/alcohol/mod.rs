@@ -2,14 +2,12 @@ use channel::Channel;
 use command::Command;
 pub use error::{Error, Result};
 use esp_idf_svc::hal::uart::UartDriver;
-use std::time::Duration;
 
 mod channel;
 mod command;
 mod error;
 mod protocol;
-
-const DEFAULT_READ_TIMEOUT: Duration = Duration::from_millis(100);
+mod checksum;
 
 /// ZE29 알코올 센서를 다루는 device handle이다.
 ///
@@ -49,8 +47,8 @@ impl<'d> AlcoholDevice<'d> {
     /// ZE29 `0x87` switch module working status 명령을 사용한다.
     #[allow(dead_code)]
     pub fn work(&mut self, wake: bool) -> Result<()> {
-        self.channel
-            .request(Command::Work, [wake as u8, 0, 0, 0, 0])?;
+        let value = wake as u8;
+        self.channel.request(Command::Work, [value, 0, 0, 0, 0])?;
 
         Ok(())
     }

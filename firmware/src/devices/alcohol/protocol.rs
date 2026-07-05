@@ -1,3 +1,4 @@
+use super::checksum;
 use super::command::Command;
 use super::error::{Error, Result};
 
@@ -24,7 +25,7 @@ impl RequestFrame {
         bytes[1] = ADDRESS;
         bytes[2] = command.byte();
         bytes[3..8].copy_from_slice(&payload);
-        bytes[8] = checksum(&bytes);
+        bytes[8] = checksum::generate(&bytes);
 
         Self { bytes }
     }
@@ -41,13 +42,7 @@ impl ResponseFrame {
         }
 
         command.expect(bytes[1])?;
-
-        let expected = checksum(&bytes);
-        let actual = bytes[8];
-
-        if expected != actual {
-            return Err(Error::InvalidChecksum { expected, actual });
-        }
+        checksum::expect(&bytes)?;
 
         let mut payload = [0; 6];
         payload.copy_from_slice(&bytes[2..8]);
@@ -73,11 +68,4 @@ impl ResponseFrame {
             self.payload[offset + 1],
         ]))
     }
-}
-
-fn checksum(bytes: &[u8; FRAME_LEN]) -> u8 {
-    bytes[1..8]
-        .iter()
-        .fold(0_u8, |sum, byte| sum.wrapping_add(*byte))
-        .wrapping_neg()
 }

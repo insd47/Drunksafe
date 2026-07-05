@@ -1,8 +1,11 @@
 use super::command::Command;
 use super::protocol::{ResponseFrame, FRAME_LEN};
-use super::{protocol, Error, DEFAULT_READ_TIMEOUT};
+use super::{protocol, Error};
 use esp_idf_svc::hal::delay::TickType;
 use esp_idf_svc::hal::uart::UartDriver;
+use std::time::Duration;
+
+const READ_TIMEOUT: Duration = Duration::from_millis(100);
 
 pub struct Channel<'d> {
     uart: UartDriver<'d>,
@@ -41,7 +44,7 @@ impl<'d> Channel<'d> {
     fn read(&mut self, command: Command) -> crate::devices::alcohol::Result<ResponseFrame> {
         let mut bytes = [0; FRAME_LEN];
         let mut offset = 0;
-        let timeout = TickType::from(DEFAULT_READ_TIMEOUT).ticks();
+        let timeout = TickType::from(READ_TIMEOUT).ticks();
 
         while offset < FRAME_LEN {
             let read = self.uart.read(&mut bytes[offset..], timeout)?;

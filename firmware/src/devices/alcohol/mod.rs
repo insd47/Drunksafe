@@ -2,13 +2,11 @@ use channel::Channel;
 use command::Command;
 pub use error::{Error, Result};
 use esp_idf_svc::hal::uart::UartDriver;
-pub use model::Concentration;
 use std::time::Duration;
 
 mod channel;
 mod command;
 mod error;
-mod model;
 mod protocol;
 
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_millis(100);
@@ -28,13 +26,13 @@ impl<'d> AlcoholDevice<'d> {
         Self { channel }
     }
 
-    /// 현재 알코올 측정값을 읽는다.
+    /// 현재 알코올 측정값을 읽는다. 반환값은 알코올 농도를 mg/L x1000 정수로 표현한 값이다.
     ///
     /// ZE29 `0x86` read test results 명령을 사용한다.
     #[allow(dead_code)]
-    pub fn test(&mut self) -> Result<Concentration> {
+    pub fn test(&mut self) -> Result<u16> {
         let res = self.channel.request(Command::Result, [0; 5])?;
-        Ok(Concentration::new(res.word(0)?))
+        Ok(res.word(0)?)
     }
 
     /// 센서 모듈의 현재 상태 코드를 읽는다.

@@ -1,4 +1,4 @@
-use crate::devices::{AlcoholConcentration, PulseAnalysis};
+use crate::devices::PulseAnalysis;
 use serde::{Deserialize, Serialize};
 
 /// BLE payload schema version이다.
@@ -116,14 +116,6 @@ pub struct Progress {
 pub struct Alcohol {
     /// 알코올 농도를 mg/L x1000 정수로 표현한 값이다.
     pub mg_l_x1000: u16,
-}
-
-impl From<AlcoholConcentration> for Alcohol {
-    fn from(concentration: AlcoholConcentration) -> Self {
-        Self {
-            mg_l_x1000: concentration.mg_l_x1000,
-        }
-    }
 }
 
 /// BLE report에 포함되는 pulse 분석 요약이다.

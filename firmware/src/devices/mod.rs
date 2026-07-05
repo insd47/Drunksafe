@@ -1,11 +1,10 @@
+pub use alcohol::AlcoholDevice;
 use esp_idf_svc::hal::gpio::AnyIOPin;
 use esp_idf_svc::hal::i2c::{I2cConfig, I2cDriver};
 use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::uart::{config, UartDriver};
 use esp_idf_svc::hal::units::Hertz;
 use esp_idf_svc::sys::EspError;
-
-pub use alcohol::{AlcoholDevice, Concentration as AlcoholConcentration};
 pub use pulse::{Analysis as PulseAnalysis, PulseDevice};
 pub use trigger::TriggerDevice;
 

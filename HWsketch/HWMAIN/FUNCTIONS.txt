@@ -172,7 +172,6 @@ updateAlertPattern()
 - 현재 알림 패턴을 시간에 맞춰 다음 단계로 진행합니다.
 - delay()를 쓰지 않아 다른 센서 갱신과 동시에 동작할 수 있습니다.
 
-triggerAlert()
 - 알림이 진행 중이 아닐 때 짧은 두 번의 알림 패턴을 시작합니다.
 
 beep(int type)
@@ -213,7 +212,6 @@ showAlcoholValueScreen(float maxAlcoholValue)
 showHeartRateScreen(int currentBpm)
 - BPM 값을 OLED에 표시합니다.
 
-showBreathMeasuringScreen(float currentValue, float maxValue)
 - 알코올 측정 중 현재값/최대값 표시용 함수입니다.
 - 현재 흐름에서는 ZE-29A 상태 안내 화면을 주로 사용합니다.
 

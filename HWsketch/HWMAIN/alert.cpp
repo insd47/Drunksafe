@@ -66,10 +66,3 @@ void updateAlertPattern() {
 }
 
 // 알림 시작.
-void triggerAlert() {
-    if (patternState == 0) {
-        patternState = 1;
-        patternTimer = millis();
-        beep(2); vibe(2);
-    }
-}

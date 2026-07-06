@@ -10,6 +10,4 @@ void initAlert();
 void updateAlertPattern();
 
 // 알림 시작.
-void triggerAlert();
-
 #endif

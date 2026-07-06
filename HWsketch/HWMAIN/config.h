@@ -34,7 +34,6 @@ const int VIBRATION_PIN = 26;
 const unsigned long DEBOUNCE_DELAY_MS = 30;
 const unsigned long BUTTON_RELEASE_CHECK_MS = 5;
 const unsigned long BPM_SEND_INTERVAL_MS = 500;
-const unsigned long ALCOHOL_MEASURE_DURATION_MS = 3000;
 const unsigned long ALCOHOL_SCREEN_REFRESH_MS = 200;
 const unsigned long RESET_MESSAGE_DURATION_MS = 3000;
 

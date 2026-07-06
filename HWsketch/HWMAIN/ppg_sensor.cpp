@@ -40,8 +40,6 @@ bool filterInitialized = false;
 
 // 최신 출력값.
 int latestBpm = 0;
-float lastValidIbiStdev = 0.0;
-float lastValidPeakAmp = 0.0;
 bool bpmReady = false;
 
 // 최근 5초 특징값.
@@ -232,9 +230,6 @@ void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
   float currentIbiStdev = calculateStdev(ibis, peakCount - 1, meanIbi);
   float currentPeakAmp = calculateMean(peakAmps, peakCount);
   bool unstable = currentIbiStdev > UNSTABLE_IBI_STDEV_MS;
-
-  lastValidIbiStdev = currentIbiStdev;
-  lastValidPeakAmp = currentPeakAmp;
 
   current_bpm_val = currentBpm;
   current_ibi_stdev_val = currentIbiStdev;

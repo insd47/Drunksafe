@@ -27,7 +27,25 @@ int popRawDataBatch(unsigned long& out_start_t, int* out_values, int max_count);
 int Bpm();
 PpgFeatures getLatestPpgFeatures();
 
+enum AlcoholSensorStatus {
+    ALCOHOL_SENSOR_IDLE,
+    ALCOHOL_SENSOR_WARMING,
+    ALCOHOL_SENSOR_READY_TO_BLOW,
+    ALCOHOL_SENSOR_BLOWING,
+    ALCOHOL_SENSOR_BLOW_WEAK,
+    ALCOHOL_SENSOR_ANALYZING,
+    ALCOHOL_SENSOR_DONE,
+    ALCOHOL_SENSOR_TIMEOUT,
+    ALCOHOL_SENSOR_ERROR
+};
+
+void initAlcoholSensor();
+void startAlcoholMeasurement();
+void updateAlcoholSensor();
+bool isAlcoholMeasurementFinished();
+AlcoholSensorStatus getAlcoholSensorStatus();
 float alcohol();
+
 SafetyState judgeSafetyState(float maxAlcoholValue, int currentBpm);
 
 #endif

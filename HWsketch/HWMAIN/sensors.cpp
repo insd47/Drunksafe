@@ -4,6 +4,8 @@
 
 namespace {
 const int PPG_PIN = 36;
+const int ZE29A_RXD2 = 16;
+const int ZE29A_TXD2 = 17;
 
 const unsigned long PPG_SAMPLE_INTERVAL_MS = 10;
 const int PPG_SAMPLE_RATE_HZ = 100;
@@ -241,10 +243,118 @@ int raw_vals[RAW_BUFFER_SIZE];
 unsigned long raw_times[RAW_BUFFER_SIZE];
 int raw_head = 0;
 int raw_tail = 0;
+
+byte zeCmdState[9]  = {0xFF, 0x01, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7A};
+byte zeCmdResult[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+byte zeCmdStart[9]  = {0xFF, 0x01, 0x87, 0x32, 0x00, 0x00, 0x00, 0x00, 0x46};
+byte zeCmdIdle[9]   = {0xFF, 0x01, 0x87, 0x31, 0x00, 0x00, 0x00, 0x00, 0x47};
+
+const unsigned long ZE29A_POLL_INTERVAL_MS = 500;
+const unsigned long ZE29A_PACKET_TIMEOUT_MS = 100;
+const unsigned long ZE29A_MEASURE_TIMEOUT_MS = 45000;
+
+byte zeLastState = 0x00;
+unsigned long zeLastPollTime = 0;
+unsigned long zeMeasurementStartTime = 0;
+float latestAlcoholValue = 0.0;
+bool alcoholMeasurementRunning = false;
+bool alcoholMeasurementFinished = true;
+AlcoholSensorStatus alcoholStatus = ALCOHOL_SENSOR_IDLE;
+
+byte checkZe29aSum(byte* packet) {
+  byte sum = 0;
+  for (int i = 1; i < 8; i++) {
+    sum += packet[i];
+  }
+
+  return (~sum) + 1;
+}
+
+void setZe29aStatusFromState(byte state) {
+  zeLastState = state;
+
+  switch (state) {
+    case 0x31:
+      alcoholStatus = ALCOHOL_SENSOR_IDLE;
+      break;
+    case 0x32:
+      alcoholStatus = ALCOHOL_SENSOR_WARMING;
+      break;
+    case 0x33:
+      alcoholStatus = ALCOHOL_SENSOR_READY_TO_BLOW;
+      break;
+    case 0x34:
+      alcoholStatus = ALCOHOL_SENSOR_BLOWING;
+      break;
+    case 0x35:
+      alcoholStatus = ALCOHOL_SENSOR_BLOW_WEAK;
+      break;
+    case 0x36:
+      alcoholStatus = ALCOHOL_SENSOR_ANALYZING;
+      break;
+    case 0x37:
+      alcoholStatus = ALCOHOL_SENSOR_ANALYZING;
+      Serial2.write(zeCmdResult, 9);
+      break;
+    default:
+      alcoholStatus = ALCOHOL_SENSOR_ERROR;
+      break;
+  }
+}
+
+bool readZe29aPacket(byte* packet) {
+  while (Serial2.available()) {
+    if (Serial2.read() != 0xFF) {
+      continue;
+    }
+
+    packet[0] = 0xFF;
+    unsigned long startTime = millis();
+    int index = 1;
+
+    while (index < 9 && millis() - startTime < ZE29A_PACKET_TIMEOUT_MS) {
+      if (Serial2.available()) {
+        packet[index++] = Serial2.read();
+      }
+    }
+
+    if (index == 9 && checkZe29aSum(packet) == packet[8]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void handleZe29aPacket(byte* packet) {
+  if (packet[1] == 0x85) {
+    setZe29aStatusFromState(packet[2]);
+    return;
+  }
+
+  if (packet[1] == 0x86) {
+    int value = (packet[2] << 8) | packet[3];
+    float mg100ml = (float)value;
+
+    latestAlcoholValue = mg100ml / 1000.0;
+    alcoholStatus = ALCOHOL_SENSOR_DONE;
+    alcoholMeasurementRunning = false;
+    alcoholMeasurementFinished = true;
+    Serial2.write(zeCmdIdle, 9);
+  }
+}
 }  // namespace
 
 void initBpmSensor() {
   analogReadResolution(12);
+}
+
+void initAlcoholSensor() {
+  Serial2.begin(9600, SERIAL_8N1, ZE29A_RXD2, ZE29A_TXD2);
+  Serial2.write(zeCmdIdle, 9);
+  alcoholStatus = ALCOHOL_SENSOR_IDLE;
+  alcoholMeasurementRunning = false;
+  alcoholMeasurementFinished = true;
 }
 
 void updateBpmSensor() {
@@ -317,8 +427,57 @@ PpgFeatures getLatestPpgFeatures() {
     return f;
 }
 
+void startAlcoholMeasurement() {
+  while (Serial2.available()) {
+    Serial2.read();
+  }
+
+  latestAlcoholValue = 0.0;
+  zeLastState = 0x00;
+  zeLastPollTime = 0;
+  zeMeasurementStartTime = millis();
+  alcoholStatus = ALCOHOL_SENSOR_WARMING;
+  alcoholMeasurementRunning = true;
+  alcoholMeasurementFinished = false;
+
+  Serial2.write(zeCmdStart, 9);
+}
+
+void updateAlcoholSensor() {
+  if (!alcoholMeasurementRunning) {
+    return;
+  }
+
+  unsigned long now = millis();
+  if (now - zeMeasurementStartTime > ZE29A_MEASURE_TIMEOUT_MS) {
+    alcoholStatus = ALCOHOL_SENSOR_TIMEOUT;
+    alcoholMeasurementRunning = false;
+    alcoholMeasurementFinished = true;
+    Serial2.write(zeCmdIdle, 9);
+    return;
+  }
+
+  if (now - zeLastPollTime >= ZE29A_POLL_INTERVAL_MS) {
+    zeLastPollTime = now;
+    Serial2.write(zeCmdState, 9);
+  }
+
+  byte packet[9];
+  while (readZe29aPacket(packet)) {
+    handleZe29aPacket(packet);
+  }
+}
+
+bool isAlcoholMeasurementFinished() {
+  return alcoholMeasurementFinished;
+}
+
+AlcoholSensorStatus getAlcoholSensorStatus() {
+  return alcoholStatus;
+}
+
 float alcohol() {
-  return (esp_random() % 1001) / 1000.0;  // 0.000~1.000%
+  return latestAlcoholValue;
 }
 
 SafetyState judgeSafetyState(float maxAlcoholValue, int currentBpm) {

@@ -24,6 +24,7 @@ static SafetyState currentSafetyState = SAFETY_GOOD;
 
 static void updateBpmAndSend();
 static void showNextMeasurementScreen();
+static void showAlcoholSensorStatus();
 static void runAlcoholMeasurement();
 static void resetDevice();
 static void startDevice();
@@ -83,6 +84,7 @@ static void triggerAlert() {
 
 void runBackgroundTasks() {
     updateBpmSensor();
+    updateAlcoholSensor();
     updateAlertPattern();
 
     if (deviceStarted) {
@@ -95,6 +97,41 @@ void runBackgroundTasks() {
             }
         }
     }
+}
+
+static void showAlcoholSensorStatus() {
+  switch (getAlcoholSensorStatus()) {
+    case ALCOHOL_SENSOR_WARMING:
+      showKorean2Lines("ZE-29A", "Warming...");
+      break;
+    case ALCOHOL_SENSOR_READY_TO_BLOW:
+      showKorean2Lines("Blow", "4 sec long");
+      break;
+    case ALCOHOL_SENSOR_BLOWING:
+      showKorean2Lines("Keep", "Blowing");
+      break;
+    case ALCOHOL_SENSOR_BLOW_WEAK:
+      showKorean2Lines("Too weak", "Try again");
+      break;
+    case ALCOHOL_SENSOR_ANALYZING:
+      showKorean2Lines("Alcohol", "Analyzing");
+      break;
+    case ALCOHOL_SENSOR_DONE: {
+      char valueText[20];
+      snprintf(valueText, sizeof(valueText), "%.3f%%", alcohol());
+      showKorean2Lines("Complete", valueText);
+      break;
+    }
+    case ALCOHOL_SENSOR_TIMEOUT:
+      showKorean2Lines("Alcohol", "Timeout");
+      break;
+    case ALCOHOL_SENSOR_ERROR:
+      showKorean2Lines("Sensor", "Error");
+      break;
+    default:
+      showKorean2Lines("Alcohol", "Ready");
+      break;
+  }
 }
 
 static void updateBpmAndSend() {
@@ -155,28 +192,26 @@ static void showNextMeasurementScreen() {
 
 static void runAlcoholMeasurement() {
   currentScreen = SCREEN_BREATH;
-
-  unsigned long startTime = millis();
   maxAlcoholValue = 0.0;
+  startAlcoholMeasurement();
 
-  while (millis() - startTime < ALCOHOL_MEASURE_DURATION_MS) {
+  unsigned long lastScreenUpdateTime = 0;
+
+  while (!isAlcoholMeasurementFinished()) {
     updateBpmAndSend();
 
-    float currentValue = alcohol();
-
-    if (currentValue > maxAlcoholValue) {
-      maxAlcoholValue = currentValue;
+    unsigned long now = millis();
+    if (now - lastScreenUpdateTime >= ALCOHOL_SCREEN_REFRESH_MS) {
+      lastScreenUpdateTime = now;
+      showAlcoholSensorStatus();
     }
 
-    showBreathMeasuringScreen(currentValue, maxAlcoholValue);
-    
-    unsigned long waitStart = millis();
-    while (millis() - waitStart < ALCOHOL_SCREEN_REFRESH_MS) {
-      runBackgroundTasks();
-      delay(1);
-    }
+    delay(1);
   }
 
+  maxAlcoholValue = alcohol();
+  showAlcoholSensorStatus();
+  delay(ALCOHOL_SCREEN_REFRESH_MS);
   nextScreenIndex = 0;
 }
 
@@ -213,6 +248,7 @@ void setupDevice() {
 
   initButtons();
   initBpmSensor();
+  initAlcoholSensor();
   initDisplay();
   
   // 알림(진동/부저) 핀 초기화

@@ -119,9 +119,9 @@ GATT transport 계약:
 | Device event characteristic | `6f5f3f7a-3b0d-4df7-9d17-151b71e12202` | device notifies JSON `DeviceEvent` |
 | Phone command characteristic | `6f5f3f7a-3b0d-4df7-9d17-151b71e12203` | app writes JSON `PhoneCommand` |
 
-Characteristic value는 UTF-8 JSON 문자열을 base64로 감싼다. `react-native-ble-plx`가 characteristic value를 base64로 주고받기 때문에 앱의 `app/src/lib/ble/codec.ts`는 JSON 문자열과 BLE base64 value 사이만 변환한다.
+실제 GATT characteristic value는 UTF-8 JSON bytes다. `react-native-ble-plx` JS API가 characteristic value를 base64 문자열로 표현하므로, 앱의 `app/src/lib/ble/codec.ts`는 API 경계에서만 JSON 문자열과 BLE base64 value 사이를 변환한다. 펌웨어는 수신한 raw bytes를 UTF-8 JSON으로 파싱한다.
 
-작은 payload는 `PhoneCommand`/`DeviceEvent` JSON을 그대로 한 번에 보낸다. `PhoneContext`처럼 `180 bytes`를 넘는 payload는 transport frame으로 나눠 보낸다.
+작은 payload는 `PhoneCommand`/`DeviceEvent` JSON을 그대로 한 번에 보낸다. `PhoneContext`처럼 협상된 GATT payload limit을 넘는 payload는 transport frame으로 나눠 보낸다. 현재 앱과 펌웨어 transport의 기본 목표 payload는 MTU 185 기준 `180 bytes`다.
 
 | Frame | Direction | Fields |
 |-------|-----------|--------|

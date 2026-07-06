@@ -1,36 +1,35 @@
 use super::command::Command;
 use super::protocol::{ResponseFrame, FRAME_LEN};
 use super::{protocol, Error};
-use esp_idf_svc::hal::delay::TickType;
-use esp_idf_svc::hal::uart::UartDriver;
-use std::time::Duration;
+use embassy_time::{with_timeout, Duration};
+use esp_idf_svc::hal::uart::{AsyncUartDriver, UartDriver};
 
 const READ_TIMEOUT: Duration = Duration::from_millis(100);
 
 pub struct Channel<'d> {
-    uart: UartDriver<'d>,
+    uart: AsyncUartDriver<'d, UartDriver<'d>>,
 }
 
 impl<'d> Channel<'d> {
-    pub const fn new(uart: UartDriver<'d>) -> Self {
+    pub const fn new(uart: AsyncUartDriver<'d, UartDriver<'d>>) -> Self {
         Self { uart }
     }
 
-    pub fn request(
+    pub async fn request(
         &mut self,
         command: Command,
         payload: [u8; 5],
     ) -> crate::devices::alcohol::Result<ResponseFrame> {
         let frame = protocol::RequestFrame::new(command, payload);
-        self.write(frame.bytes())?;
-        Ok(self.read(command)?)
+        self.write(frame.bytes()).await?;
+        self.read(command).await
     }
 
-    fn write(&mut self, bytes: &[u8]) -> crate::devices::alcohol::Result<()> {
+    async fn write(&mut self, bytes: &[u8]) -> crate::devices::alcohol::Result<()> {
         let mut offset = 0;
 
         while offset < bytes.len() {
-            let written = self.uart.write(&bytes[offset..])?;
+            let written = self.uart.write(&bytes[offset..]).await?;
             if written == 0 {
                 return Err(Error::WriteZero);
             }
@@ -41,19 +40,25 @@ impl<'d> Channel<'d> {
         Ok(())
     }
 
-    fn read(&mut self, command: Command) -> crate::devices::alcohol::Result<ResponseFrame> {
+    async fn read(&mut self, command: Command) -> crate::devices::alcohol::Result<ResponseFrame> {
         let mut bytes = [0; FRAME_LEN];
-        let mut offset = 0;
-        let timeout = TickType::from(READ_TIMEOUT).ticks();
 
-        while offset < FRAME_LEN {
-            let read = self.uart.read(&mut bytes[offset..], timeout)?;
-            if read == 0 {
-                return Err(Error::Timeout);
+        with_timeout(READ_TIMEOUT, async {
+            let mut offset = 0;
+
+            while offset < FRAME_LEN {
+                let read = self.uart.read(&mut bytes[offset..]).await?;
+                if read == 0 {
+                    return Err(Error::Timeout);
+                }
+
+                offset += read;
             }
 
-            offset += read;
-        }
+            Ok(())
+        })
+        .await
+        .map_err(|_| Error::Timeout)??;
 
         ResponseFrame::parse(command, bytes)
     }

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[repr(u8)]
-pub(super) enum Command {
+pub enum Command {
     Status = 0x85,
     Result = 0x86,
     Work = 0x87,
@@ -17,11 +17,11 @@ pub(super) enum Command {
 }
 
 impl Command {
-    pub(super) const fn byte(self) -> u8 {
+    pub const fn byte(self) -> u8 {
         self as u8
     }
 
-    pub(super) const fn from(byte: u8) -> Result<Self> {
+    pub const fn from(byte: u8) -> Result<Self> {
         match byte {
             0x85 => Ok(Self::Status),
             0x86 => Ok(Self::Result),
@@ -36,7 +36,7 @@ impl Command {
         }
     }
 
-    pub(super) fn expect(self, byte: u8) -> Result<()> {
+    pub fn expect(self, byte: u8) -> Result<()> {
         let actual = Command::from(byte)?;
 
         if actual != self {

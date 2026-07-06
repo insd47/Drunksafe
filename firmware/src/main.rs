@@ -2,7 +2,9 @@ mod devices;
 mod features;
 mod utils;
 
+use esp_idf_svc::hal::task::block_on;
 use esp_idf_svc::sys::EspError;
+use features::measure;
 use std::time::Duration;
 
 const IDLE_POLL: Duration = Duration::from_millis(20);
@@ -15,21 +17,22 @@ fn main() -> Result<(), EspError> {
     log::debug!("initializing firmware devices");
 
     let mut devices = devices::init()?;
-    let mut session_sequence = 0_u32;
+    let mut try_index = 0_u32;
 
     log::debug!("firmware devices initialized");
 
     loop {
         if devices.trigger.pressed() {
-            session_sequence = session_sequence.wrapping_add(1);
-            let session_id = format!("button-{session_sequence}");
-            devices.pulse.reset();
+            let result = block_on(measure::run(&mut devices.pulse, &mut devices.alcohol));
 
-            let request = features::ble::session(session_id.clone());
+            match result {
+                Ok((pulse, alcohol_mg_l_x1000)) => log::info!(
+                    "measurement completed: try={try_index}, alcohol_mg_l_x1000={alcohol_mg_l_x1000}, pulse={pulse:?}"
+                ),
+                Err(error) => log::warn!("measurement failed: try={try_index}, error={error}"),
+            }
 
-            log::info!("measurement session requested: {request:?}");
-            log::debug!("active measurement session: {session_id}");
-            log::info!("waiting for phone measurement context before calibration");
+            try_index += 1;
         }
 
         std::thread::sleep(IDLE_POLL);

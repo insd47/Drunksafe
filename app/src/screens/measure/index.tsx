@@ -28,9 +28,15 @@ export function MeasureScreen() {
   const routeMatchesActive = routeSessionId === 'live' || routeSessionId === ble.activeSessionId;
   const routeProgress = routeMatchesActive ? ble.progress : null;
   const routeResult =
-    routeSessionId !== 'live' && ble.result?.session_id === routeSessionId ? ble.result : null;
+    routeSessionId === 'live'
+      ? ble.result
+      : routeSessionId !== 'live' && ble.result?.session_id === routeSessionId
+        ? ble.result
+        : null;
   const activeSessionId =
-    routeSessionId === 'live' ? (routeProgress?.session_id ?? 'live') : routeSessionId;
+    routeSessionId === 'live'
+      ? (routeResult?.session_id ?? routeProgress?.session_id ?? 'live')
+      : routeSessionId;
   const activeStep = routeResult ? 'done' : routeProgress?.step;
   const resultHref = routeResult
     ? `/results/${routeResult.session_id}`

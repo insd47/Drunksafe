@@ -16,6 +16,7 @@ import {
   riskTone,
 } from '@/lib/format/measurement';
 import { latestMeasurement, readHistory, type MeasurementRecord } from '@/lib/storage/history';
+import { isProfileComplete } from '@/lib/personalization/profile-context';
 import { emptyBaseline, emptyProfile, readBaseline, readProfile } from '@/lib/storage/profile';
 
 export function ConnectScreen() {
@@ -46,9 +47,7 @@ export function ConnectScreen() {
 
           setSummary({
             baselineReady: baseline.sample_count > 0,
-            profileReady: Boolean(
-              profile.age_years && profile.height_cm && profile.weight_kg && profile.sex
-            ),
+            profileReady: isProfileComplete(profile),
             recentCount: history.filter((record) => record.kind === 'measurement').length,
             latest,
             failed: false,
@@ -72,7 +71,7 @@ export function ConnectScreen() {
     }, [])
   );
 
-  const contextReady = summary.baselineReady;
+  const contextReady = summary.baselineReady || summary.profileReady;
   const scanDisabled =
     ble.mockMode || ble.connectionPhase === 'connecting' || ble.bluetoothState !== 'PoweredOn';
   const measurementDisabled =
@@ -144,7 +143,7 @@ export function ConnectScreen() {
           description={
             summary.failed
               ? '로컬 context를 불러오지 못했습니다.'
-              : 'baseline과 최근 히스토리를 보냅니다.'
+              : '프로필 파생값, baseline, 최근 히스토리를 보냅니다.'
           }
           tone={summary.failed ? 'danger' : contextReady ? 'safe' : 'caution'}
         />
@@ -234,7 +233,7 @@ export function ConnectScreen() {
         <StatusRow
           label="프로필"
           value={summary.profileReady ? '입력됨' : '미입력'}
-          description="나이, 키, 몸무게, 성별은 앱 안에서만 보관합니다."
+          description="원본은 앱에 보관하고 보수적 해소율만 context에 반영합니다."
           tone={summary.profileReady ? 'safe' : 'neutral'}
         />
       </Section>

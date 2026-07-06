@@ -7,6 +7,7 @@ import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
 import { formatAlcohol, formatBpm } from '@/lib/format/measurement';
+import { estimateProfileEliminationMgLPerHourX1000 } from '@/lib/personalization/profile-context';
 import {
   emptyBaseline,
   emptyProfile,
@@ -56,6 +57,12 @@ export function OnboardingScreen() {
     isValidRequiredInt(height, 30, 250) &&
     isValidRequiredInt(weight, 2, 500) &&
     sex !== null;
+  const profileElimination = estimateProfileEliminationMgLPerHourX1000({
+    age_years: parseNullableInt(age, 1, 130).value,
+    height_cm: parseNullableInt(height, 30, 250).value,
+    weight_kg: parseNullableInt(weight, 2, 500).value,
+    sex,
+  });
 
   async function handleSaveProfile() {
     const parsedAge = parseNullableInt(age, 1, 130);
@@ -150,8 +157,8 @@ export function OnboardingScreen() {
       <Section eyebrow="Recovery" title="개인 분해 경향">
         <StatusRow
           label="개인 분해율"
-          value={formatElimination(baseline.elimination_mg_l_per_hour_x1000)}
-          description="히스토리가 쌓이면 천천히 보정합니다."
+          value={formatElimination(baseline.elimination_mg_l_per_hour_x1000, profileElimination)}
+          description="baseline 학습값이 없으면 프로필 기반 보수값을 씁니다."
         />
       </Section>
 
@@ -243,9 +250,9 @@ function isValidRequiredInt(value: string, min: number, max: number) {
   return parsed.ok && parsed.value !== null;
 }
 
-function formatElimination(value: number | null) {
+function formatElimination(value: number | null, fallback: number | null) {
   if (value === null) {
-    return '기본값';
+    return fallback === null ? '기본값' : `${formatAlcohol(fallback)}/h`;
   }
 
   return `${formatAlcohol(value)}/h`;

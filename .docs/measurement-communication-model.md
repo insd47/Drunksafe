@@ -111,6 +111,25 @@ SOLID 관점:
 
 - `ble::measurement_started(session_id)`: 보드 버튼으로 시작된 측정 세션 이벤트 DTO를 만든다.
 
+GATT transport 계약:
+
+| Name | UUID | Direction |
+|------|------|-----------|
+| Drunksafe service | `6f5f3f7a-3b0d-4df7-9d17-151b71e12201` | app discovers device service |
+| Device event characteristic | `6f5f3f7a-3b0d-4df7-9d17-151b71e12202` | device notifies JSON `DeviceEvent` |
+| Phone command characteristic | `6f5f3f7a-3b0d-4df7-9d17-151b71e12203` | app writes JSON `PhoneCommand` |
+
+Characteristic value는 UTF-8 JSON 문자열을 base64로 감싼다. `react-native-ble-plx`가 characteristic value를 base64로 주고받기 때문에 앱의 `app/src/lib/ble/codec.ts`는 JSON 문자열과 BLE base64 value 사이만 변환한다.
+
+작은 payload는 `PhoneCommand`/`DeviceEvent` JSON을 그대로 한 번에 보낸다. `PhoneContext`처럼 `180 bytes`를 넘는 payload는 transport frame으로 나눠 보낸다.
+
+| Frame | Direction | Fields |
+|-------|-----------|--------|
+| `phone_command_chunk` | app -> device | `id`, `index`, `count`, `data` |
+| `device_event_chunk` | device -> app | `id`, `index`, `count`, `data` |
+
+수신자는 같은 `id`의 chunk를 `index` 순서대로 합친 뒤 원래 JSON DTO validator를 통과시켜야 한다. 이 chunk frame은 BLE transport framing일 뿐이며, domain DTO에는 넣지 않는다.
+
 BLE 모델은 다음 정도만 가진다.
 
 - `DeviceStatus`: 연결 직후와 runtime 상태 변경 시 장치 상태를 전달한다.

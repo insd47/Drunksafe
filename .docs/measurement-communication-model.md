@@ -18,8 +18,8 @@
 
 공개 액션:
 
-- `TriggerDevice::new(pin)`: BOOT 버튼 GPIO를 input pull-up으로 설정한다.
-- `trigger.pressed()`: 버튼이 새로 눌린 순간에만 `true`를 반환한다.
+- `ButtonDevice::new(pin)`: GPIO를 input pull-up 버튼으로 설정한다.
+- `button.pressed()`: 버튼이 새로 눌린 순간에만 `true`를 반환한다.
 
 버튼 trigger는 테스트용 입력이다. 프로덕션 흐름은 주기적 pulse 측정 중 위험 신호가 확인되면 디스플레이와 BLE를 통해 알코올 측정 필요 알림을 보내는 방향으로 확장한다.
 
@@ -29,22 +29,25 @@
 
 공개 액션:
 
-- `AlcoholDevice::new(uart)`: `devices::init()`이 구성한 9600 8N1 UART driver를 ZE29 device handle로 감싼다.
-- `device.sample()`: `0x86` read test results 명령으로 현재 알코올 농도를 읽는다.
+- `AlcoholDevice::new(uart, tx, rx)`: `devices::init()`이 구성한 9600 8N1 UART와 TX/RX 핀을 ZE29 device handle로 감싼다.
+- `device.test()`: `0x86` read test results 명령으로 현재 알코올 농도를 읽는다.
 - `device.status()`: `0x85` query module status 명령으로 모듈 상태 코드를 읽는다.
-- `device.set_wake(wake)`: `0x87` switch module working status 명령으로 센서 모듈의 wake 상태를 전환한다. 공개 매뉴얼의 payload 정의가 상세하지 않아 현재 firmware에서는 `true`를 `0x01`, `false`를 `0x00`으로 캡슐화한다.
+- `device.work(wake)`: `0x87` switch module working status 명령으로 센서 모듈의 wake 상태를 전환한다. 공개 매뉴얼의 payload 정의가 상세하지 않아 현재 firmware에서는 `true`를 `0x01`, `false`를 `0x00`으로 캡슐화한다.
 
 구조:
 
 - `command`: ZE29 명령 코드와 command별 request payload factory
-- `protocol`: 9 byte request/response frame과 checksum
-- `model`: 공통 `Response`, `Concentration`
+- `protocol`: 9 byte request/response frame
+- `checksum`: ZE29 checksum 생성과 검증
+- `channel`: async UART request/response 처리
+- `status`: 모듈 상태 코드 모델
+- `error`: alcohol device 전용 오류 타입
 
 SOLID 관점:
 
 - `protocol`은 frame encode/decode만 담당한다.
-- `model::Response`는 command별 response struct를 만들지 않고 공통 payload 해석을 담당한다.
-- `model::Concentration`은 BLE와 측정 결과에 넘길 도메인 데이터만 담당한다.
+- `channel`은 UART I/O와 timeout만 담당한다.
+- `ResponseFrame`은 command별 response struct를 만들지 않고 공통 payload 해석을 담당한다.
 - `AlcoholDevice`는 concrete `UartDriver`를 소유하므로 ZE29 read/write 호출과 frame 처리 책임이 alcohol device 안에 머문다.
 - UART peripheral/TX/RX 핀 배선과 baudrate 설정은 `devices::init()`에서 관리한다.
 
@@ -54,9 +57,9 @@ SOLID 관점:
 
 공개 액션:
 
-- `PulseDevice::new(i2c)`: `devices::init()`이 구성한 400kHz I2C driver와 pulse algorithm state를 묶는다.
+- `PulseDevice::new(adc, pin)`: `devices::init()`이 구성한 ADC1/GPIO36 입력과 pulse algorithm state를 묶는다.
 - `device.reset()`: 새 측정 세션 시작 시 filter와 sample buffer를 초기화한다.
-- `device.sample(elapsed_ms)`: MAX30102 FIFO에서 PPG 값을 읽고 5초 분석 주기마다 optional analysis를 반환한다.
+- `device.sample(elapsed_ms)`: GPIO36에서 PPG ADC 값을 읽고 5초 분석 주기마다 optional analysis를 반환한다.
 - `device.analyze()`: 마지막 analysis를 조회한다.
 
 `origin/modules`와 `origin/modules-fixed`의 `ppg_processor.py`는 동일하다. 적용 기준은 더 명시적인 `origin/modules-fixed`로 둔다. 핵심은 100Hz PPG 입력에 대한 0.7-3.5Hz 2차 Butterworth band-pass streaming filter, 10초 시작 지연 후 5초마다 분석, peak threshold 50, 최소 peak distance 300ms, IBI 표준편차 200ms 초과 시 불안정 처리, 20초/1분/5분 이동평균 feature다. peak distance 충돌은 더 큰 peak를 남기고, sample cadence jitter는 warning으로만 기록한다. 세션이 바뀔 때는 `device.reset()`을 먼저 호출한다.
@@ -67,7 +70,7 @@ SOLID 관점:
 - `algorithm`: peak detection, IBI/BPM/stability 계산
 - `filter`: origin/modules-fixed 기준 Butterworth streaming filter
 - `state`: filter, sample window, moving average, last analysis
-- `mod.rs`: MAX30102 I2C bus, FIFO sample read, algorithm state handle
+- `mod.rs`: ADC PPG sample read, algorithm state handle
 - `crate::utils::math`: 평균, 표준편차, 반올림 같은 순수 유틸리티
 
 ## ZE29 Protocol
@@ -118,7 +121,7 @@ BLE 모델은 다음 정도만 가진다.
 BLE 모델이 직접 소유하지 않는 것:
 
 - ZE29 raw frame 해석 규칙
-- MAX30102 raw/PPG 알고리즘 세부 구현
+- PPG raw/algorithm 세부 구현
 - 앱 히스토리 DB schema
 - 장기 추천/상담 모델
 
@@ -133,7 +136,7 @@ BLE 모델이 직접 소유하지 않는 것:
 | `sober_alcohol_mg_l_x1000` | 0 근처 baseline 판단 |
 | `elimination_mg_l_per_hour_x1000` | 개인화된 sober-time 계산 |
 
-MAX30102 모델은 `PulseDevice`가 소유하고, BLE `Report`는 해당 device 모델을 optional로 참조한다.
+Pulse 분석 모델은 `PulseDevice`가 소유하고, BLE `Report`는 해당 device 모델을 optional로 참조한다.
 
 ## ERD
 

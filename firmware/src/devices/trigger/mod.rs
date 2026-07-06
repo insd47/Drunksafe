@@ -1,20 +1,20 @@
 use crate::error::Result;
-use esp_idf_svc::hal::gpio::{Gpio0, Input, PinDriver, Pull};
+use esp_idf_svc::hal::gpio::{Input, InputPin, PinDriver, Pull};
 use std::time::{Duration, Instant};
 
 const DEBOUNCE: Duration = Duration::from_millis(80);
 
-/// 테스트용 측정 시작 버튼 디바이스다.
-pub struct TriggerDevice {
+/// Pull-up 입력 버튼 디바이스다.
+pub struct ButtonDevice {
     button: PinDriver<'static, Input>,
     was_pressed: bool,
     last_changed: Instant,
 }
 
-impl TriggerDevice {
-    /// BOOT 버튼 핀을 input pull-up으로 설정한다.
-    pub fn new(pin: Gpio0<'static>) -> Result<Self> {
-        log::debug!("initializing trigger device");
+impl ButtonDevice {
+    /// 버튼 핀을 input pull-up으로 설정한다.
+    pub fn new(pin: impl InputPin + 'static) -> Result<Self> {
+        log::debug!("initializing button device");
         let button = PinDriver::input(pin, Pull::Up)?;
         let was_pressed = button.is_low();
 

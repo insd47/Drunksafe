@@ -7,70 +7,84 @@
 
 위치: `firmware/src/main.rs`
 
-- `main() -> Result<(), EspError>`
+- `main() -> crate::error::Result<()>`
   - logger와 보드 디바이스를 초기화하고 runtime loop를 시작한다.
-  - 현재 runtime loop는 버튼 측정 요청을 감지하고, 새 session ID를 만들고, pulse 상태를 초기화한 뒤 BLE session DTO를 만든다.
+  - 현재 runtime loop는 측정 버튼을 감지해 pulse/alcohol 측정을 실행하고, OLED에 측정 중/결과/오류 화면을 표시한다.
+  - 결과가 있으면 result page 버튼으로 요약, 알코올, pulse 화면을 순환한다.
 
 ## Devices
 
 위치: `firmware/src/devices/mod.rs`
 
-- `devices::init() -> Result<devices::Devices, EspError>`
+- `devices::init() -> crate::error::Result<devices::Devices>`
   - `Peripherals::take()`를 한 번 호출하고 보드 배선에 맞는 HAL driver와 device handle을 구성한다.
 - `devices::Devices`
-  - `trigger`: 테스트용 측정 시작 버튼인 `TriggerDevice`.
+  - `trigger`: 측정 시작 버튼인 `ButtonDevice`.
+  - `result_page`: 결과 화면 순환 버튼인 `ButtonDevice`.
   - `alcohol`: ZE29용 `AlcoholDevice`.
-  - `pulse`: MAX30102용 `PulseDevice`.
+  - `pulse`: 아날로그 PPG용 `PulseDevice`.
+  - `display`: SH1106 OLED용 `DisplayDevice`.
 
 현재 배선은 다음과 같다.
 
 | Feature | Peripheral | Pins |
 |---------|------------|------|
-| Trigger | GPIO | GPIO0 |
+| Measurement trigger | GPIO | GPIO0 |
+| Result page cycle | GPIO | GPIO18 |
 | Alcohol | UART2 | TX GPIO17, RX GPIO16 |
-| Pulse | I2C0 | SDA GPIO21, SCL GPIO22 |
+| Pulse | ADC1 | GPIO36 |
+| Display | I2C0 | SDA GPIO21, SCL GPIO22 |
 
-## Trigger
+## Buttons
 
 위치: `firmware/src/devices/trigger/`
 
-- `TriggerDevice::new(pin) -> Result<TriggerDevice, EspError>`
-  - BOOT 버튼 핀을 input pull-up으로 설정한다.
-- `trigger.pressed() -> bool`
+- `ButtonDevice::new(pin) -> crate::error::Result<ButtonDevice>`
+  - GPIO 핀을 input pull-up 버튼으로 설정한다.
+- `button.pressed() -> bool`
   - 버튼이 새로 눌린 순간에만 `true`를 반환한다.
-  - 버튼 trigger는 테스트용 입력이므로 이벤트 매핑은 두지 않는다. 단, 채터링으로 세션이 중복 생성되지 않도록 최소 debounce만 둔다.
+  - 채터링으로 동작이 중복 실행되지 않도록 최소 debounce를 둔다.
 
 ## Alcohol
 
 위치: `firmware/src/devices/alcohol/`
 
-- `AlcoholDevice::new(uart) -> AlcoholDevice`
-  - `devices::init()`이 구성한 UART driver를 ZE29 device handle로 감싼다.
-- `device.sample() -> alcohol device Result<AlcoholConcentration>`
+- `AlcoholDevice::new(uart, tx, rx) -> alcohol::Result<AlcoholDevice>`
+  - `devices::init()`에서 UART2와 TX/RX 핀을 받아 ZE29 device handle을 만든다.
+- `device.test() -> alcohol device Result<u16>`
   - ZE29 `0x86` read test results 명령으로 현재 알코올 측정값을 읽는다.
-- `device.status() -> alcohol device Result<u8>`
+- `device.status() -> alcohol device Result<Status>`
   - ZE29 `0x85` query module status 명령으로 모듈 상태 코드를 읽는다.
-- `device.set_wake(wake) -> alcohol device Result<()>`
+- `device.work(wake) -> alcohol device Result<()>`
   - ZE29 `0x87` switch module working status 명령으로 센서 모듈의 wake 상태를 전환한다.
-  - 공개 매뉴얼의 payload 정의가 상세하지 않아 현재 firmware에서는 `true`를 `0x01`, `false`를 `0x00`으로 캡슐화한다.
-- `AlcoholConcentration`
-  - `mg_l_x1000`: mg/L x1000 정수로 표현한 호기 알코올 농도다.
+  - 현재 firmware에서는 `true`를 `0x01`, `false`를 `0x00`으로 캡슐화한다.
 
 ## Pulse
 
 위치: `firmware/src/devices/pulse/`
 
-- `PulseDevice::new(i2c) -> PulseDevice`
-  - `devices::init()`이 구성한 I2C driver와 pulse 분석 상태를 묶는다.
+- `PulseDevice::new(adc, pin) -> core::result::Result<PulseDevice, EspError>`
+  - `devices::init()`이 구성한 ADC1/GPIO36 입력과 pulse 분석 상태를 묶는다.
 - `device.reset()`
   - 새 측정 세션 시작 전에 filter, sample window, trend 상태를 초기화한다.
 - `device.sample(elapsed_ms) -> pulse device Result<Option<PulseAnalysis>>`
-  - MAX30102 FIFO에서 sample을 읽고 분석 상태에 반영한다.
+  - GPIO36에서 PPG ADC sample을 읽고 분석 상태에 반영한다.
   - 분석 주기가 되지 않았거나 안정적인 pulse가 아직 확인되지 않으면 `Ok(None)`을 반환한다.
 - `device.analyze() -> Option<PulseAnalysis>`
   - 마지막 분석 결과를 조회한다.
 - `PulseAnalysis`
   - `bpm`, `ibi_stddev_ms`, `peak_amplitude`, 안정 여부, 신뢰도, 20초/1분/5분 trend를 포함한다.
+
+## Display
+
+위치: `firmware/src/devices/display/`, `firmware/src/features/screen/`
+
+- `DisplayDevice::new(i2c, sda, scl) -> core::result::Result<DisplayDevice, EspError>`
+  - I2C0/GPIO21/GPIO22로 SH1106 128x64 OLED를 초기화한다.
+- `display.draw(|canvas| canvas.centered(...)) -> core::result::Result<(), EspError>`
+  - feature layer가 전달한 drawing closure를 128x64 frame buffer에 반영하고 OLED로 전송한다.
+- `features::screen::ResultPager`
+  - 측정 결과 이후 `Done -> Alcohol -> Pulse -> Done` 화면 순환 상태를 소유한다.
 
 ## BLE
 

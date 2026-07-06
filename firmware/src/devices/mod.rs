@@ -3,7 +3,7 @@ pub use alcohol::AlcoholDevice;
 pub use display::DisplayDevice;
 use esp_idf_svc::hal::peripherals::Peripherals;
 pub use pulse::PulseDevice;
-pub use trigger::ButtonDevice;
+pub use trigger::TriggerDevice;
 
 pub mod alcohol;
 pub mod display;
@@ -18,8 +18,7 @@ pub fn init() -> Result<Devices> {
         alcohol: AlcoholDevice::new(peripherals.uart2, pins.gpio17, pins.gpio16)?,
         display: DisplayDevice::new(peripherals.i2c0, pins.gpio21, pins.gpio22)?,
         pulse: PulseDevice::new(peripherals.adc1, pins.gpio36)?,
-        trigger: ButtonDevice::new(pins.gpio0)?,
-        result_page: ButtonDevice::new(pins.gpio18)?,
+        trigger: TriggerDevice::new(pins.gpio0)?,
     })
 }
 
@@ -28,6 +27,5 @@ pub struct Devices {
     pub alcohol: AlcoholDevice<'static>,
     pub display: DisplayDevice<'static>,
     pub pulse: PulseDevice<'static>,
-    pub trigger: ButtonDevice,
-    pub result_page: ButtonDevice,
+    pub trigger: TriggerDevice,
 }

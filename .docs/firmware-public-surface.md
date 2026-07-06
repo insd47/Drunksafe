@@ -10,7 +10,6 @@
 - `main() -> crate::error::Result<()>`
   - logger와 보드 디바이스를 초기화하고 runtime loop를 시작한다.
   - 현재 runtime loop는 측정 버튼을 감지해 pulse/alcohol 측정을 실행하고, OLED에 측정 중/결과/오류 화면을 표시한다.
-  - 결과가 있으면 result page 버튼으로 요약, 알코올, pulse 화면을 순환한다.
 
 ## Devices
 
@@ -19,8 +18,7 @@
 - `devices::init() -> crate::error::Result<devices::Devices>`
   - `Peripherals::take()`를 한 번 호출하고 보드 배선에 맞는 HAL driver와 device handle을 구성한다.
 - `devices::Devices`
-  - `trigger`: 측정 시작 버튼인 `ButtonDevice`.
-  - `result_page`: 결과 화면 순환 버튼인 `ButtonDevice`.
+  - `trigger`: 측정 시작 버튼인 `TriggerDevice`.
   - `alcohol`: ZE29용 `AlcoholDevice`.
   - `pulse`: 아날로그 PPG용 `PulseDevice`.
   - `display`: SH1106 OLED용 `DisplayDevice`.
@@ -30,18 +28,17 @@
 | Feature | Peripheral | Pins |
 |---------|------------|------|
 | Measurement trigger | GPIO | GPIO0 |
-| Result page cycle | GPIO | GPIO18 |
 | Alcohol | UART2 | TX GPIO17, RX GPIO16 |
 | Pulse | ADC1 | GPIO36 |
 | Display | I2C0 | SDA GPIO21, SCL GPIO22 |
 
-## Buttons
+## Trigger
 
 위치: `firmware/src/devices/trigger/`
 
-- `ButtonDevice::new(pin) -> crate::error::Result<ButtonDevice>`
-  - GPIO 핀을 input pull-up 버튼으로 설정한다.
-- `button.pressed() -> bool`
+- `TriggerDevice::new(pin) -> crate::error::Result<TriggerDevice>`
+  - BOOT 버튼 GPIO0를 input pull-up으로 설정한다.
+- `trigger.pressed() -> bool`
   - 버튼이 새로 눌린 순간에만 `true`를 반환한다.
   - 채터링으로 동작이 중복 실행되지 않도록 최소 debounce를 둔다.
 
@@ -77,18 +74,18 @@
 
 ## Display
 
-위치: `firmware/src/devices/display/`, `firmware/src/features/screen/`
+위치: `firmware/src/devices/display/`, `../firmware/src/services/screen/`
 
 - `DisplayDevice::new(i2c, sda, scl) -> core::result::Result<DisplayDevice, EspError>`
   - I2C0/GPIO21/GPIO22로 SH1106 128x64 OLED를 초기화한다.
-- `display.draw(|canvas| canvas.centered(...)) -> core::result::Result<(), EspError>`
-  - feature layer가 전달한 drawing closure를 128x64 frame buffer에 반영하고 OLED로 전송한다.
-- `features::screen::ResultPager`
-  - 측정 결과 이후 `Done -> Alcohol -> Pulse -> Done` 화면 순환 상태를 소유한다.
+- `display.clear() -> core::result::Result<(), EspError>`
+  - 128x64 frame buffer를 비우고 OLED로 전송한다.
+- `features::screen::show(display, view)`
+  - `Home`, `Measuring`, `Failed`, `Result` 화면을 표시하고 실패 시 warning log를 남긴다.
 
 ## BLE
 
-위치: `../firmware/src/features/ble/`
+위치: `../firmware/src/services/ble/`
 
 - `ble::session(session_id) -> DeviceToPhone`
   - 보드 버튼으로 시작된 측정 세션 요청 DTO를 만든다.

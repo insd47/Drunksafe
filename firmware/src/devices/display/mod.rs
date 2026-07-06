@@ -1,4 +1,4 @@
-pub use canvas::Canvas;
+pub(crate) use canvas::Canvas;
 use esp_idf_svc::hal::delay::BLOCK;
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
 use esp_idf_svc::hal::i2c::{I2c, I2cConfig, I2cDriver};
@@ -41,7 +41,7 @@ impl<'d> DisplayDevice<'d> {
         self.flush()
     }
 
-    pub fn draw(&mut self, content: impl FnOnce(&mut Canvas<'_>)) -> Result<(), EspError> {
+    pub(crate) fn draw(&mut self, content: impl FnOnce(&mut Canvas<'_>)) -> Result<(), EspError> {
         self.frame.clear();
         content(&mut Canvas {
             frame: &mut self.frame,

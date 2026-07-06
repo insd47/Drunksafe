@@ -18,8 +18,8 @@
 
 공개 액션:
 
-- `ButtonDevice::new(pin)`: GPIO를 input pull-up 버튼으로 설정한다.
-- `button.pressed()`: 버튼이 새로 눌린 순간에만 `true`를 반환한다.
+- `TriggerDevice::new(pin)`: BOOT 버튼 GPIO0를 input pull-up으로 설정한다.
+- `trigger.pressed()`: 버튼이 새로 눌린 순간에만 `true`를 반환한다.
 
 버튼 trigger는 테스트용 입력이다. 프로덕션 흐름은 주기적 pulse 측정 중 위험 신호가 확인되면 디스플레이와 BLE를 통해 알코올 측정 필요 알림을 보내는 방향으로 확장한다.
 
@@ -70,7 +70,7 @@ SOLID 관점:
 - `algorithm`: peak detection, IBI/BPM/stability 계산
 - `filter`: origin/modules-fixed 기준 Butterworth streaming filter
 - `state`: filter, sample window, moving average, last analysis
-- `mod.rs`: ADC PPG sample read, algorithm state handle
+- `services`: ADC PPG sample read, algorithm state handle
 - `crate::utils::math`: 평균, 표준편차, 반올림 같은 순수 유틸리티
 
 ## ZE29 Protocol
@@ -105,7 +105,7 @@ SOLID 관점:
 
 ## BLE Model
 
-위치: `../firmware/src/features/ble/model.rs`
+위치: `../firmware/src/services/ble/model.rs`
 
 공개 액션:
 

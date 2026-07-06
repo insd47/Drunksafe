@@ -20,17 +20,15 @@ The Arduino display code uses:
 The Rust firmware maps this into:
 
 - `firmware/src/devices/display`: SH1106 I2C driver and pixel rendering
-- `firmware/src/features/screen`: screen policy and result-page state
+- `../firmware/src/services/screen`: screen view policy
 - `firmware/src/devices/mod.rs`: hardware pin ownership
 
-The current supported pages are:
+The current supported screen views are:
 
 - Home
 - Measuring
-- Done summary
-- Alcohol value
-- Pulse value
-- Error
+- Result summary
+- Failed
 
 Korean U8g2 font rendering is not ported yet. The first Rust integration uses an ASCII 5x7 font so it can build without adding a display/font dependency.
 
@@ -46,7 +44,6 @@ Current Rust firmware pins:
 | OLED SCL | GPIO22 | Same as Screen branch |
 | Pulse ADC | GPIO36 | Same PPG input family |
 | Measurement trigger | GPIO0 | Uses the ESP32 BOOT button for now |
-| Result page cycle | GPIO18 | Repurposed from Arduino `BTN_BREATH` because GPIO16/17 are occupied |
 
 Arduino `HWsketch/HWMAIN/config.h` used:
 
@@ -54,9 +51,7 @@ Arduino `HWsketch/HWMAIN/config.h` used:
 - `BTN_NEXT = 17`
 - `BTN_BREATH = 18`
 
-GPIO16 and GPIO17 cannot be copied directly because the Rust firmware already uses them for the alcohol UART. GPIO18 is therefore wired as a temporary result-page cycle button in Rust:
-
-`Done -> Alcohol -> Pulse -> Done`
+GPIO16 and GPIO17 cannot be copied directly because the Rust firmware already uses them for the alcohol UART. GPIO18 is currently not used by the Rust firmware.
 
 ## Hardware Checks
 
@@ -65,6 +60,5 @@ On the physical OLED, verify:
 - Display responds at `0x3c`
 - SH1106 initialization sequence wakes the panel
 - `COLUMN_OFFSET = 2` correctly aligns the image
-- GPIO18 button is wired as active-low with pull-up
 
 If the display is blank, check address and initialization first. If content is shifted horizontally, tune `COLUMN_OFFSET`.

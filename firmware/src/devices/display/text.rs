@@ -1,8 +1,8 @@
-use crate::devices::display::TEXT_BYTES;
+use super::TEXT_BYTES;
 use core::fmt;
 use std::fmt::Write;
 
-pub struct Text {
+pub(super) struct Text {
     bytes: [u8; TEXT_BYTES],
     len: usize,
 }
@@ -15,13 +15,13 @@ impl Text {
         }
     }
 
-    pub fn from_args(args: fmt::Arguments<'_>) -> Self {
+    pub(super) fn from_args(args: fmt::Arguments<'_>) -> Self {
         let mut text = Self::empty();
         let _ = text.write_fmt(args);
         text
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(super) fn as_str(&self) -> &str {
         core::str::from_utf8(&self.bytes[..self.len]).unwrap_or("")
     }
 }

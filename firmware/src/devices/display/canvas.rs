@@ -1,14 +1,14 @@
-use core::fmt;
+use super::text::Text;
 use crate::devices::display::font;
 use crate::devices::display::frame::{Frame, WIDTH};
-use super::text::Text;
+use core::fmt;
 
-pub struct Canvas<'a> {
+pub(crate) struct Canvas<'a> {
     pub(super) frame: &'a mut Frame,
 }
 
 impl Canvas<'_> {
-    pub fn centered(&mut self, y: usize, text: fmt::Arguments<'_>) {
+    pub(crate) fn centered(&mut self, y: usize, text: fmt::Arguments<'_>) {
         let text = Text::from_args(text);
         self.draw_centered(y, text.as_str());
     }

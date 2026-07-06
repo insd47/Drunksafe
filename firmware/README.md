@@ -7,7 +7,7 @@ The current hardware scope is:
 - ZE29 C2H5OH alcohol module over UART.
 - Analog PPG heart-rate sensor over ADC.
 - SH1106 128x64 OLED display over I2C.
-- Pull-up buttons for measurement trigger and result page cycling.
+- Pull-up button for measurement trigger.
 
 The measurement flow, BLE protocol model, and storage ERD are documented in [../.docs/measurement-communication-model.md](../.docs/measurement-communication-model.md).
 Firmware 공개 표면은 [../.docs/firmware-public-surface.md](../.docs/firmware-public-surface.md)에 한국어로 정리되어 있다.

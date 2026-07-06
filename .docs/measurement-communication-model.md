@@ -161,6 +161,8 @@ BLE 모델이 직접 소유하지 않는 것:
 | `elimination_mg_l_per_hour_x1000` | 개인화된 sober-time 계산 |
 | `resting_bpm` | pulse 보조 신뢰도 판단 |
 
+앱은 원본 프로필(나이, 키, 몸무게, 성별)을 BLE로 보내지 않는다. 학습된 `elimination_mg_l_per_hour_x1000`가 없고 프로필이 완성된 경우에만 평균 0.015% BAC/hour보다 보수적인 0.013% BAC/hour 상당값인 `62 mg/L x1000/hour`를 fallback context로 보낸다. 실측 baseline이나 향후 개인화 학습값이 생기면 그 값이 우선한다.
+
 Pulse 분석 모델은 `PulseDevice`가 소유하고, BLE `MeasurementResult`는 해당 device 모델을 optional로 참조한다.
 
 ## Result Analysis MVP
@@ -178,6 +180,7 @@ Pulse 분석 모델은 `PulseDevice`가 소유하고, BLE `MeasurementResult`는
 
 - 대한민국 도로교통법 제44조 제4항: https://www.law.go.kr/LSW//lsLinkCommonInfo.do?ancYnChk=&chrClsCd=010202&lsJoLnkSeq=1020823237
 - BAC/BrAC 2100:1 단위 설명: https://www.utoledo.edu/studentaffairs/counseling/selfhelp/substanceuse/bac.html
+- ANSI/ASB BPR 122 alcohol calculation elimination-rate range: https://www.tdcaa.com/wp-content/uploads/BPR-122-BAC-Calculations.pdf
 
 ## ERD
 

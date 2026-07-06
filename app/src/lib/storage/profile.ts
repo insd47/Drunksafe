@@ -1,5 +1,6 @@
 import { protocolVersion } from '@/lib/ble/model';
 import type { PhoneContext } from '@/lib/ble/model';
+import { estimateProfileEliminationMgLPerHourX1000 } from '@/lib/personalization/profile-context';
 import { readHistoryEntries } from '@/lib/storage/history';
 import { readJson, writeJson } from '@/lib/storage/json';
 
@@ -68,6 +69,7 @@ export async function buildPhoneContext(
   sessionId: string,
   historyLimit: number
 ): Promise<PhoneContext> {
+  const profile = await readProfile();
   const baseline = await readBaseline();
   const recent = await readHistoryEntries(clampHistoryLimit(historyLimit));
 
@@ -78,7 +80,9 @@ export async function buildPhoneContext(
     recent,
     sober_alcohol_mg_l_x1000: baseline.sober_alcohol_mg_l_x1000,
     sober_alcohol_mad_mg_l_x1000: baseline.sober_alcohol_mad_mg_l_x1000,
-    elimination_mg_l_per_hour_x1000: baseline.elimination_mg_l_per_hour_x1000,
+    elimination_mg_l_per_hour_x1000:
+      baseline.elimination_mg_l_per_hour_x1000 ??
+      estimateProfileEliminationMgLPerHourX1000(profile),
     resting_bpm: baseline.resting_bpm,
   };
 }

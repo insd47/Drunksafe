@@ -19,6 +19,7 @@ const steps: { step: MeasurementStep; value: '완료' | '진행 중' | '대기' 
 export function MeasureScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const isBaseline = sessionId === 'baseline';
+  const resultHref = isBaseline ? '/results/baseline-demo' : '/results/demo-result';
 
   return (
     <Screen>
@@ -49,7 +50,7 @@ export function MeasureScreen() {
         ))}
       </Section>
 
-      <ActionLink href="/results/demo-result" label="결과 화면 미리보기" />
+      <ActionLink href={resultHref} label="결과 화면 미리보기" />
     </Screen>
   );
 }

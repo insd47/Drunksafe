@@ -1,4 +1,4 @@
-import Storage from 'expo-sqlite/kv-store';
+import { jsonStore } from '@/lib/storage/json-store';
 
 export async function readJson<T>(
   key: string,
@@ -6,7 +6,7 @@ export async function readJson<T>(
   isValue: (value: unknown) => value is T,
   sanitizeValue?: (value: unknown) => T | null
 ) {
-  const value = await Storage.getItem(key);
+  const value = await jsonStore.getItem(key);
 
   if (!value) {
     return fallback();
@@ -29,14 +29,14 @@ export async function readJson<T>(
     // Corrupt JSON is cleared below.
   }
 
-  await Storage.removeItem(key);
+  await jsonStore.removeItem(key);
   return fallback();
 }
 
 export async function writeJson<T>(key: string, value: T) {
-  await Storage.setItem(key, JSON.stringify(value));
+  await jsonStore.setItem(key, JSON.stringify(value));
 }
 
 export async function removeJson(key: string) {
-  await Storage.removeItem(key);
+  await jsonStore.removeItem(key);
 }

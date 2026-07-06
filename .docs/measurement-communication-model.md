@@ -121,6 +121,8 @@ GATT transport 계약:
 
 실제 GATT characteristic value는 UTF-8 JSON bytes다. `react-native-ble-plx` JS API가 characteristic value를 base64 문자열로 표현하므로, 앱의 `app/src/lib/ble/codec.ts`는 API 경계에서만 JSON 문자열과 BLE base64 value 사이를 변환한다. 펌웨어는 수신한 raw bytes를 UTF-8 JSON으로 파싱한다.
 
+대표 GATT UUID, `DeviceEvent`, `PhoneCommand`, chunk 검증 입력은 `.docs/ble-contract-fixtures.json`에 둔다. 앱의 `pnpm test:ble-contract`는 이 fixture를 기준으로 BLE model validator, command serialization, event chunk reassembly, base64 boundary codec을 검증한다.
+
 작은 payload는 `PhoneCommand`/`DeviceEvent` JSON을 그대로 한 번에 보낸다. `PhoneContext`처럼 협상된 GATT payload limit을 넘는 payload는 transport frame으로 나눠 보낸다. 현재 앱과 펌웨어 transport의 기본 목표 payload는 MTU 185 기준 `180 bytes`다.
 
 | Frame | Direction | Fields |

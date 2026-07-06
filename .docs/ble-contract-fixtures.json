@@ -1,0 +1,145 @@
+{
+  "protocolVersion": 6,
+  "gatt": {
+    "serviceUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12201",
+    "deviceEventCharacteristicUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12202",
+    "phoneCommandCharacteristicUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12203",
+    "deviceNamePrefix": "Drunksafe"
+  },
+  "enums": {
+    "source": ["board_button", "phone"],
+    "statusKind": [
+      "idle",
+      "connected",
+      "need_context",
+      "measuring",
+      "result_ready",
+      "error"
+    ],
+    "measurementStep": [
+      "preparing",
+      "warming_sensor",
+      "waiting_breath",
+      "sampling_breath",
+      "sampling_pulse",
+      "analyzing",
+      "done"
+    ],
+    "risk": ["safe", "caution", "danger"],
+    "errorCode": [
+      "context_timeout",
+      "alcohol_sensor",
+      "pulse_sensor",
+      "weak_breath",
+      "measurement_timeout",
+      "cancelled",
+      "protocol"
+    ]
+  },
+  "payloadKinds": {
+    "deviceEvent": [
+      "status",
+      "measurement_started",
+      "measurement_progress",
+      "measurement_result",
+      "device_error"
+    ],
+    "phoneCommand": ["start", "context", "cancel", "time", "ack"],
+    "transportFrame": ["phone_command_chunk", "device_event_chunk"],
+    "transportFrameFields": ["frame", "id", "index", "count", "data"]
+  },
+  "deviceEvents": [
+    {
+      "event": "status",
+      "v": 6,
+      "status": "connected",
+      "active_session_id": null,
+      "battery_percent": 88,
+      "firmware_version": "0.1.0"
+    },
+    {
+      "event": "measurement_started",
+      "v": 6,
+      "session_id": "fw-fixture-1",
+      "source": "phone",
+      "history_limit": 8,
+      "needs_context": true,
+      "sync_time": true
+    },
+    {
+      "event": "measurement_progress",
+      "v": 6,
+      "session_id": "fw-fixture-1",
+      "step": "sampling_breath",
+      "percent": 50
+    },
+    {
+      "event": "measurement_result",
+      "v": 6,
+      "session_id": "fw-fixture-1",
+      "measured_at_unix_ms": 1798848000000,
+      "alcohol": {
+        "mg_l_x1000": 165
+      },
+      "pulse": {
+        "bpm": 96,
+        "stable": true,
+        "confidence_percent": 82
+      },
+      "bac_milli_percent": 35,
+      "bac_upper_milli_percent": 39,
+      "sober_time_minutes": 156,
+      "risk": "danger",
+      "confidence_percent": 82
+    },
+    {
+      "event": "device_error",
+      "v": 6,
+      "session_id": "fw-fixture-1",
+      "code": "context_timeout"
+    }
+  ],
+  "phoneCommands": [
+    {
+      "cmd": "start"
+    },
+    {
+      "cmd": "time",
+      "unix_time_ms": 1798848000000
+    },
+    {
+      "cmd": "context",
+      "v": 6,
+      "session_id": "fw-fixture-1",
+      "phone_time_unix_ms": 1798848000000,
+      "recent": [
+        {
+          "measured_at_unix_ms": 1798844400000,
+          "alcohol_mg_l_x1000": 7,
+          "bac_milli_percent": 1,
+          "risk": "safe",
+          "confidence_percent": 90
+        },
+        {
+          "measured_at_unix_ms": 1798846200000,
+          "alcohol_mg_l_x1000": 118,
+          "bac_milli_percent": 25,
+          "risk": "caution",
+          "confidence_percent": 76
+        }
+      ],
+      "sober_alcohol_mg_l_x1000": 7,
+      "sober_alcohol_mad_mg_l_x1000": 3,
+      "elimination_mg_l_per_hour_x1000": 63,
+      "resting_bpm": 71
+    },
+    {
+      "cmd": "cancel",
+      "session_id": "fw-fixture-1"
+    },
+    {
+      "cmd": "ack",
+      "session_id": "fw-fixture-1"
+    }
+  ]
+}

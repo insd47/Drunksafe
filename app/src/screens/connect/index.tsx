@@ -1,16 +1,21 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 
+import { ActionButton } from '@/components/action-button';
 import { ActionLink } from '@/components/action-link';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { Separator } from '@/components/separator';
 import { StatusRow } from '@/components/status-row';
+import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
 import { formatBac, formatMinutes, formatRisk, riskTone } from '@/lib/format/measurement';
 import { latestMeasurement, readHistory, type MeasurementRecord } from '@/lib/storage/history';
 import { emptyBaseline, emptyProfile, readBaseline, readProfile } from '@/lib/storage/profile';
 
 export function ConnectScreen() {
+  const router = useRouter();
+  const ble = useBleSession();
+  const initializeBle = ble.initialize;
   const [summary, setSummary] = useState<Summary>({
     baselineReady: false,
     profileReady: false,
@@ -18,6 +23,10 @@ export function ConnectScreen() {
     latest: null,
     failed: false,
   });
+
+  useEffect(() => {
+    initializeBle();
+  }, [initializeBle]);
 
   useFocusEffect(
     useCallback(() => {
@@ -58,19 +67,54 @@ export function ConnectScreen() {
   );
 
   const contextReady = summary.baselineReady;
+  const scanDisabled = ble.connectionPhase === 'connecting' || ble.bluetoothState !== 'PoweredOn';
+  const measurementDisabled =
+    !ble.connectedDevice ||
+    ble.measurementPhase === 'starting' ||
+    ble.measurementPhase === 'waiting_context';
+
+  const handleScan = () => {
+    if (ble.connectionPhase === 'scanning') {
+      void ble.stopScan();
+      return;
+    }
+
+    void ble.startScan();
+  };
+
+  const handleStartMeasurement = () => {
+    void ble.startMeasurement();
+    router.push(`/measure/${ble.activeSessionId ?? 'live'}`);
+  };
 
   return (
     <Screen>
       <Section eyebrow="BLE" title="장치 연결">
         <StatusRow
+          label="Bluetooth"
+          value={bluetoothLabel(ble.bluetoothState)}
+          description={ble.message ?? '근처 Drunksafe 장치를 검색할 수 있습니다.'}
+          tone={bluetoothTone(ble.bluetoothState)}
+        />
+        <StatusRow
           label="스캔"
-          value="대기"
-          description="Drunksafe 보드 notify를 받을 준비가 됐습니다."
+          value={connectionLabel(ble.connectionPhase)}
+          description={
+            ble.devices.length > 0
+              ? `${ble.devices.length}개 장치를 찾았습니다.`
+              : 'Drunksafe 보드 notify를 받을 준비가 됐습니다.'
+          }
+          tone={connectionTone(ble.connectionPhase)}
         />
         <StatusRow
           label="연결"
-          value="미연결"
-          description="연결되면 측정 context를 보낼 수 있습니다."
+          value={ble.connectedDevice?.name ?? '미연결'}
+          description={
+            ble.connectedDevice
+              ? '측정 시작과 context 전송이 가능합니다.'
+              : '연결되면 측정 context를 보낼 수 있습니다.'
+          }
+          tone={ble.connectedDevice ? 'safe' : 'neutral'}
         />
         <StatusRow
           label="Context"
@@ -82,6 +126,66 @@ export function ConnectScreen() {
           }
           tone={summary.failed ? 'danger' : contextReady ? 'safe' : 'caution'}
         />
+        <StatusRow
+          label="측정"
+          value={measurementLabel(ble.measurementPhase)}
+          description={ble.activeSessionId ?? '아직 활성 세션이 없습니다.'}
+          tone={
+            ble.measurementPhase === 'error'
+              ? 'danger'
+              : ble.measurementPhase === 'result'
+                ? 'safe'
+                : ble.measurementPhase === 'idle'
+                  ? 'neutral'
+                  : 'caution'
+          }
+        />
+      </Section>
+
+      {ble.devices.length > 0 ? (
+        <Section eyebrow="Scan" title="발견된 장치">
+          {ble.devices.map((device) => (
+            <StatusRow
+              key={device.id}
+              label={device.name}
+              value={device.rssi === null ? 'RSSI -' : `${device.rssi} dBm`}
+              description={device.id}
+            />
+          ))}
+        </Section>
+      ) : null}
+
+      <Section eyebrow="Control" title="측정 제어">
+        <ActionButton
+          label={ble.connectionPhase === 'scanning' ? '스캔 중지' : 'Drunksafe 스캔'}
+          disabled={scanDisabled}
+          onPress={handleScan}
+        />
+        {ble.devices.map((device) => (
+          <ActionButton
+            key={device.id}
+            label={`${device.name} 연결`}
+            disabled={ble.connectionPhase === 'connecting'}
+            variant="secondary"
+            onPress={() => {
+              void ble.connect(device.id);
+            }}
+          />
+        ))}
+        <ActionButton
+          label="측정 시작"
+          disabled={measurementDisabled}
+          onPress={handleStartMeasurement}
+        />
+        {ble.connectedDevice ? (
+          <ActionButton
+            label="연결 해제"
+            variant="secondary"
+            onPress={() => {
+              void ble.disconnect();
+            }}
+          />
+        ) : null}
       </Section>
 
       <Section eyebrow="Context" title="개인화 준비">
@@ -140,7 +244,7 @@ export function ConnectScreen() {
       <Separator />
 
       <ActionLink href="/onboarding" label="온보딩 시작" />
-      <ActionLink href="/measure/demo-session" label="측정 화면 미리보기" variant="secondary" />
+      <ActionLink href="/measure/live" label="측정 화면 열기" variant="secondary" />
       <ActionLink href="/history" label="히스토리 보기" variant="secondary" />
     </Screen>
   );
@@ -153,3 +257,78 @@ type Summary = {
   latest: MeasurementRecord | null;
   failed: boolean;
 };
+
+function bluetoothLabel(state: string) {
+  if (state === 'PoweredOn') {
+    return '켜짐';
+  }
+
+  if (state === 'Unsupported') {
+    return '미지원';
+  }
+
+  return '꺼짐';
+}
+
+function bluetoothTone(state: string) {
+  if (state === 'PoweredOn') {
+    return 'safe';
+  }
+
+  if (state === 'Unsupported') {
+    return 'danger';
+  }
+
+  return 'caution';
+}
+
+function connectionLabel(phase: BleConnectionPhase) {
+  const labels: Record<BleConnectionPhase, string> = {
+    idle: '대기',
+    bluetooth_off: '대기',
+    scanning: '검색 중',
+    connecting: '연결 중',
+    connected: '연결됨',
+    unsupported: '미지원',
+    error: '오류',
+  };
+
+  return labels[phase];
+}
+
+function connectionTone(phase: BleConnectionPhase) {
+  if (phase === 'connected') {
+    return 'safe';
+  }
+
+  if (phase === 'error' || phase === 'unsupported') {
+    return 'danger';
+  }
+
+  if (phase === 'scanning' || phase === 'connecting' || phase === 'bluetooth_off') {
+    return 'caution';
+  }
+
+  return 'neutral';
+}
+
+function measurementLabel(phase: SummaryMeasurementPhase) {
+  const labels: Record<SummaryMeasurementPhase, string> = {
+    idle: '대기',
+    starting: '시작 중',
+    waiting_context: 'Context 전송',
+    measuring: '측정 중',
+    result: '결과 수신',
+    error: '오류',
+  };
+
+  return labels[phase];
+}
+
+type SummaryMeasurementPhase =
+  | 'idle'
+  | 'starting'
+  | 'waiting_context'
+  | 'measuring'
+  | 'result'
+  | 'error';

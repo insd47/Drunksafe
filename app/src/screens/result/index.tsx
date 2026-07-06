@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 
 import { ActionButton } from '@/components/action-button';
@@ -8,6 +8,7 @@ import { Section } from '@/components/section';
 import { Separator } from '@/components/separator';
 import { StatusRow } from '@/components/status-row';
 import { protocolVersion, type MeasurementResult } from '@/lib/ble/model';
+import { useBleSession } from '@/lib/ble/session';
 import {
   formatAlcohol,
   formatBac,
@@ -20,9 +21,20 @@ import { recordFromResult, type MeasurementKind } from '@/lib/storage/history';
 
 export function ResultScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const kind: MeasurementKind = id === 'baseline-demo' ? 'baseline' : 'measurement';
-  const result = useMemo(() => createDemoResult(kind), [kind]);
+  const ble = useBleSession();
+  const initializeBle = ble.initialize;
+  const liveResult = ble.result?.session_id === id ? ble.result : null;
+  const kind: MeasurementKind = liveResult
+    ? ble.activeMeasurementKind
+    : id === 'baseline-demo'
+      ? 'baseline'
+      : 'measurement';
+  const result = useMemo(() => liveResult ?? createDemoResult(kind), [kind, liveResult]);
   const record = useMemo(() => recordFromResult(result, kind), [kind, result]);
+
+  useEffect(() => {
+    initializeBle();
+  }, [initializeBle]);
 
   return (
     <Screen>
@@ -61,15 +73,26 @@ export function ResultScreen() {
         />
         <StatusRow
           label="저장 상태"
-          value="미리보기"
-          description="실측 BLE result가 붙으면 저장합니다."
+          value={liveResult ? (ble.resultSaved ? '저장됨' : '저장 실패') : '미리보기'}
+          description={
+            liveResult
+              ? 'BLE result를 기준으로 표시합니다.'
+              : '실측 BLE result가 붙으면 저장합니다.'
+          }
+          tone={liveResult && !ble.resultSaved ? 'danger' : liveResult ? 'safe' : 'neutral'}
         />
       </Section>
 
       <Separator />
 
       <ActionButton
-        label={kind === 'baseline' ? '실측 Baseline만 저장' : '실측 결과만 저장'}
+        label={
+          liveResult
+            ? '결과 저장 완료'
+            : kind === 'baseline'
+              ? '실측 Baseline만 저장'
+              : '실측 결과만 저장'
+        }
         disabled
         onPress={() => {}}
       />

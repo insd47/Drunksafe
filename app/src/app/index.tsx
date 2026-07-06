@@ -1,5 +1,5 @@
-import { ScreenContent } from '@/components/ScreenContent';
+import { ConnectScreen } from '@/screens/connect';
 
 export default function HomeScreen() {
-  return <ScreenContent title="Home" path="src/app/index.tsx" />;
+  return <ConnectScreen />;
 }

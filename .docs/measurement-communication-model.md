@@ -161,6 +161,22 @@ BLE 모델이 직접 소유하지 않는 것:
 
 Pulse 분석 모델은 `PulseDevice`가 소유하고, BLE `MeasurementResult`는 해당 device 모델을 optional로 참조한다.
 
+## Result Analysis MVP
+
+펌웨어 MVP의 `MeasurementResult`는 실험용/보수적 안내값이다. 법적 판정이나 의료 판단으로 쓰지 않는다.
+
+- ZE29 호기 알코올 `mg/L`는 일반적인 breath-to-blood 2100:1 환산을 사용해 BAC percent로 추정한다. 코드 단위에서는 `alcohol_mg_l_x1000 * 0.21`을 `bac_milli_percent`로 둔다.
+- 한국 도로교통법상 운전금지 기준인 혈중알코올농도 `0.03%`를 `danger` 기준으로 둔다. `0.015%` 이상 `0.03%` 미만은 조기 경고 목적의 `caution`이다.
+- 앱에서 보낸 `sober_alcohol_mg_l_x1000`은 센서 baseline 보정에 사용한다. 다만 위험도를 낮출 수 있는 입력이므로 sober baseline은 `50 mg/L x1000`, MAD는 `50 mg/L x1000`까지만 반영한다. 위험 단계와 `bac_upper_milli_percent`는 raw BrAC가 가리키는 BAC보다 낮아지지 않게 산출한다.
+- `elimination_mg_l_per_hour_x1000`가 있으면 해소 예상 시간에 우선 사용한다. 단, `20..=120 mg/L x1000/hour` 범위 밖이면 무시한다. 없으면 보수적인 기본 BAC 해소율 `0.015%/hour`를 사용한다.
+- `resting_bpm`, baseline, 최근 히스토리 존재 여부는 결과 신뢰도 보정에만 반영한다.
+- 펌웨어는 `MeasurementStarted(needs_context=true)` 이후 최대 5초 동안 `PhoneContext`를 기다린다. context timeout 또는 cancel은 result를 만들지 않고 `DeviceError`로 종료한다.
+
+참고:
+
+- 대한민국 도로교통법 제44조 제4항: https://www.law.go.kr/LSW//lsLinkCommonInfo.do?ancYnChk=&chrClsCd=010202&lsJoLnkSeq=1020823237
+- BAC/BrAC 2100:1 단위 설명: https://www.utoledo.edu/studentaffairs/counseling/selfhelp/substanceuse/bac.html
+
 ## ERD
 
 ```mermaid

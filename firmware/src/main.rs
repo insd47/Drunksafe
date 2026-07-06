@@ -1,11 +1,11 @@
 use error::Result;
 use esp_idf_svc::hal::task::block_on;
 use services::ble::{
-    self, BleService, ErrorCode, MeasurementStep, PhoneCommand, Source, StatusKind,
+    self, BleService, ErrorCode, MeasurementStep, PhoneCommand, PhoneContext, Source, StatusKind,
 };
 use services::measure::MeasureService;
 use services::screen::{ScreenService, View};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 mod devices;
 mod error;
@@ -13,6 +13,7 @@ mod services;
 mod utils;
 
 const IDLE_POLL: Duration = Duration::from_millis(20);
+const CONTEXT_WAIT: Duration = Duration::from_secs(5);
 
 fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -77,11 +78,47 @@ fn main() -> Result<()> {
                 ble::measurement_progress(session_id.clone(), MeasurementStep::Preparing, 5),
             );
 
+            let context = wait_for_context(&ble, &session_id);
+
+            if matches!(
+                context,
+                SessionContext::Cancelled | SessionContext::TimedOut
+            ) {
+                let error_code = match context {
+                    SessionContext::Cancelled => ErrorCode::Cancelled,
+                    SessionContext::TimedOut => ErrorCode::ContextTimeout,
+                    SessionContext::Received(_) => unreachable!(),
+                };
+
+                notify_ble(
+                    &ble,
+                    ble::device_error(Some(session_id.clone()), error_code),
+                );
+                notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
+                screen.show(View::Failed);
+                continue;
+            }
+
+            notify_ble(
+                &ble,
+                ble::measurement_progress(session_id.clone(), MeasurementStep::WaitingBreath, 20),
+            );
+
             screen.show(View::Measuring);
             let result = block_on(measure.run());
 
             match result {
                 Ok(measurement) => {
+                    if cancelled_after_measurement(&ble, &session_id) {
+                        notify_ble(
+                            &ble,
+                            ble::device_error(Some(session_id.clone()), ErrorCode::Cancelled),
+                        );
+                        notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
+                        screen.show(View::Home);
+                        continue;
+                    }
+
                     notify_ble(
                         &ble,
                         ble::measurement_progress(
@@ -92,7 +129,7 @@ fn main() -> Result<()> {
                     );
                     notify_ble(
                         &ble,
-                        ble::measurement_result(session_id.clone(), measurement),
+                        ble::measurement_result(session_id.clone(), measurement, context.as_ref()),
                     );
                     notify_ble(
                         &ble,
@@ -124,6 +161,100 @@ fn notify_ble(ble: &BleService, event: ble::DeviceEvent) {
     if let Err(error) = ble.notify(&event) {
         log::warn!("BLE notify failed: {error}");
     }
+}
+
+enum SessionContext {
+    Received(PhoneContext),
+    Cancelled,
+    TimedOut,
+}
+
+impl SessionContext {
+    fn as_ref(&self) -> Option<&PhoneContext> {
+        match self {
+            Self::Received(context) => Some(context),
+            Self::Cancelled | Self::TimedOut => None,
+        }
+    }
+}
+
+fn wait_for_context(ble: &BleService, session_id: &str) -> SessionContext {
+    let started = Instant::now();
+
+    while started.elapsed() < CONTEXT_WAIT {
+        while let Some(command) = ble.try_recv_command() {
+            match command {
+                PhoneCommand::Context(context) if context.session_id == session_id => {
+                    log::info!("received phone context for session={session_id}");
+                    return SessionContext::Received(context);
+                }
+                PhoneCommand::Cancel {
+                    session_id: cancelled_session_id,
+                } if cancelled_session_id == session_id => {
+                    log::info!("received cancel for session={session_id}");
+                    return SessionContext::Cancelled;
+                }
+                PhoneCommand::Time { unix_time_ms } => {
+                    log::debug!("received phone time unix_ms={unix_time_ms}");
+                }
+                PhoneCommand::Start => {
+                    log::debug!("ignoring nested phone start while waiting for context");
+                }
+                PhoneCommand::Context(context) => {
+                    log::debug!(
+                        "ignoring context for inactive session={}",
+                        context.session_id
+                    );
+                }
+                PhoneCommand::Cancel {
+                    session_id: cancelled_session_id,
+                } => {
+                    log::debug!("ignoring cancel for inactive session={cancelled_session_id}");
+                }
+                PhoneCommand::Ack { session_id } => {
+                    log::debug!("received result ack for session={session_id}");
+                }
+            }
+        }
+
+        std::thread::sleep(IDLE_POLL);
+    }
+
+    log::warn!("phone context timed out for session={session_id}");
+    SessionContext::TimedOut
+}
+
+fn cancelled_after_measurement(ble: &BleService, session_id: &str) -> bool {
+    let mut cancelled = false;
+
+    while let Some(command) = ble.try_recv_command() {
+        match command {
+            PhoneCommand::Cancel {
+                session_id: cancelled_session_id,
+            } if cancelled_session_id == session_id => {
+                cancelled = true;
+            }
+            PhoneCommand::Time { unix_time_ms } => {
+                log::debug!("received phone time unix_ms={unix_time_ms}");
+            }
+            PhoneCommand::Ack { session_id } => {
+                log::debug!("received result ack for session={session_id}");
+            }
+            PhoneCommand::Start => {
+                log::debug!("ignoring phone start while finishing active measurement");
+            }
+            PhoneCommand::Context(context) => {
+                log::debug!("ignoring late context for session={}", context.session_id);
+            }
+            PhoneCommand::Cancel {
+                session_id: cancelled_session_id,
+            } => {
+                log::debug!("ignoring cancel for inactive session={cancelled_session_id}");
+            }
+        }
+    }
+
+    cancelled
 }
 
 fn ble_error_code(error: &error::Error) -> ErrorCode {

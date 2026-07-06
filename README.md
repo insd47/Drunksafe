@@ -28,7 +28,7 @@
 
 | 영역      | 기능                                                                       |
 |-----------|----------------------------------------------------------------------------|
-| 센서 연결 | ZE29 C2H5OH 알코올 모듈과 MAX30102 심박/SpO2 센서 상태를 앱에서 확인       |
+| 센서 연결 | ZE29 C2H5OH 알코올 모듈과 아날로그 PPG 심박 센서 상태를 앱에서 확인       |
 | 측정 진행 | 보드 버튼으로 측정을 시작하고 앱에서 진행률과 호기/PPG 품질을 표시         |
 | 결과 분석 | ZE29 호기 알코올 농도, BAC 추정값, 위험 단계, 심박수, 산소포화도 표시      |
 | 해독 예상 | 개인 분해 경향과 최근 측정 히스토리를 기반으로 해독 예상 시간 제공         |
@@ -39,7 +39,7 @@
 
 ```mermaid
 flowchart LR
-    Sensors["Sensors\nZE29 C2H5OH / MAX30102"] --> Firmware["ESP32 DevKitC V4\nesp-rs firmware"]
+    Sensors["Sensors\nZE29 C2H5OH / Analog PPG"] --> Firmware["ESP32 DevKitC V4\nesp-rs firmware"]
     Firmware --> BLE["Bluetooth LE"]
     BLE --> App["React Native app"]
     App --> History["Local history and personalization context"]
@@ -51,6 +51,8 @@ flowchart LR
 서버를 전제로 하지 않는 구조입니다. 보드 버튼으로 측정을 시작하면 펌웨어가 Bluetooth LE로 앱에 측정 컨텍스트를 요청하고, 앱은 최근 측정 히스토리와 개인 기준값을 전달합니다. 펌웨어는 보정과 측정을 수행한 뒤 결과를 앱으로 전송하고, 앱은 결과와 히스토리를 사용자 중심으로 저장합니다.
 
 측정 컨텍스트, BLE 통신 모델, 저장 ERD는 [.docs/measurement-communication-model.md](.docs/measurement-communication-model.md)에 정리되어 있습니다.
+개인화 분석 산출값과 위험도 알고리즘 방향은 [.docs/personalized-alcohol-analysis.md](.docs/personalized-alcohol-analysis.md)에 정리되어 있습니다.
+중간 보고서와 MVP 통합 구현 계획은 [.docs/midterm-integration-plan.md](.docs/midterm-integration-plan.md)에 정리되어 있습니다.
 
 ## 기술 스택
 

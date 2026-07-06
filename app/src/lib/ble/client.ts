@@ -2,6 +2,7 @@ import {
   BleManager,
   ScanMode,
   type BleError,
+  type Characteristic,
   type Device,
   type State,
   type Subscription,
@@ -9,11 +10,16 @@ import {
 
 import { decodeUtf8Base64, encodeUtf8Base64 } from '@/lib/ble/codec';
 import { parseDeviceEvent, type DeviceEvent, type PhoneCommand } from '@/lib/ble/model';
-import { DeviceEventFrameAssembler, serializePhoneCommandFrames } from '@/lib/ble/transport';
+import {
+  DeviceEventFrameAssembler,
+  maxBleJsonPayloadBytes,
+  serializePhoneCommandFrames,
+} from '@/lib/ble/transport';
 import { drunksafeBle } from '@/lib/ble/uuids';
 
 const eventTransactionId = 'drunksafe-device-events';
 const commandTransactionId = 'drunksafe-phone-command';
+const preferredMtu = 185;
 
 export type DrunksafeBleDevice = {
   id: string;
@@ -34,6 +40,7 @@ export type ScanOptions = {
 export class DrunksafeBleClient {
   private readonly manager: BleManager;
   private readonly eventAssembler = new DeviceEventFrameAssembler();
+  private maxWritePayloadBytes = maxBleJsonPayloadBytes;
   private deviceId: string | null = null;
   private eventSubscription: Subscription | null = null;
 
@@ -80,12 +87,19 @@ export class DrunksafeBleClient {
   async connect(deviceId: string) {
     await this.stopScan();
 
-    const device = await this.manager.connectToDevice(deviceId, { timeout: 10000 });
-    const discovered = await device.discoverAllServicesAndCharacteristics();
-    await this.assertDrunksafeCharacteristics(discovered.id);
+    let device = await this.manager.connectToDevice(deviceId, { timeout: 10000 });
 
-    this.deviceId = discovered.id;
-    return toDrunksafeDevice(discovered);
+    try {
+      device = await this.requestPreferredMtu(device);
+      const discovered = await device.discoverAllServicesAndCharacteristics();
+      await this.assertDrunksafeCharacteristics(discovered.id);
+
+      this.deviceId = discovered.id;
+      return toDrunksafeDevice(discovered);
+    } catch (error) {
+      await this.manager.cancelDeviceConnection(device.id).catch(() => {});
+      throw error;
+    }
   }
 
   async disconnect() {
@@ -141,7 +155,7 @@ export class DrunksafeBleClient {
   async send(command: PhoneCommand) {
     const deviceId = this.requireDeviceId();
 
-    for (const frame of serializePhoneCommandFrames(command)) {
+    for (const frame of serializePhoneCommandFrames(command, this.maxWritePayloadBytes)) {
       await this.manager.writeCharacteristicWithResponseForDevice(
         deviceId,
         drunksafeBle.serviceUuid,
@@ -186,17 +200,36 @@ export class DrunksafeBleClient {
       deviceId,
       drunksafeBle.serviceUuid
     );
-    const characteristicUUIDs = new Set(
-      characteristics.map((characteristic) => characteristic.uuid.toLowerCase())
+
+    const eventCharacteristic = findCharacteristic(
+      characteristics,
+      drunksafeBle.deviceEventCharacteristicUuid
+    );
+    const commandCharacteristic = findCharacteristic(
+      characteristics,
+      drunksafeBle.phoneCommandCharacteristicUuid
     );
 
-    if (
-      !characteristicUUIDs.has(drunksafeBle.deviceEventCharacteristicUuid) ||
-      !characteristicUUIDs.has(drunksafeBle.phoneCommandCharacteristicUuid)
-    ) {
+    if (!eventCharacteristic?.isNotifiable || !commandCharacteristic?.isWritableWithResponse) {
       throw new Error('Connected device does not expose Drunksafe BLE characteristics');
     }
   }
+
+  private async requestPreferredMtu(device: Device) {
+    try {
+      const mtuDevice = await this.manager.requestMTUForDevice(device.id, preferredMtu);
+      this.maxWritePayloadBytes = Math.min(maxBleJsonPayloadBytes, Math.max(20, mtuDevice.mtu - 3));
+
+      return mtuDevice;
+    } catch {
+      this.maxWritePayloadBytes = maxBleJsonPayloadBytes;
+      return device;
+    }
+  }
+}
+
+function findCharacteristic(characteristics: Characteristic[], uuid: string) {
+  return characteristics.find((characteristic) => characteristic.uuid.toLowerCase() === uuid);
 }
 
 function isDrunksafeDevice(device: Device) {

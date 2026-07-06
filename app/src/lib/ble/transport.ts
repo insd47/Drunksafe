@@ -3,7 +3,8 @@ import { utf8ByteLength } from '@/lib/ble/codec';
 
 export const maxBleJsonPayloadBytes = 180;
 
-const chunkDataBytes = 64;
+const defaultChunkDataBytes = 64;
+const chunkFrameOverheadReserveBytes = 96;
 let nextFrameSequence = 0;
 
 type ChunkFrame = {
@@ -19,23 +20,33 @@ type ChunkEntry = {
   chunks: (string | undefined)[];
 };
 
-export function serializePhoneCommandFrames(command: PhoneCommand) {
+export function serializePhoneCommandFrames(
+  command: PhoneCommand,
+  maxPayloadBytes = maxBleJsonPayloadBytes
+) {
   const payload = toPhoneCommandPayload(command);
 
-  if (utf8ByteLength(payload) <= maxBleJsonPayloadBytes) {
+  if (utf8ByteLength(payload) <= maxPayloadBytes) {
     return [payload];
   }
 
+  const chunkDataBytes = Math.max(
+    1,
+    Math.min(defaultChunkDataBytes, maxPayloadBytes - chunkFrameOverheadReserveBytes)
+  );
   const frameId = createFrameId();
 
-  return chunkPayload(payload).map((data, index, chunks) =>
-    serializeFrame({
-      frame: 'phone_command_chunk',
-      id: frameId,
-      index,
-      count: chunks.length,
-      data,
-    })
+  return chunkPayload(payload, chunkDataBytes).map((data, index, chunks) =>
+    serializeFrame(
+      {
+        frame: 'phone_command_chunk',
+        id: frameId,
+        index,
+        count: chunks.length,
+        data,
+      },
+      maxPayloadBytes
+    )
   );
 }
 
@@ -70,7 +81,7 @@ export class DeviceEventFrameAssembler {
   }
 }
 
-function chunkPayload(payload: string) {
+function chunkPayload(payload: string, chunkDataBytes: number) {
   const chunks: string[] = [];
   let chunk = '';
 
@@ -90,10 +101,10 @@ function chunkPayload(payload: string) {
   return chunks;
 }
 
-function serializeFrame(frame: ChunkFrame) {
+function serializeFrame(frame: ChunkFrame, maxPayloadBytes: number) {
   const payload = JSON.stringify(frame);
 
-  if (utf8ByteLength(payload) > maxBleJsonPayloadBytes) {
+  if (utf8ByteLength(payload) > maxPayloadBytes) {
     throw new Error('BLE transport frame exceeds configured payload size');
   }
 

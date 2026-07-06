@@ -6,22 +6,21 @@ namespace {
 const int PPG_PIN = 36;
 
 // 샘플링 기준.
-// 10ms, 5초 창, 10초 안정화.
+// 10ms, 20초 창(Window), 5초마다 연산.
 const unsigned long PPG_SAMPLE_INTERVAL_MS = 10;
 const int PPG_SAMPLE_RATE_HZ = 100;
-const int PPG_WINDOW_SECONDS = 5;
-const int PPG_WINDOW_SIZE = PPG_SAMPLE_RATE_HZ * PPG_WINDOW_SECONDS;
-const int PPG_START_DELAY_SAMPLES = PPG_SAMPLE_RATE_HZ * 10;
-const int PPG_CALC_INTERVAL_SAMPLES = PPG_WINDOW_SIZE;
+const int PPG_WINDOW_SECONDS = 20;
+const int PPG_WINDOW_SIZE = PPG_SAMPLE_RATE_HZ * PPG_WINDOW_SECONDS; // 20초 버퍼 (2000 샘플)
+const int PPG_START_DELAY_SAMPLES = PPG_WINDOW_SIZE; // 최초 20초 대기
+const int PPG_CALC_INTERVAL_SAMPLES = PPG_SAMPLE_RATE_HZ * 5; // 500 샘플 (5초) 마다 갱신
 
 // 필터/피크 기준값.
 const float LOWPASS_CUTOFF_HZ = 3.5;
 const float HIGHPASS_CUTOFF_HZ = 0.7;
-const float PEAK_THRESHOLD = 50.0;
-const int MIN_PEAK_DISTANCE_SAMPLES = 30;
+const int MIN_PEAK_DISTANCE_SAMPLES = 40; // 150 BPM 상한선 대응
 const float UNSTABLE_IBI_STDEV_MS = 200.0;
 
-// 5초 보정값 버퍼.
+// 20초 보정값 버퍼.
 float correctedBuffer[PPG_WINDOW_SIZE];
 unsigned long timeBuffer[PPG_WINDOW_SIZE];
 int bufferIndex = 0;
@@ -50,16 +49,14 @@ float current_peak_amp_val = 0.0;
 int stabilized_val = 1;
 
 // 이동평균 큐.
-// 20초, 1분, 5분.
-const int Q_20S_SIZE = 4;
+// 20초는 current_bpm 자체가 20초 윈도우이므로 큐 제거. 1분(12), 5분(60) 큐 유지.
 const int Q_1M_SIZE = 12;
 const int Q_5M_SIZE = 60;
-float q_20s[4];
 float q_1m[12];
 float q_5m[60];
-int q_20s_count = 0, q_1m_count = 0, q_5m_count = 0;
-int head_20s = 0, head_1m = 0, head_5m = 0;
-float sum_20s = 0.0, sum_1m = 0.0, sum_5m = 0.0;
+int q_1m_count = 0, q_5m_count = 0;
+int head_1m = 0, head_5m = 0;
+float sum_1m = 0.0, sum_5m = 0.0;
 float prev_bpm_20s = 0.0, prev_bpm_1m = 0.0, prev_bpm_5m = 0.0;
 float bpm_20s_val = 0.0, bpm_20s_d_val = 0.0;
 float bpm_1m_val = 0.0, bpm_1m_d_val = 0.0;
@@ -155,10 +152,39 @@ float calculateStdev(float values[], int count, float mean) {
   return sqrt(sumSquares / count);
 }
 
-// 심박 피크 검출.
-// 가까운 피크는 큰 값만 유지.
+// 배열 정렬 함수 (중앙값 계산용)
+void sortArray(float* array, int size) {
+    for (int i = 0; i < size - 1; i++) {
+        for (int j = 0; j < size - i - 1; j++) {
+            if (array[j] > array[j+1]) {
+                float temp = array[j];
+                array[j] = array[j+1];
+                array[j+1] = temp;
+            }
+        }
+    }
+}
+
+// 중앙값(Median) 계산.
+float calculateMedian(float values[], int count) {
+    if (count == 0) return 0.0;
+    float temp[count];
+    for (int i = 0; i < count; i++) temp[i] = values[i];
+    sortArray(temp, count);
+    if (count % 2 == 0) return (temp[count/2 - 1] + temp[count/2]) / 2.0;
+    return temp[count/2];
+}
+
+// 심박 피크 검출. (동적 임계값)
 void findPpgPeaks(int peakIndexes[], int &peakCount) {
   peakCount = 0;
+  
+  // 전체 버퍼의 평균과 표준편차를 구하여 동적 임계값(Dynamic Prominence) 설정
+  float bufferMean = calculateMean(correctedBuffer, bufferCount);
+  float bufferStdev = calculateStdev(correctedBuffer, bufferCount, bufferMean);
+  float dynamicThreshold = bufferStdev * 0.5;
+  if (dynamicThreshold < 5.0) dynamicThreshold = 5.0; // 하한선 5.0
+  
   for (int i = 1; i < PPG_WINDOW_SIZE - 1; i++) {
     int prevIdx = orderedIndex(i - 1);
     int currentIdx = orderedIndex(i);
@@ -168,7 +194,7 @@ void findPpgPeaks(int peakIndexes[], int &peakCount) {
     float currentValue = correctedBuffer[currentIdx];
     float nextValue = correctedBuffer[nextIdx];
 
-    if (currentValue <= PEAK_THRESHOLD) {
+    if (currentValue <= dynamicThreshold) {
       continue;
     }
 
@@ -201,10 +227,10 @@ void push_trend(float bpm, float* q, int size, int& count, int& head, float& sum
     }
 }
 
-// 피크 간격으로 BPM 계산.
-// 불안정하면 표시값 보류.
+// 피크 간격으로 BPM 계산 (노이즈 필터링).
 void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
   if (peakCount < 2) {
+    stabilized_val = 1;
     return;
   }
 
@@ -221,13 +247,30 @@ void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
     peakAmps[i] = correctedBuffer[orderedIndex(peakIndexes[i])];
   }
 
-  float meanIbi = calculateMean(ibis, peakCount - 1);
+  // IBI 노이즈 제거: 중앙값 기준 +-150ms 이내만 유효
+  float medianIbi = calculateMedian(ibis, peakCount - 1);
+  float validIbis[PPG_WINDOW_SIZE];
+  int validCount = 0;
+  
+  for (int i = 0; i < peakCount - 1; i++) {
+      if ((ibis[i] - medianIbi) >= -150.0 && (ibis[i] - medianIbi) <= 150.0) {
+          validIbis[validCount++] = ibis[i];
+      }
+  }
+
+  if (validCount < 1) {
+    stabilized_val = 1;
+    return;
+  }
+
+  float meanIbi = calculateMean(validIbis, validCount);
   if (meanIbi <= 0.0) {
+    stabilized_val = 1;
     return;
   }
 
   float currentBpm = 60000.0 / meanIbi;
-  float currentIbiStdev = calculateStdev(ibis, peakCount - 1, meanIbi);
+  float currentIbiStdev = calculateStdev(validIbis, validCount, meanIbi);
   float currentPeakAmp = calculateMean(peakAmps, peakCount);
   bool unstable = currentIbiStdev > UNSTABLE_IBI_STDEV_MS;
 
@@ -241,7 +284,11 @@ void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
     bpmReady = true;
   }
 
-  push_trend(currentBpm, q_20s, Q_20S_SIZE, q_20s_count, head_20s, sum_20s, bpm_20s_val, bpm_20s_d_val, prev_bpm_20s);
+  // 20초 평균값은 currentBpm과 동일 (20초 버퍼로 계산됨)
+  bpm_20s_val = currentBpm;
+  bpm_20s_d_val = (prev_bpm_20s > 0.0) ? (bpm_20s_val - prev_bpm_20s) : 0.0;
+  prev_bpm_20s = bpm_20s_val;
+
   push_trend(currentBpm, q_1m, Q_1M_SIZE, q_1m_count, head_1m, sum_1m, bpm_1m_val, bpm_1m_d_val, prev_bpm_1m);
   push_trend(currentBpm, q_5m, Q_5M_SIZE, q_5m_count, head_5m, sum_5m, bpm_5m_val, bpm_5m_d_val, prev_bpm_5m);
 
@@ -274,7 +321,7 @@ void updateBpmSensor() {
     return;
   }
 
-  lastSampleTime = now;
+  lastSampleTime += PPG_SAMPLE_INTERVAL_MS;
 
   int rawValue = measurePpg();
 

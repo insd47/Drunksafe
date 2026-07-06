@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.24.0",
   "scripts": {
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
+    "test:ble-contract": "tsx --tsconfig tsconfig.json scripts/check-ble-contract.mjs",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write"
   },
   "dependencies": {
@@ -38,6 +39,7 @@
     "prettier": "^3.2.5",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.23.0",
     "typescript": "~6.0.3"
   },
   "main": "expo-router/entry",

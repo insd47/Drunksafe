@@ -1,8 +1,11 @@
 HWMAIN 핀 배선 정리
 
-기준 코드
-- ZE-29A: 68209cc0da97b0b1f12d95121771ac90204ac8ca / ZE29A_Button_Code.ino
-- HWMAIN: 83c8a9685991ae5ecbab11c50f64301919b5b7cb / HWsketch/HWMAIN
+기준 코드 위치
+- 메인 코드: HWsketch/HWMAIN
+- 핀 상수: HWsketch/HWMAIN/config.h
+- PPG 핀: HWsketch/HWMAIN/ppg_sensor.cpp
+- ZE-29A UART 핀: HWsketch/HWMAIN/alcohol_sensor.cpp
+- 부저/진동 핀: HWsketch/HWMAIN/config.h, alert.cpp
 
 
 1. 전원 기준
@@ -10,16 +13,16 @@ HWMAIN 핀 배선 정리
 5V 사용 부품
 - 부저
 - 진동모터
-- ZE-29A
+- ZE-29A 알코올 센서
 
 3.3V 사용 부품
 - OLED
 - 펄스센서
 
-모든 부품의 GND는 ESP32 GND와 공통으로 연결한다.
+모든 부품의 GND는 ESP32 GND와 공통으로 연결합니다.
 
 
-2. ESP32 핀 배선표
+2. ESP32 핀 배선
 
 OLED
 - VCC -> ESP32 3.3V
@@ -32,7 +35,7 @@ OLED
 - GND -> ESP32 GND
 - Signal -> GPIO36
 
-ZE-29A
+ZE-29A 알코올 센서
 - VIN / 빨간선 -> ESP32 5V 또는 VIN
 - GND / 검은선 -> ESP32 GND
 - TXD / 노란선 -> ESP32 GPIO16 RX2
@@ -51,38 +54,56 @@ ZE-29A
 푸시버튼
 - 시작/초기화 버튼: GPIO32 <-> GND
 - 다음 화면 버튼: GPIO33 <-> GND
-- 음주 측정 버튼: GPIO18 <-> GND
+- 알코올 측정 버튼: GPIO18 <-> GND
 
-버튼은 INPUT_PULLUP 방식이다. 버튼을 누르면 LOW로 읽힌다.
+버튼은 INPUT_PULLUP 방식입니다.
+- 평상시: HIGH
+- 버튼 누름: LOW
 
 
-3. 핀 변경 사유
+3. 핀 충돌 정리
 
-기존 HWMAIN 버튼 핀은 다음과 같았다.
-- 시작/초기화 버튼: GPIO16
-- 다음 화면 버튼: GPIO17
-- 음주 측정 버튼: GPIO18
+기존 HWMAIN 초기 버전에서는 버튼 일부가 GPIO16, GPIO17에 있었지만,
+현재 코드는 ZE-29A UART 통신에 GPIO16, GPIO17을 사용합니다.
 
-하지만 ZE-29A UART 통신에서 GPIO16, GPIO17을 사용한다.
-- GPIO16: ESP32 RX2
-- GPIO17: ESP32 TX2
+따라서 버튼 핀은 다음처럼 정리되어 있습니다.
+- 시작/초기화 버튼: GPIO32
+- 다음 화면 버튼: GPIO33
+- 알코올 측정 버튼: GPIO18
 
-따라서 버튼 핀과 ZE-29A 통신 핀이 충돌한다.
-이 충돌을 피하기 위해 버튼 핀을 아래처럼 변경했다.
-- 시작/초기화 버튼: GPIO16 -> GPIO32
-- 다음 화면 버튼: GPIO17 -> GPIO33
-- 음주 측정 버튼: GPIO18 유지
+GPIO16, GPIO17은 ZE-29A 전용으로 사용합니다.
+- GPIO16: ESP32 RX2, ZE-29A TXD 수신
+- GPIO17: ESP32 TX2, ZE-29A RXD 송신
 
 
 4. 전압 주의사항
 
-ESP32 GPIO 입력은 3.3V 기준이다.
-ZE-29A TXD 신호가 5V로 출력되는 모델이면 GPIO16으로 바로 넣지 말고 3.3V로 감압한다.
+ESP32 GPIO 입력 기준은 3.3V입니다.
+
+ZE-29A TXD 신호가 5V로 출력되는 모듈이라면 GPIO16에 바로 넣지 말고 3.3V로 감압해야 합니다.
 
 권장 감압 예시
 - ZE-29A TXD -> 10k 저항 -> GPIO16
 - GPIO16 -> 20k 저항 -> GND
 
-ESP32 GPIO17 TX2에서 ZE-29A RXD로 나가는 3.3V 신호는 일반적으로 입력으로 인식될 가능성이 높다.
+ESP32 GPIO17 TX2에서 ZE-29A RXD로 나가는 3.3V 신호는 일반적으로 입력으로 인식될 가능성이 높습니다.
 
-GPIO0은 부팅 모드에 영향을 줄 수 있으므로 최종 배선에서는 버튼 핀으로 사용하지 않는다.
+
+5. GPIO0 관련
+
+GPIO0은 ESP32 부팅 모드에 영향을 줄 수 있습니다.
+최종 배선에서는 버튼 핀으로 사용하지 않는 것을 권장합니다.
+
+
+6. 현재 코드 기준 핀 요약
+
+GPIO18: 알코올 측정 버튼
+GPIO21: OLED SDA
+GPIO22: OLED SCL
+GPIO25: 부저 I/O
+GPIO26: 진동모터 IN
+GPIO32: 시작/초기화 버튼
+GPIO33: 다음 화면 버튼
+GPIO36: 펄스센서 Signal
+GPIO16: ZE-29A TXD -> ESP32 RX2
+GPIO17: ESP32 TX2 -> ZE-29A RXD

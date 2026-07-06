@@ -6,31 +6,19 @@
 #include "comms.h"
 #include "buttons.h"
 #include "display.h"
+#include "alert.h"
 #include "device.h"
 
-// =====================================================
-// 전체 장치 상태값
-// =====================================================
-// deviceStarted가 false이면 홈 화면에서 시작 버튼을 기다리는 상태입니다.
+// 전체 상태값.
+// 세부 로직은 부품별 파일에 있음.
 static bool deviceStarted = false;
-
-// 최근 알코올 측정 결과입니다. 변수명은 기존 흐름 호환을 위해 maxAlcoholValue를 유지합니다.
 static float maxAlcoholValue = 0.0;
-
-// OLED 표시용 최신 BPM 값입니다. 아직 안정 계산 전이면 0일 수 있습니다.
 static int currentBpm = 0;
-
-// BLE 특징값 전송 간격을 맞추기 위한 마지막 전송 시각입니다.
 static unsigned long lastBpmSendTime = 0;
 
-// BTN_NEXT로 보여줄 화면 순서입니다.
-// 0: 판별 상태, 1: 알코올 수치, 2: BPM
+// 화면 순서: 상태 -> 알코올 -> BPM.
 static int nextScreenIndex = 0;
-
-// 현재 OLED에 표시 중인 화면 종류입니다.
 static ScreenState currentScreen = SCREEN_HOME;
-
-// 마지막으로 계산한 안전 판별 상태입니다.
 static SafetyState currentSafetyState = SAFETY_GOOD;
 
 static void updateBpmAndSend();
@@ -40,79 +28,13 @@ static void runAlcoholMeasurement();
 static void resetDevice();
 static void startDevice();
 
-// =====================================================
-// 진동/부저 알림 패턴 상태
-// =====================================================
-// patternState:
-// 0 = 대기, 1 = 첫 ON 구간, 2 = 중간 OFF 구간, 3 = 두 번째 ON 구간
-static int patternState = 0;
-static unsigned long patternTimer = 0;
-
-// 부저 출력 상태를 제어합니다.
-// 현재 회로 기준으로 type 2가 ON, type 1이 OFF 역할입니다.
-static void beep(int type) {
-    switch (type) {
-        case 1: digitalWrite(SPEAKER_PIN, HIGH); break;
-        case 2: digitalWrite(SPEAKER_PIN, LOW); break;
-        default: digitalWrite(SPEAKER_PIN, HIGH); break;
-    }
-}
-
-// 진동모터 출력 상태를 제어합니다.
-// 현재 회로 기준으로 type 2가 ON, type 1이 OFF 역할입니다.
-static void vibe(int type) {
-    switch (type) {
-        case 1: digitalWrite(VIBRATION_PIN, LOW); break;
-        case 2: digitalWrite(VIBRATION_PIN, HIGH); break;
-        default: digitalWrite(VIBRATION_PIN, LOW); break;
-    }
-}
-
-// delay() 없이 millis()로 짧은 알림 패턴을 진행합니다.
-// 이 함수가 non-blocking이라 심박 샘플링과 알코올 센서 polling을 막지 않습니다.
-static void updateAlertPattern() {
-    switch (patternState) {
-      case 1:
-        if (millis() - patternTimer >= 100) {
-          patternState = 2;
-          patternTimer = millis();
-          beep(1); vibe(1);
-        }
-        break;
-
-      case 2:
-        if (millis() - patternTimer >= 50) {
-          patternState = 3;
-          patternTimer = millis();
-          beep(2); vibe(2);
-        }
-        break;
-
-      case 3:
-        if (millis() - patternTimer >= 100) {
-          patternState = 0;
-          beep(1); vibe(1);
-        }
-        break;
-    }
-}
-
-// 다른 알림이 진행 중이 아닐 때만 새 알림 패턴을 시작합니다.
-static void triggerAlert() {
-    if (patternState == 0) {
-        patternState = 1;
-        patternTimer = millis();
-        beep(2); vibe(2);
-    }
-}
-
+// 항상 돌아야 하는 작업.
+// 알코올 측정 중에도 심박 유지.
 void runBackgroundTasks() {
-    // 측정/대기 중에도 심박과 알코올 센서 상태는 계속 갱신되어야 합니다.
     updateBpmSensor();
     updateAlcoholSensor();
     updateAlertPattern();
 
-    // 장치가 시작된 뒤에는 raw PPG 샘플을 앱 전송용 버퍼에서 일정 개수씩 꺼냅니다.
     if (deviceStarted) {
         if (getRawDataAvailable() >= 40) {
             unsigned long start_t;
@@ -125,7 +47,7 @@ void runBackgroundTasks() {
     }
 }
 
-// ZE-29A 상태값을 사용자가 이해할 수 있는 OLED 안내 문구로 바꿉니다.
+// 알코올 상태를 OLED 문구로 변환.
 static void showAlcoholSensorStatus() {
   switch (getAlcoholSensorStatus()) {
     case ALCOHOL_SENSOR_WARMING:
@@ -161,7 +83,7 @@ static void showAlcoholSensorStatus() {
   }
 }
 
-// 심박 계산, BLE 특징값 전송, BPM 화면 갱신을 한 번에 처리합니다.
+// 심박 갱신 및 앱 전송.
 static void updateBpmAndSend() {
   runBackgroundTasks();
 
@@ -180,13 +102,12 @@ static void updateBpmAndSend() {
 
   lastBpmSendTime = millis();
 
-  // 사용자가 BPM 화면을 보고 있을 때만 OLED 숫자를 바로 갱신합니다.
   if (currentScreen == SCREEN_BPM) {
     showHeartRateScreen(currentBpm);
   }
 }
 
-// BTN_NEXT로 순환하는 결과 화면을 표시합니다.
+// 결과 화면 순환.
 static void showNextMeasurementScreen() {
   switch (nextScreenIndex) {
     case 0:
@@ -215,8 +136,8 @@ static void showNextMeasurementScreen() {
   }
 }
 
-// ZE-29A 알코올 측정을 시작하고 끝날 때까지 상태 화면을 갱신합니다.
-// 내부 루프에서 updateBpmAndSend()를 계속 호출하므로 측정 중에도 심박 알고리즘이 멈추지 않습니다.
+// 알코올 1회 측정.
+// 측정 중에도 심박 갱신.
 static void runAlcoholMeasurement() {
   currentScreen = SCREEN_BREATH;
   maxAlcoholValue = 0.0;
@@ -239,7 +160,7 @@ static void runAlcoholMeasurement() {
   nextScreenIndex = 0;
 }
 
-// 장치를 홈 상태로 되돌립니다.
+// 홈 상태로 초기화.
 static void resetDevice() {
   currentScreen = SCREEN_RESET;
   showResetMessageScreen();
@@ -255,7 +176,7 @@ static void resetDevice() {
   showEnglishText("Drunksafe");
 }
 
-// 시작 버튼을 눌렀을 때 최초 측정 흐름을 시작합니다.
+// 최초 시작 흐름.
 static void startDevice() {
   deviceStarted = true;
   currentBpm = Bpm();
@@ -269,6 +190,7 @@ static void startDevice() {
   showNextMeasurementScreen();
 }
 
+// 전체 초기화.
 void setupDevice() {
   randomSeed(esp_random());
 
@@ -276,19 +198,16 @@ void setupDevice() {
   initBpmSensor();
   initAlcoholSensor();
   initDisplay();
-
-  pinMode(SPEAKER_PIN, OUTPUT);
-  pinMode(VIBRATION_PIN, OUTPUT);
-  beep(1); vibe(1);
-
+  initAlert();
   initComms();
 
   currentScreen = SCREEN_HOME;
   showEnglishText("Drunksafe");
 }
 
+// 메인 반복 처리.
+// 시작/리셋, 재측정, 화면 전환 처리.
 void loopDevice() {
-  // 시작 전에도 심박 샘플링과 알림 패턴은 가볍게 갱신합니다.
   updateBpmSensor();
   updateAlertPattern();
 

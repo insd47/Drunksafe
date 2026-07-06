@@ -1,5 +1,5 @@
 use crate::devices::{pulse, PulseDevice};
-use crate::error::Result;
+use crate::error::{Result, TimeoutKind};
 use embassy_time::{Duration, Instant, Timer};
 
 const SAMPLE: Duration = Duration::from_millis(10);
@@ -16,7 +16,7 @@ pub async fn read(pulse: &mut PulseDevice<'static>) -> Result<Option<pulse::Anal
         }
 
         if started.elapsed() >= TIMEOUT {
-            return Ok(pulse.analyze());
+            return Err(TimeoutKind::PulseMeasurement.into());
         }
 
         Timer::after(SAMPLE).await;

@@ -60,6 +60,7 @@ impl<'d> PulseDevice<'d> {
     }
 
     /// 마지막으로 계산된 pulse 분석 결과를 반환한다.
+    #[allow(dead_code)]
     pub fn analyze(&self) -> Option<Analysis> {
         self.state.last_analysis()
     }

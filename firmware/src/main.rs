@@ -18,21 +18,15 @@ fn main() -> Result<()> {
     log::info!("Drunksafe firmware started");
     log::debug!("initializing firmware devices");
 
-    let devices::Devices {
-        alcohol,
-        display,
-        pulse,
-        mut trigger,
-    } = devices::init()?;
-
-    let mut measure = MeasureService::new(pulse, alcohol);
-    let mut screen = ScreenService::new(display);
+    let mut devices = devices::init()?;
+    let mut measure = MeasureService::new(devices.pulse, devices.alcohol);
+    let mut screen = ScreenService::new(devices.display);
 
     log::debug!("firmware devices initialized");
     screen.show(View::Home);
 
     loop {
-        if trigger.pressed() {
+        if devices.trigger.pressed() {
             screen.show(View::Measuring);
             let result = block_on(measure.run());
 

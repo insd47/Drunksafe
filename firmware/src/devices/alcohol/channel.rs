@@ -49,6 +49,7 @@ impl<'d> Channel<'d> {
             offset += written;
         }
 
+        log::trace!("[ALCOHOL] sent request: bytes={bytes:?}");
         Ok(())
     }
 
@@ -72,6 +73,7 @@ impl<'d> Channel<'d> {
         .await
         .map_err(|_| Error::Timeout)??;
 
+        log::trace!("[ALCOHOL] received response: command={command:?}, bytes={bytes:?}");
         ResponseFrame::parse(command, bytes)
     }
 }

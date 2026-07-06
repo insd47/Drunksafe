@@ -4,14 +4,11 @@
     "slug": "drunksafe",
     "scheme": "drunksafe",
     "version": "1.0.0",
-
     "experiments": {
       "tsconfigPaths": true
     },
-
     "plugins": [
       "expo-router",
-
       [
         "react-native-ble-plx",
         {
@@ -19,26 +16,22 @@
           "modes": ["central"],
           "isBackgroundEnabled": true
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
-
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-
     "userInterfaceStyle": "light",
-
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": ["**/*"],
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "dev.insd.drunksafe"
     },
-
     "android": {
       "package": "dev.insd.drunksafe",
       "adaptiveIcon": {

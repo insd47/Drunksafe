@@ -109,14 +109,16 @@ SOLID 관점:
 
 공개 액션:
 
-- `ble::session(session_id)`: 보드 버튼으로 시작된 측정 세션 요청 DTO를 만든다.
+- `ble::measurement_started(session_id)`: 보드 버튼으로 시작된 측정 세션 이벤트 DTO를 만든다.
 
 BLE 모델은 다음 정도만 가진다.
 
-- `Session`: 보드 버튼으로 새 측정 세션을 열고, 앱에 필요한 히스토리 개수와 시간 동기화 여부를 요청한다.
-- `Context`: 앱이 최근 히스토리와 개인화에 필요한 최소 필드만 보낸다.
-- `Progress`: 측정 진행 상태와 percent만 전달한다.
-- `Report`: 최종 측정 결과를 전달한다. BLE에는 `Alcohol`, `Pulse` 요약 DTO만 싣고 raw frame이나 알고리즘 내부 필드는 노출하지 않는다.
+- `DeviceStatus`: 연결 직후와 runtime 상태 변경 시 장치 상태를 전달한다.
+- `MeasurementStarted`: 보드 또는 앱에서 새 측정 세션을 열고, 필요한 히스토리 개수와 시간 동기화 여부를 요청한다.
+- `PhoneContext`: 앱이 최근 히스토리와 개인화에 필요한 파생 context만 보낸다.
+- `MeasurementProgress`: 측정 진행 단계와 percent만 전달한다.
+- `MeasurementResult`: 최종 측정 결과를 전달한다. BLE에는 `Alcohol`, `Pulse` 요약 DTO만 싣고 raw frame이나 알고리즘 내부 필드는 노출하지 않는다.
+- `DeviceError`: 앱이 조치할 수 있는 오류 코드를 전달한다.
 
 BLE 모델이 직접 소유하지 않는 것:
 
@@ -134,9 +136,11 @@ BLE 모델이 직접 소유하지 않는 것:
 | `phone_time_unix_ms` | 결과 timestamp 기준 |
 | `recent` | 최근 측정값으로 해독 추세와 이상치 판단 |
 | `sober_alcohol_mg_l_x1000` | 0 근처 baseline 판단 |
+| `sober_alcohol_mad_mg_l_x1000` | sober baseline 신뢰 범위 |
 | `elimination_mg_l_per_hour_x1000` | 개인화된 sober-time 계산 |
+| `resting_bpm` | pulse 보조 신뢰도 판단 |
 
-Pulse 분석 모델은 `PulseDevice`가 소유하고, BLE `Report`는 해당 device 모델을 optional로 참조한다.
+Pulse 분석 모델은 `PulseDevice`가 소유하고, BLE `MeasurementResult`는 해당 device 모델을 optional로 참조한다.
 
 ## ERD
 

@@ -87,17 +87,19 @@
 
 위치: `../firmware/src/services/ble/`
 
-- `ble::session(session_id) -> DeviceToPhone`
-  - 보드 버튼으로 시작된 측정 세션 요청 DTO를 만든다.
+- `ble::measurement_started(session_id) -> DeviceEvent`
+  - 보드 버튼으로 시작된 측정 세션 이벤트 DTO를 만든다.
 
 BLE model은 app과 firmware 사이의 JSON payload 계약이다.
 
-- `DeviceToPhone`
+- `DeviceEvent`
   - `Status`: 장치 상태.
-  - `Session`: 앱 context 요청.
-  - `Progress`: 측정 진행률.
-  - `Result`: 최종 측정 결과.
-- `PhoneToDevice`
+  - `MeasurementStarted`: 앱 context 요청.
+  - `MeasurementProgress`: 측정 진행률.
+  - `MeasurementResult`: 최종 측정 결과.
+  - `DeviceError`: 앱이 조치할 수 있는 오류.
+- `PhoneCommand`
+  - `Start`: 앱에서 측정 시작.
   - `Context`: 앱이 보내는 히스토리와 개인화 context.
   - `Cancel`: 측정 취소.
   - `Time`: 앱 기준 시간 동기화.

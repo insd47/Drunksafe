@@ -67,11 +67,17 @@ export function ConnectScreen() {
   );
 
   const contextReady = summary.baselineReady;
-  const scanDisabled = ble.connectionPhase === 'connecting' || ble.bluetoothState !== 'PoweredOn';
+  const scanDisabled =
+    ble.mockMode || ble.connectionPhase === 'connecting' || ble.bluetoothState !== 'PoweredOn';
   const measurementDisabled =
     !ble.connectedDevice ||
     ble.measurementPhase === 'starting' ||
     ble.measurementPhase === 'waiting_context';
+  const showMockConnection =
+    !ble.connectedDevice &&
+    (ble.bluetoothState === 'Unsupported' ||
+      ble.connectionPhase === 'unsupported' ||
+      ble.connectionPhase === 'bluetooth_off');
 
   const handleScan = () => {
     if (ble.connectionPhase === 'scanning') {
@@ -87,14 +93,22 @@ export function ConnectScreen() {
     router.push(`/measure/${ble.activeSessionId ?? 'live'}`);
   };
 
+  const handleMockConnection = () => {
+    void ble.connectMockDevice();
+  };
+
   return (
     <Screen>
       <Section eyebrow="BLE" title="장치 연결">
         <StatusRow
           label="Bluetooth"
-          value={bluetoothLabel(ble.bluetoothState)}
-          description={ble.message ?? '근처 Drunksafe 장치를 검색할 수 있습니다.'}
-          tone={bluetoothTone(ble.bluetoothState)}
+          value={ble.mockMode ? '데모' : bluetoothLabel(ble.bluetoothState)}
+          description={
+            ble.mockMode
+              ? '시뮬레이터 데모 장치로 앱 흐름을 검증합니다.'
+              : (ble.message ?? '근처 Drunksafe 장치를 검색할 수 있습니다.')
+          }
+          tone={ble.mockMode ? 'safe' : bluetoothTone(ble.bluetoothState)}
         />
         <StatusRow
           label="스캔"
@@ -110,9 +124,11 @@ export function ConnectScreen() {
           label="연결"
           value={ble.connectedDevice?.name ?? '미연결'}
           description={
-            ble.connectedDevice
-              ? '측정 시작과 context 전송이 가능합니다.'
-              : '연결되면 측정 context를 보낼 수 있습니다.'
+            ble.mockMode
+              ? '실제 BLE 없이 측정 이벤트를 재생합니다.'
+              : ble.connectedDevice
+                ? '측정 시작과 context 전송이 가능합니다.'
+                : '연결되면 측정 context를 보낼 수 있습니다.'
           }
           tone={ble.connectedDevice ? 'safe' : 'neutral'}
         />
@@ -161,17 +177,26 @@ export function ConnectScreen() {
           disabled={scanDisabled}
           onPress={handleScan}
         />
-        {ble.devices.map((device) => (
+        {showMockConnection ? (
           <ActionButton
-            key={device.id}
-            label={`${device.name} 연결`}
-            disabled={ble.connectionPhase === 'connecting'}
+            label="시뮬레이터 데모 연결"
             variant="secondary"
-            onPress={() => {
-              void ble.connect(device.id);
-            }}
+            onPress={handleMockConnection}
           />
-        ))}
+        ) : null}
+        {!ble.connectedDevice
+          ? ble.devices.map((device) => (
+              <ActionButton
+                key={device.id}
+                label={`${device.name} 연결`}
+                disabled={ble.connectionPhase === 'connecting'}
+                variant="secondary"
+                onPress={() => {
+                  void ble.connect(device.id);
+                }}
+              />
+            ))
+          : null}
         <ActionButton
           label="측정 시작"
           disabled={measurementDisabled}

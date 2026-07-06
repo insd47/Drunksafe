@@ -8,6 +8,14 @@ import type {
   MeasurementResult,
   StatusKind,
 } from '@/lib/ble/model';
+import {
+  createMockProgressEvent,
+  createMockResultEvent,
+  createMockSessionId,
+  createMockStartedEvent,
+  mockBleDevice,
+  mockProgressPlan,
+} from '@/lib/ble/mock';
 import { recordFromResult, saveMeasurement, type MeasurementKind } from '@/lib/storage/history';
 import { buildPhoneContext, readBaseline, writeBaseline } from '@/lib/storage/profile';
 
@@ -47,6 +55,7 @@ export type BleSessionSnapshot = {
   deviceErrorCode: ErrorCode | null;
   message: string | null;
   contextSentSessionId: string | null;
+  mockMode: boolean;
 };
 
 const initialSnapshot: BleSessionSnapshot = {
@@ -64,12 +73,14 @@ const initialSnapshot: BleSessionSnapshot = {
   deviceErrorCode: null,
   message: null,
   contextSentSessionId: null,
+  mockMode: false,
 };
 
 class BleSessionStore {
   private client: DrunksafeBleClient | null = null;
   private stateSubscription: Removable | null = null;
   private eventSubscription: Removable | null = null;
+  private readonly mockTimers = new Set<ReturnType<typeof setTimeout>>();
   private readonly listeners = new Set<() => void>();
   private snapshot = initialSnapshot;
 
@@ -170,7 +181,44 @@ class BleSessionStore {
     }
   };
 
+  connectMockDevice = async () => {
+    this.clearMockTimers();
+    this.eventSubscription?.remove();
+    this.eventSubscription = null;
+
+    this.set({
+      connectionPhase: 'connected',
+      measurementPhase: 'idle',
+      devices: [mockBleDevice],
+      connectedDevice: mockBleDevice,
+      deviceStatus: 'connected',
+      activeSessionId: null,
+      progress: null,
+      result: null,
+      resultSaved: false,
+      deviceErrorCode: null,
+      message: '시뮬레이터 데모 장치가 연결됐습니다.',
+      contextSentSessionId: null,
+      mockMode: true,
+    });
+  };
+
   disconnect = async () => {
+    if (this.snapshot.mockMode) {
+      this.clearMockTimers();
+      this.set({
+        connectionPhase: this.snapshot.bluetoothState === 'Unsupported' ? 'unsupported' : 'idle',
+        measurementPhase: 'idle',
+        connectedDevice: null,
+        deviceStatus: null,
+        activeSessionId: null,
+        progress: null,
+        message: null,
+        mockMode: false,
+      });
+      return;
+    }
+
     if (!this.client) {
       return;
     }
@@ -190,6 +238,11 @@ class BleSessionStore {
   };
 
   startMeasurement = async (kind: MeasurementKind = 'measurement') => {
+    if (this.snapshot.mockMode) {
+      await this.startMockMeasurement(kind);
+      return;
+    }
+
     if (
       !this.client ||
       !this.snapshot.connectedDevice ||
@@ -220,6 +273,7 @@ class BleSessionStore {
   };
 
   destroy = async () => {
+    this.clearMockTimers();
     this.eventSubscription?.remove();
     this.eventSubscription = null;
     this.stateSubscription?.remove();
@@ -287,6 +341,18 @@ class BleSessionStore {
       message: event.needs_context ? '측정 context를 준비하는 중입니다.' : '측정이 시작됐습니다.',
     });
 
+    if (this.snapshot.mockMode) {
+      if (event.needs_context) {
+        await buildPhoneContext(event.session_id, event.history_limit);
+        this.set({
+          measurementPhase: 'measuring',
+          contextSentSessionId: event.session_id,
+          message: '시뮬레이터 측정 context를 준비했습니다.',
+        });
+      }
+      return;
+    }
+
     if (!this.client) {
       return;
     }
@@ -351,6 +417,11 @@ class BleSessionStore {
   }
 
   private setBluetoothState(state: string) {
+    if (this.snapshot.mockMode) {
+      this.set({ bluetoothState: state });
+      return;
+    }
+
     const patch: Partial<BleSessionSnapshot> = { bluetoothState: state };
 
     if (state === 'Unsupported') {
@@ -406,6 +477,47 @@ class BleSessionStore {
     });
   }
 
+  private async startMockMeasurement(kind: MeasurementKind) {
+    const sessionId = createMockSessionId(kind);
+    this.clearMockTimers();
+    this.set({
+      measurementPhase: 'starting',
+      activeMeasurementKind: kind,
+      activeSessionId: sessionId,
+      progress: null,
+      result: null,
+      resultSaved: false,
+      deviceErrorCode: null,
+      message: '시뮬레이터 측정을 시작했습니다.',
+    });
+
+    await this.handleEvent(createMockStartedEvent(sessionId));
+
+    mockProgressPlan.forEach((progress) => {
+      this.scheduleMockEvent(async () => {
+        await this.handleEvent(createMockProgressEvent(sessionId, progress.step, progress.percent));
+      }, progress.delayMs);
+    });
+
+    this.scheduleMockEvent(async () => {
+      await this.handleEvent(createMockResultEvent(sessionId, kind));
+    }, 3800);
+  }
+
+  private scheduleMockEvent(callback: () => Promise<void>, delayMs: number) {
+    const timer = setTimeout(() => {
+      this.mockTimers.delete(timer);
+      void callback();
+    }, delayMs);
+
+    this.mockTimers.add(timer);
+  }
+
+  private clearMockTimers() {
+    this.mockTimers.forEach((timer) => clearTimeout(timer));
+    this.mockTimers.clear();
+  }
+
   private set(patch: Partial<BleSessionSnapshot>) {
     this.snapshot = { ...this.snapshot, ...patch };
     this.listeners.forEach((listener) => listener());
@@ -432,6 +544,7 @@ export function useBleSession() {
     startScan: bleSession.startScan,
     stopScan: bleSession.stopScan,
     connect: bleSession.connect,
+    connectMockDevice: bleSession.connectMockDevice,
     disconnect: bleSession.disconnect,
     startMeasurement: bleSession.startMeasurement,
     destroy: bleSession.destroy,

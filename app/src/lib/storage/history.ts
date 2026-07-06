@@ -50,6 +50,11 @@ export async function latestMeasurement() {
   return history.find((record) => record.kind === 'measurement') ?? null;
 }
 
+export async function readMeasurementById(id: string) {
+  const history = await readHistory();
+  return history.find((record) => record.id === id || record.session_id === id) ?? null;
+}
+
 export async function saveMeasurement(record: MeasurementRecord) {
   if (!isMeasurementRecord(record)) {
     throw new Error('Invalid Drunksafe measurement record');

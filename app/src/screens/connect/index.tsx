@@ -8,7 +8,13 @@ import { Section } from '@/components/section';
 import { Separator } from '@/components/separator';
 import { StatusRow } from '@/components/status-row';
 import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
-import { formatBac, formatMinutes, formatRisk, riskTone } from '@/lib/format/measurement';
+import {
+  formatBac,
+  formatDrivingStatus,
+  formatMinutes,
+  formatRisk,
+  riskTone,
+} from '@/lib/format/measurement';
 import { latestMeasurement, readHistory, type MeasurementRecord } from '@/lib/storage/history';
 import { emptyBaseline, emptyProfile, readBaseline, readProfile } from '@/lib/storage/profile';
 
@@ -237,11 +243,11 @@ export function ConnectScreen() {
         {summary.latest ? (
           <>
             <StatusRow
-              label="위험 단계"
-              value={formatRisk(summary.latest.risk)}
-              description={formatBac(
+              label="운전 상태"
+              value={formatDrivingStatus(summary.latest.risk)}
+              description={`${formatRisk(summary.latest.risk)} · ${formatBac(
                 summary.latest.bac_upper_milli_percent ?? summary.latest.bac_milli_percent
-              )}
+              )}`}
               tone={riskTone(summary.latest.risk)}
             />
             <StatusRow
@@ -253,7 +259,7 @@ export function ConnectScreen() {
         ) : (
           <>
             <StatusRow
-              label="위험 단계"
+              label="운전 상태"
               value="기록 없음"
               description="첫 일반 측정 후 결과가 저장됩니다."
             />

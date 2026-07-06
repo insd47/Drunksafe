@@ -46,6 +46,28 @@ export function formatRisk(value: MeasurementRecord['risk']) {
   }
 }
 
+export function formatDrivingStatus(value: MeasurementRecord['risk']) {
+  switch (value) {
+    case 'safe':
+      return '운전 가능';
+    case 'caution':
+      return '운전 주의';
+    case 'danger':
+      return '운전 금지';
+  }
+}
+
+export function formatDrivingDescription(value: MeasurementRecord['risk']) {
+  switch (value) {
+    case 'safe':
+      return '측정값 기준 위험 신호가 낮습니다.';
+    case 'caution':
+      return '추가 휴식 후 재측정을 권장합니다.';
+    case 'danger':
+      return '현재 결과 기준 운전하지 마세요.';
+  }
+}
+
 export function riskTone(value: MeasurementRecord['risk']) {
   switch (value) {
     case 'safe':

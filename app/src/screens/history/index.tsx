@@ -5,7 +5,13 @@ import { ActionLink } from '@/components/action-link';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
-import { formatBac, formatMeasuredAt, formatRisk, riskTone } from '@/lib/format/measurement';
+import {
+  formatBac,
+  formatDrivingStatus,
+  formatMeasuredAt,
+  formatRisk,
+  riskTone,
+} from '@/lib/format/measurement';
 import { readHistory, type MeasurementRecord } from '@/lib/storage/history';
 
 export function HistoryScreen() {
@@ -55,8 +61,10 @@ export function HistoryScreen() {
           <StatusRow
             key={record.id}
             label={formatMeasuredAt(record.measured_at_unix_ms)}
-            value={formatBac(record.bac_upper_milli_percent ?? record.bac_milli_percent)}
-            description={formatRisk(record.risk)}
+            value={formatDrivingStatus(record.risk)}
+            description={`${formatRisk(record.risk)} · ${formatBac(
+              record.bac_upper_milli_percent ?? record.bac_milli_percent
+            )}`}
             tone={riskTone(record.risk)}
           />
         ))}

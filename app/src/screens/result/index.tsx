@@ -13,6 +13,8 @@ import {
   formatAlcohol,
   formatBac,
   formatBpm,
+  formatDrivingDescription,
+  formatDrivingStatus,
   formatMinutes,
   formatRisk,
   riskTone,
@@ -38,7 +40,17 @@ export function ResultScreen() {
 
   return (
     <Screen>
-      <Section eyebrow="Result" title={kind === 'baseline' ? 'Baseline 결과' : '운전 금지'}>
+      <Section
+        eyebrow="Result"
+        title={kind === 'baseline' ? 'Baseline 결과' : formatDrivingStatus(record.risk)}>
+        {kind !== 'baseline' ? (
+          <StatusRow
+            label="운전 상태"
+            value={formatDrivingStatus(record.risk)}
+            description={formatDrivingDescription(record.risk)}
+            tone={riskTone(record.risk)}
+          />
+        ) : null}
         <StatusRow
           label="위험 단계"
           value={formatRisk(record.risk)}

@@ -7,6 +7,7 @@ import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
 import type { MeasurementStep } from '@/lib/ble/model';
+import { resolveMeasureRoute } from '@/lib/ble/measure-route';
 import { useBleSession } from '@/lib/ble/session';
 
 const steps: MeasurementStep[] = [
@@ -25,18 +26,18 @@ export function MeasureScreen() {
   const initializeBle = ble.initialize;
   const routeSessionId = sessionId ?? 'live';
   const isBaseline = routeSessionId === 'baseline';
-  const routeMatchesActive = routeSessionId === 'live' || routeSessionId === ble.activeSessionId;
-  const routeProgress = routeMatchesActive ? ble.progress : null;
-  const routeResult =
-    routeSessionId === 'live'
-      ? ble.result
-      : routeSessionId !== 'live' && ble.result?.session_id === routeSessionId
-        ? ble.result
-        : null;
-  const activeSessionId =
-    routeSessionId === 'live'
-      ? (routeResult?.session_id ?? routeProgress?.session_id ?? 'live')
-      : routeSessionId;
+  const {
+    progress: routeProgress,
+    result: routeResult,
+    activeSessionId,
+    routeMatchesActive,
+  } = resolveMeasureRoute({
+    routeSessionId,
+    activeMeasurementKind: ble.activeMeasurementKind,
+    activeSessionId: ble.activeSessionId,
+    progress: ble.progress,
+    result: ble.result,
+  });
   const activeStep = routeResult ? 'done' : routeProgress?.step;
   const resultHref = routeResult
     ? `/results/${routeResult.session_id}`

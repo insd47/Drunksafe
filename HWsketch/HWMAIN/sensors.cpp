@@ -3,10 +3,16 @@
 #include "sensors.h"
 
 namespace {
+// =====================================================
+// 센서 핀과 PPG 샘플링/계산 기준값
+// =====================================================
+// PPG_PIN은 ESP32 ADC 입력입니다. ZE29A_RXD2/TXD2는 Serial2 연결 핀입니다.
 const int PPG_PIN = 36;
 const int ZE29A_RXD2 = 16;
 const int ZE29A_TXD2 = 17;
 
+// PPG는 10ms마다 샘플링해서 100Hz로 취급합니다.
+// BPM 계산은 최근 5초 창을 기준으로 하며, 시작 후 10초는 안정화 시간으로 둡니다.
 const unsigned long PPG_SAMPLE_INTERVAL_MS = 10;
 const int PPG_SAMPLE_RATE_HZ = 100;
 const int PPG_WINDOW_SECONDS = 5;
@@ -14,26 +20,32 @@ const int PPG_WINDOW_SIZE = PPG_SAMPLE_RATE_HZ * PPG_WINDOW_SECONDS;
 const int PPG_START_DELAY_SAMPLES = PPG_SAMPLE_RATE_HZ * 10;
 const int PPG_CALC_INTERVAL_SAMPLES = PPG_WINDOW_SIZE;
 
+// PPG 신호 보정용 필터와 피크 검출 기준입니다.
+// 저역/고역 통과 필터로 심박 성분만 남기고, 일정 크기 이상인 봉우리를 박동 후보로 봅니다.
 const float LOWPASS_CUTOFF_HZ = 3.5;
 const float HIGHPASS_CUTOFF_HZ = 0.7;
 const float PEAK_THRESHOLD = 50.0;
 const int MIN_PEAK_DISTANCE_SAMPLES = 30;
 const float UNSTABLE_IBI_STDEV_MS = 200.0;
 
+// 최근 5초 보정 PPG 값과 각 샘플의 시간을 저장하는 원형 버퍼입니다.
 float correctedBuffer[PPG_WINDOW_SIZE];
 unsigned long timeBuffer[PPG_WINDOW_SIZE];
 int bufferIndex = 0;
 int bufferCount = 0;
 
+// 샘플링 주기와 BPM 계산 주기를 관리하는 카운터입니다.
 unsigned long lastSampleTime = 0;
 unsigned long totalSamples = 0;
 int samplesSinceLastCalc = 0;
 
+// 필터 내부 상태값입니다. 이전 상태가 있어야 다음 보정값을 계산할 수 있습니다.
 float lowpassState = 0.0;
 float highpassState = 0.0;
 float previousLowpassInput = 0.0;
 bool filterInitialized = false;
 
+// OLED와 앱으로 넘길 최신 심박 계산 결과입니다.
 int latestBpm = 0;
 float lastValidIbiStdev = 0.0;
 float lastValidPeakAmp = 0.0;
@@ -60,18 +72,22 @@ float bpm_20s_val = 0.0, bpm_20s_d_val = 0.0;
 float bpm_1m_val = 0.0, bpm_1m_d_val = 0.0;
 float bpm_5m_val = 0.0, bpm_5m_d_val = 0.0;
 
+// 1차 저역 통과 필터 alpha를 계산합니다.
 float calculateLowpassAlpha(float cutoffHz) {
   const float dt = 1.0 / PPG_SAMPLE_RATE_HZ;
   const float rc = 1.0 / (2.0 * PI * cutoffHz);
   return dt / (rc + dt);
 }
 
+// 1차 고역 통과 필터 alpha를 계산합니다.
 float calculateHighpassAlpha(float cutoffHz) {
   const float dt = 1.0 / PPG_SAMPLE_RATE_HZ;
   const float rc = 1.0 / (2.0 * PI * cutoffHz);
   return rc / (rc + dt);
 }
 
+// PPG ADC를 4번 읽어 평균을 냅니다.
+// 비트 시프트로 4로 나누어 순간 잡음을 조금 줄입니다.
 int measurePpg() {
   int sum = 0;
   sum += analogRead(PPG_PIN);
@@ -81,6 +97,7 @@ int measurePpg() {
   return sum >> 2;
 }
 
+// raw PPG 값에 저역/고역 통과 필터를 적용해 박동 성분을 강조합니다.
 float correctPpg(int rawValue) {
   const float lpAlpha = calculateLowpassAlpha(LOWPASS_CUTOFF_HZ);
   const float hpAlpha = calculateHighpassAlpha(HIGHPASS_CUTOFF_HZ);
@@ -99,6 +116,7 @@ float correctPpg(int rawValue) {
   return highpassState;
 }
 
+// 보정된 PPG 값을 5초 원형 버퍼에 저장합니다.
 void saveCorrectedPpg(float correctedValue, unsigned long sampleTime) {
   correctedBuffer[bufferIndex] = correctedValue;
   timeBuffer[bufferIndex] = sampleTime;
@@ -109,6 +127,7 @@ void saveCorrectedPpg(float correctedValue, unsigned long sampleTime) {
   }
 }
 
+// 원형 버퍼를 시간 순서대로 읽기 위한 실제 배열 인덱스를 계산합니다.
 int orderedIndex(int index) {
   if (bufferCount < PPG_WINDOW_SIZE) {
     return index;
@@ -116,6 +135,7 @@ int orderedIndex(int index) {
   return (bufferIndex + index) % PPG_WINDOW_SIZE;
 }
 
+// 배열 평균 계산 helper입니다.
 float calculateMean(float values[], int count) {
   if (count == 0) return 0.0;
   float sum = 0.0;
@@ -125,6 +145,7 @@ float calculateMean(float values[], int count) {
   return sum / count;
 }
 
+// 배열 표준편차 계산 helper입니다.
 float calculateStdev(float values[], int count, float mean) {
   if (count == 0) return 0.0;
   float sumSquares = 0.0;
@@ -135,6 +156,8 @@ float calculateStdev(float values[], int count, float mean) {
   return sqrt(sumSquares / count);
 }
 
+// 최근 5초 보정 PPG 창에서 피크 후보를 찾습니다.
+// 너무 가까운 피크가 겹치면 더 큰 값을 남겨 중복 박동을 줄입니다.
 void findPpgPeaks(int peakIndexes[], int &peakCount) {
   peakCount = 0;
   for (int i = 1; i < PPG_WINDOW_SIZE - 1; i++) {
@@ -164,6 +187,8 @@ void findPpgPeaks(int peakIndexes[], int &peakCount) {
   }
 }
 
+// 20초/1분/5분 이동평균 큐를 공통 처리하는 helper입니다.
+// out_bpm은 이동평균, out_bpm_d는 직전 이동평균 대비 변화량입니다.
 void push_trend(float bpm, float* q, int size, int& count, int& head, float& sum, float& out_bpm, float& out_bpm_d, float& prev_bpm) {
     if (count == size) { sum -= q[head]; } else { count++; }
     q[head] = bpm;
@@ -178,6 +203,8 @@ void push_trend(float bpm, float* q, int size, int& count, int& head, float& sum
     }
 }
 
+// 검출된 피크 사이 간격(IBI)으로 BPM과 안정도 지표를 계산합니다.
+// IBI 표준편차가 크면 움직임/접촉 불안정으로 판단해 latestBpm 갱신을 보류합니다.
 void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
   if (peakCount < 2) {
     return;
@@ -227,6 +254,7 @@ void calculateBpmFromPeaks(int peakIndexes[], int peakCount) {
   time_counter += 5;
 }
 
+// 5초 버퍼가 충분히 찼을 때 피크 검출과 BPM 계산을 수행합니다.
 void updateBpmCalculation() {
   if (bufferCount < PPG_WINDOW_SIZE) {
     return;
@@ -238,21 +266,28 @@ void updateBpmCalculation() {
   calculateBpmFromPeaks(peakIndexes, peakCount);
 }
 
+// =====================================================
+// 앱 전송용 raw PPG 원형 버퍼
+// =====================================================
 const int RAW_BUFFER_SIZE = 100; 
 int raw_vals[RAW_BUFFER_SIZE];
 unsigned long raw_times[RAW_BUFFER_SIZE];
 int raw_head = 0;
 int raw_tail = 0;
 
+// =====================================================
+// ZE-29A 알코올 센서 명령/상태값
+// =====================================================
+// ZE-29A는 9바이트 명령 패킷으로 상태 조회, 결과 요청, 측정 시작/대기를 제어합니다.
 byte zeCmdState[9]  = {0xFF, 0x01, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7A};
 byte zeCmdResult[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
 byte zeCmdStart[9]  = {0xFF, 0x01, 0x87, 0x32, 0x00, 0x00, 0x00, 0x00, 0x46};
 byte zeCmdIdle[9]   = {0xFF, 0x01, 0x87, 0x31, 0x00, 0x00, 0x00, 0x00, 0x47};
 
 const unsigned long ZE29A_POLL_INTERVAL_MS = 500;
-const unsigned long ZE29A_PACKET_TIMEOUT_MS = 100;
 const unsigned long ZE29A_MEASURE_TIMEOUT_MS = 45000;
 
+// 알코올 측정 진행 상태입니다.
 byte zeLastState = 0x00;
 unsigned long zeLastPollTime = 0;
 unsigned long zeMeasurementStartTime = 0;
@@ -261,6 +296,7 @@ bool alcoholMeasurementRunning = false;
 bool alcoholMeasurementFinished = true;
 AlcoholSensorStatus alcoholStatus = ALCOHOL_SENSOR_IDLE;
 
+// ZE-29A 패킷의 checksum을 계산합니다.
 byte checkZe29aSum(byte* packet) {
   byte sum = 0;
   for (int i = 1; i < 8; i++) {
@@ -270,6 +306,8 @@ byte checkZe29aSum(byte* packet) {
   return (~sum) + 1;
 }
 
+// ZE-29A 상태 바이트를 내부 AlcoholSensorStatus로 변환합니다.
+// 0x37은 결과 준비 상태라 결과 요청 명령을 즉시 보냅니다.
 void setZe29aStatusFromState(byte state) {
   zeLastState = state;
 
@@ -302,23 +340,21 @@ void setZe29aStatusFromState(byte state) {
   }
 }
 
+// Serial2 수신 버퍼에서 완전한 9바이트 ZE-29A 패킷을 읽습니다.
+// 이 함수는 기다리지 않고, 지금 들어와 있는 데이터만 확인합니다.
 bool readZe29aPacket(byte* packet) {
-  while (Serial2.available()) {
+  while (Serial2.available() >= 9) {
     if (Serial2.read() != 0xFF) {
       continue;
     }
 
     packet[0] = 0xFF;
-    unsigned long startTime = millis();
-    int index = 1;
 
-    while (index < 9 && millis() - startTime < ZE29A_PACKET_TIMEOUT_MS) {
-      if (Serial2.available()) {
-        packet[index++] = Serial2.read();
-      }
+    for (int index = 1; index < 9; index++) {
+      packet[index] = Serial2.read();
     }
 
-    if (index == 9 && checkZe29aSum(packet) == packet[8]) {
+    if (checkZe29aSum(packet) == packet[8]) {
       return true;
     }
   }
@@ -326,6 +362,7 @@ bool readZe29aPacket(byte* packet) {
   return false;
 }
 
+// 읽은 ZE-29A 패킷 종류에 따라 상태 또는 결과값을 처리합니다.
 void handleZe29aPacket(byte* packet) {
   if (packet[1] == 0x85) {
     setZe29aStatusFromState(packet[2]);
@@ -345,10 +382,14 @@ void handleZe29aPacket(byte* packet) {
 }
 }  // namespace
 
+// ESP32 ADC 해상도를 12비트로 설정합니다.
+// PPG_PIN은 analogRead() 호출 시 자동으로 ADC 입력으로 사용됩니다.
 void initBpmSensor() {
   analogReadResolution(12);
 }
 
+// ZE-29A가 연결된 Serial2를 시작하고 센서를 idle 상태로 되돌립니다.
+// 측정을 시작하기 전 기본 준비 단계입니다.
 void initAlcoholSensor() {
   Serial2.begin(9600, SERIAL_8N1, ZE29A_RXD2, ZE29A_TXD2);
   Serial2.write(zeCmdIdle, 9);
@@ -357,6 +398,8 @@ void initAlcoholSensor() {
   alcoholMeasurementFinished = true;
 }
 
+// PPG 센서를 10ms 간격으로 샘플링합니다.
+// raw 값은 앱 그래프 버퍼에 넣고, 보정값은 BPM 계산용 5초 버퍼에 넣습니다.
 void updateBpmSensor() {
   unsigned long now = millis();
   if (now - lastSampleTime < PPG_SAMPLE_INTERVAL_MS) {
@@ -389,14 +432,19 @@ void updateBpmSensor() {
   }
 }
 
+// 현재 표시 가능한 최신 BPM을 반환합니다.
+// 초기 안정화 또는 불안정 상태에서는 bpmReady가 false라 0을 반환할 수 있습니다.
 int Bpm() {
   return bpmReady ? latestBpm : 0;
 }
 
+// 앱 전송용 raw PPG 버퍼에 쌓인 샘플 개수를 반환합니다.
 int getRawDataAvailable() {
     return (raw_head >= raw_tail) ? (raw_head - raw_tail) : (RAW_BUFFER_SIZE - raw_tail + raw_head);
 }
 
+// raw PPG 버퍼에서 최대 max_count개를 꺼냅니다.
+// 꺼낸 샘플은 버퍼에서 제거되며, 첫 샘플 시간은 out_start_t에 저장됩니다.
 int popRawDataBatch(unsigned long& out_start_t, int* out_values, int max_count) {
     int available = getRawDataAvailable();
     if (available == 0) return 0;
@@ -410,6 +458,8 @@ int popRawDataBatch(unsigned long& out_start_t, int* out_values, int max_count) 
     return to_pop;
 }
 
+// 현재까지 계산된 심박 특징값 전체를 구조체로 묶어 반환합니다.
+// BLE JSON 생성부가 이 값을 그대로 사용합니다.
 PpgFeatures getLatestPpgFeatures() {
     PpgFeatures f;
     f.t = millis();
@@ -427,6 +477,8 @@ PpgFeatures getLatestPpgFeatures() {
     return f;
 }
 
+// 새 알코올 측정을 시작합니다.
+// 이전 수신 버퍼를 비우고, 상태/결과값을 초기화한 뒤 ZE-29A start 명령을 보냅니다.
 void startAlcoholMeasurement() {
   while (Serial2.available()) {
     Serial2.read();
@@ -443,6 +495,8 @@ void startAlcoholMeasurement() {
   Serial2.write(zeCmdStart, 9);
 }
 
+// 알코올 측정 진행 중에 주기적으로 호출되어야 하는 함수입니다.
+// 상태 조회는 500ms마다 보내고, 들어온 패킷은 즉시 처리합니다.
 void updateAlcoholSensor() {
   if (!alcoholMeasurementRunning) {
     return;
@@ -468,18 +522,26 @@ void updateAlcoholSensor() {
   }
 }
 
+// 알코올 측정 완료 여부를 반환합니다.
+// 완료, 시간 초과, 오류 등 더 이상 기다릴 필요가 없을 때 true가 됩니다.
 bool isAlcoholMeasurementFinished() {
   return alcoholMeasurementFinished;
 }
 
+// 현재 ZE-29A 진행 상태를 반환합니다.
+// OLED 안내 화면은 이 값을 보고 문구를 선택합니다.
 AlcoholSensorStatus getAlcoholSensorStatus() {
   return alcoholStatus;
 }
 
+// 가장 최근 ZE-29A 결과값을 반환합니다.
+// handleZe29aPacket()에서 결과 패킷을 받으면 최신값으로 갱신됩니다.
 float alcohol() {
   return latestAlcoholValue;
 }
 
+// 최종 안전 상태 판별 함수입니다.
+// 현재는 임시 랜덤 판별이므로, 실제 기준식이 확정되면 이 함수 내부만 교체하면 됩니다.
 SafetyState judgeSafetyState(float maxAlcoholValue, int currentBpm) {
   (void)maxAlcoholValue;
   (void)currentBpm;

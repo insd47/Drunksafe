@@ -1,13 +1,17 @@
-mod devices;
-mod features;
-mod utils;
-
-use esp_idf_svc::sys::EspError;
+use error::Result;
+use esp_idf_svc::hal::task::block_on;
+use services::measure::MeasureService;
+use services::screen::{ScreenService, View};
 use std::time::Duration;
+
+mod devices;
+mod error;
+mod services;
+mod utils;
 
 const IDLE_POLL: Duration = Duration::from_millis(20);
 
-fn main() -> Result<(), EspError> {
+fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
@@ -15,21 +19,26 @@ fn main() -> Result<(), EspError> {
     log::debug!("initializing firmware devices");
 
     let mut devices = devices::init()?;
-    let mut session_sequence = 0_u32;
+    let mut measure = MeasureService::new(devices.pulse, devices.alcohol);
+    let mut screen = ScreenService::new(devices.display);
 
     log::debug!("firmware devices initialized");
+    screen.show(View::Home);
 
     loop {
         if devices.trigger.pressed() {
-            session_sequence = session_sequence.wrapping_add(1);
-            let session_id = format!("button-{session_sequence}");
-            devices.pulse.reset();
+            screen.show(View::Measuring);
+            let result = block_on(measure.run());
 
-            let request = features::ble::session(session_id.clone());
-
-            log::info!("measurement session requested: {request:?}");
-            log::debug!("active measurement session: {session_id}");
-            log::info!("waiting for phone measurement context before calibration");
+            match result {
+                Ok(measurement) => {
+                    screen.show(View::Result(measurement));
+                }
+                Err(error) => {
+                    screen.show(View::Failed);
+                    log::error!("measure failed: error={error}");
+                }
+            }
         }
 
         std::thread::sleep(IDLE_POLL);

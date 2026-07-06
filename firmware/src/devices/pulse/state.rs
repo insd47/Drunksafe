@@ -5,7 +5,7 @@ use crate::utils::math;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
-pub(super) struct State {
+pub struct State {
     filter: StreamingButterworth,
     window: VecDeque<Sample>,
     total_samples: usize,
@@ -82,11 +82,11 @@ impl Default for State {
 }
 
 impl State {
-    pub(super) fn filter(&mut self, raw_12bit: u16) -> f32 {
+    pub fn filter(&mut self, raw_12bit: u16) -> f32 {
         self.filter.push(f32::from(raw_12bit))
     }
 
-    pub(super) fn push(&mut self, sample: Sample) {
+    pub fn push(&mut self, sample: Sample) {
         if self.window.len() == WINDOW_SAMPLES {
             self.window.pop_front();
         }
@@ -96,35 +96,35 @@ impl State {
         self.samples_since_analysis += 1;
     }
 
-    pub(super) fn reset(&mut self) {
+    pub fn reset(&mut self) {
         *self = Self::default();
     }
 
-    pub(super) fn window(&self) -> &VecDeque<Sample> {
+    pub fn window(&self) -> &VecDeque<Sample> {
         &self.window
     }
 
-    pub(super) const fn total_samples(&self) -> usize {
+    pub const fn total_samples(&self) -> usize {
         self.total_samples
     }
 
-    pub(super) const fn samples_since_analysis(&self) -> usize {
+    pub const fn samples_since_analysis(&self) -> usize {
         self.samples_since_analysis
     }
 
-    pub(super) fn mark_analyzed(&mut self) {
+    pub fn mark_analyzed(&mut self) {
         self.samples_since_analysis = 0;
     }
 
-    pub(super) const fn first_stable_found(&self) -> bool {
+    pub const fn first_stable_found(&self) -> bool {
         self.first_stable_found
     }
 
-    pub(super) fn mark_first_stable(&mut self) {
+    pub fn mark_first_stable(&mut self) {
         self.first_stable_found = true;
     }
 
-    pub(super) const fn last_values(&self) -> (f32, f32, f32) {
+    pub const fn last_values(&self) -> (f32, f32, f32) {
         (
             self.last_bpm,
             self.last_ibi_stddev_ms,
@@ -132,13 +132,13 @@ impl State {
         )
     }
 
-    pub(super) fn set_last_values(&mut self, bpm: f32, ibi_stddev_ms: f32, peak_amplitude: f32) {
+    pub fn set_last_values(&mut self, bpm: f32, ibi_stddev_ms: f32, peak_amplitude: f32) {
         self.last_bpm = bpm;
         self.last_ibi_stddev_ms = ibi_stddev_ms;
         self.last_peak_amplitude = peak_amplitude;
     }
 
-    pub(super) fn push_trends(&mut self, bpm: f32) -> (Trend, Trend, Trend) {
+    pub fn push_trends(&mut self, bpm: f32) -> (Trend, Trend, Trend) {
         (
             self.trend_20s.push(bpm),
             self.trend_1m.push(bpm),
@@ -146,11 +146,11 @@ impl State {
         )
     }
 
-    pub(super) fn set_analysis(&mut self, analysis: Analysis) {
+    pub fn set_analysis(&mut self, analysis: Analysis) {
         self.last_analysis = Some(analysis);
     }
 
-    pub(super) const fn last_analysis(&self) -> Option<Analysis> {
+    pub const fn last_analysis(&self) -> Option<Analysis> {
         self.last_analysis
     }
 }

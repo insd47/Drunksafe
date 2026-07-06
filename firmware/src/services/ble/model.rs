@@ -1,4 +1,4 @@
-use crate::devices::{AlcoholSample, PulseAnalysis};
+use crate::devices::pulse;
 use serde::{Deserialize, Serialize};
 
 /// BLE payload schema version이다.
@@ -118,14 +118,6 @@ pub struct Alcohol {
     pub mg_l_x1000: u16,
 }
 
-impl From<AlcoholSample> for Alcohol {
-    fn from(sample: AlcoholSample) -> Self {
-        Self {
-            mg_l_x1000: sample.concentration.mg_l_x1000,
-        }
-    }
-}
-
 /// BLE report에 포함되는 pulse 분석 요약이다.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Pulse {
@@ -137,8 +129,8 @@ pub struct Pulse {
     pub confidence_percent: u8,
 }
 
-impl From<PulseAnalysis> for Pulse {
-    fn from(analysis: PulseAnalysis) -> Self {
+impl From<pulse::Analysis> for Pulse {
+    fn from(analysis: pulse::Analysis) -> Self {
         Self {
             bpm: analysis.bpm,
             stable: analysis.stable,

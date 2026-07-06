@@ -1,8 +1,10 @@
+use super::error::Result;
+use super::Error::{UnexpectedCommand, UnknownCommand};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[repr(u8)]
-pub(super) enum Command {
+pub enum Command {
     Status = 0x85,
     Result = 0x86,
     Work = 0x87,
@@ -15,22 +17,35 @@ pub(super) enum Command {
 }
 
 impl Command {
-    pub(super) const fn byte(self) -> u8 {
+    pub const fn byte(self) -> u8 {
         self as u8
     }
 
-    pub(super) const fn from(byte: u8) -> Option<Self> {
+    pub const fn from(byte: u8) -> Result<Self> {
         match byte {
-            0x85 => Some(Self::Status),
-            0x86 => Some(Self::Result),
-            0x87 => Some(Self::Work),
-            0x88 => Some(Self::Time),
-            0x89 => Some(Self::SetTime),
-            0x90 => Some(Self::Threshold),
-            0x91 => Some(Self::SetThreshold),
-            0x92 => Some(Self::Pressure),
-            0x93 => Some(Self::SetPressure),
-            _ => None,
+            0x85 => Ok(Self::Status),
+            0x86 => Ok(Self::Result),
+            0x87 => Ok(Self::Work),
+            0x88 => Ok(Self::Time),
+            0x89 => Ok(Self::SetTime),
+            0x90 => Ok(Self::Threshold),
+            0x91 => Ok(Self::SetThreshold),
+            0x92 => Ok(Self::Pressure),
+            0x93 => Ok(Self::SetPressure),
+            _ => Err(UnknownCommand { command: byte }),
+        }
+    }
+
+    pub fn expect(self, byte: u8) -> Result<()> {
+        let actual = Command::from(byte)?;
+
+        if actual != self {
+            Err(UnexpectedCommand {
+                expected: self.byte(),
+                actual: byte,
+            })
+        } else {
+            Ok(())
         }
     }
 }

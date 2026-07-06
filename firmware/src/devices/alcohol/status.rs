@@ -10,7 +10,7 @@ pub enum Status {
 }
 
 impl Status {
-    pub(super) const fn from(byte: u8) -> Self {
+    pub const fn from(byte: u8) -> Self {
         match byte {
             0x31 => Self::Idle,
             0x32 => Self::Preheating,

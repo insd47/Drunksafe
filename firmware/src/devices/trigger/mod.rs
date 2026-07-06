@@ -1,5 +1,5 @@
+use crate::error::Result;
 use esp_idf_svc::hal::gpio::{Gpio0, Input, PinDriver, Pull};
-use esp_idf_svc::sys::EspError;
 use std::time::{Duration, Instant};
 
 const DEBOUNCE: Duration = Duration::from_millis(80);
@@ -13,7 +13,7 @@ pub struct TriggerDevice {
 
 impl TriggerDevice {
     /// BOOT 버튼 핀을 input pull-up으로 설정한다.
-    pub fn new(pin: Gpio0<'static>) -> Result<Self, EspError> {
+    pub fn new(pin: Gpio0<'static>) -> Result<Self> {
         log::debug!("initializing trigger device");
         let button = PinDriver::input(pin, Pull::Up)?;
         let was_pressed = button.is_low();

@@ -3,7 +3,7 @@ use esp_idf_svc::sys::EspError;
 /// pulse 센서 I/O와 분석 입력 검증 중 발생하는 오류다.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// ESP-IDF I2C driver에서 전달된 오류다.
+    /// ESP-IDF HAL에서 전달된 오류다.
     #[error(transparent)]
     Esp(#[from] EspError),
     /// sample timestamp가 이전 sample보다 뒤로 이동했다.

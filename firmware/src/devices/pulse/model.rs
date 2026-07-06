@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
-pub(super) struct Sample {
-    pub(super) elapsed_ms: u32,
-    pub(super) raw_12bit: u16,
-    pub(super) filtered: f32,
+pub struct Sample {
+    pub elapsed_ms: u32,
+    pub raw_12bit: u16,
+    pub filtered: f32,
 }
 
 /// pulse window에서 계산한 분석 결과다.

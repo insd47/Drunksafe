@@ -1,4 +1,4 @@
-use crate::devices::PulseAnalysis;
+use crate::devices::pulse;
 use serde::{Deserialize, Serialize};
 
 /// BLE payload schema version이다.
@@ -129,8 +129,8 @@ pub struct Pulse {
     pub confidence_percent: u8,
 }
 
-impl From<PulseAnalysis> for Pulse {
-    fn from(analysis: PulseAnalysis) -> Self {
+impl From<pulse::Analysis> for Pulse {
+    fn from(analysis: pulse::Analysis) -> Self {
         Self {
             bpm: analysis.bpm,
             stable: analysis.stable,

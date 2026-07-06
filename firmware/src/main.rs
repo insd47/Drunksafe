@@ -1,15 +1,16 @@
-mod devices;
-mod features;
-mod utils;
-
+use error::Result;
 use esp_idf_svc::hal::task::block_on;
-use esp_idf_svc::sys::EspError;
 use features::measure;
 use std::time::Duration;
 
+mod devices;
+mod error;
+mod features;
+mod utils;
+
 const IDLE_POLL: Duration = Duration::from_millis(20);
 
-fn main() -> Result<(), EspError> {
+fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
@@ -27,9 +28,9 @@ fn main() -> Result<(), EspError> {
 
             match result {
                 Ok((pulse, alcohol_mg_l_x1000)) => log::info!(
-                    "measurement completed: try={try_index}, alcohol_mg_l_x1000={alcohol_mg_l_x1000}, pulse={pulse:?}"
+                    "measurement completed: try_index={try_index}, alcohol_mg_l_x1000={alcohol_mg_l_x1000}, pulse={pulse:?}"
                 ),
-                Err(error) => log::warn!("measurement failed: try={try_index}, error={error}"),
+                Err(error) => log::warn!("measurement failed: try_index={try_index}, error={error}"),
             }
 
             try_index += 1;

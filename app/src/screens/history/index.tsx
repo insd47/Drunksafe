@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
+import { Pressable } from 'react-native';
 
 import { ActionLink } from '@/components/action-link';
 import { Screen } from '@/components/screen';
@@ -58,15 +59,21 @@ export function HistoryScreen() {
           <StatusRow label="기록" value="없음" description="저장된 일반 측정 결과가 없습니다." />
         ) : null}
         {records.map((record) => (
-          <StatusRow
+          <Link
             key={record.id}
-            label={formatMeasuredAt(record.measured_at_unix_ms)}
-            value={formatDrivingStatus(record.risk)}
-            description={`${formatRisk(record.risk)} · ${formatBac(
-              record.bac_upper_milli_percent ?? record.bac_milli_percent
-            )}`}
-            tone={riskTone(record.risk)}
-          />
+            href={{ pathname: '/results/[id]', params: { id: record.id } }}
+            asChild>
+            <Pressable>
+              <StatusRow
+                label={formatMeasuredAt(record.measured_at_unix_ms)}
+                value={formatDrivingStatus(record.risk)}
+                description={`${formatRisk(record.risk)} · ${formatBac(
+                  record.bac_upper_milli_percent ?? record.bac_milli_percent
+                )}`}
+                tone={riskTone(record.risk)}
+              />
+            </Pressable>
+          </Link>
         ))}
       </Section>
 

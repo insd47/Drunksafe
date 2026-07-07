@@ -5,14 +5,15 @@
 
 ## 0. 준비 상태
 
-| 항목        | 명령 또는 확인                                               | 통과 기준                                               |
-| ----------- | ------------------------------------------------------------ | ------------------------------------------------------- |
-| Git 기준    | `git status --short --branch`                                | `main...origin/main`이며 의도한 변경 외 dirty file 없음 |
-| 앱 테스트   | `cd app && pnpm test && pnpm lint && pnpm exec tsc --noEmit` | 모두 exit 0                                             |
-| 앱 번들     | `cd app && pnpm exec expo export -p ios --no-minify --clear` | iOS bundle 생성                                         |
-| 웹 번들     | `cd app && pnpm exec expo export -p web --no-minify --clear` | web bundle 생성                                         |
-| 펌웨어 빌드 | `cd firmware && cargo fmt --check && cargo check`            | 모두 exit 0                                             |
-| 배선        | `.docs/firmware-public-surface.md`의 핀 표                   | ESP32 DevKitC V4, ZE29, PPG, SH1106, GPIO0 배선 일치    |
+| 항목             | 명령 또는 확인                                               | 통과 기준                                               |
+| ---------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| Git 기준         | `git status --short --branch`                                | `main...origin/main`이며 의도한 변경 외 dirty file 없음 |
+| 실기기 preflight | `cd app && pnpm mvp:hardware-preflight`                      | ESP32 후보 serial port와 flash 도구가 확인됨            |
+| 앱 테스트        | `cd app && pnpm test && pnpm lint && pnpm exec tsc --noEmit` | 모두 exit 0                                             |
+| 앱 번들          | `cd app && pnpm exec expo export -p ios --no-minify --clear` | iOS bundle 생성                                         |
+| 웹 번들          | `cd app && pnpm exec expo export -p web --no-minify --clear` | web bundle 생성                                         |
+| 펌웨어 빌드      | `cd firmware && cargo fmt --check && cargo check`            | 모두 exit 0                                             |
+| 배선             | `.docs/firmware-public-surface.md`의 핀 표                   | ESP32 DevKitC V4, ZE29, PPG, SH1106, GPIO0 배선 일치    |
 
 ## 1. 펌웨어 flash 및 광고
 

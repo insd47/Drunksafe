@@ -59,6 +59,7 @@ cargo run --release
 | 연결된 device id/name |     |
 | 권한 허용 화면 캡처   |     |
 | 연결 화면 캡처        |     |
+| BLE 검증 로그 캡처    |     |
 
 ## 3. Baseline 측정
 
@@ -195,6 +196,7 @@ MVP 완료는 다음 증거가 모두 있을 때만 선언한다.
 | Board / sensor wiring   |     |
 | Monitor log path        |     |
 | Screen recording path   |     |
+| BLE verification log    |     |
 | Notify-ready evidence   |     |
 | Baseline session id     |     |
 | Measurement session id  |     |

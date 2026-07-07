@@ -10,6 +10,7 @@ import { StatusRow } from '@/components/status-row';
 import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
 import { measurementStartBlocker, measurementStartBlockerMessage } from '@/lib/ble/start-readiness';
+import type { BleVerificationLogEntry } from '@/lib/ble/verification-log';
 import {
   formatBac,
   formatDrivingStatus,
@@ -231,6 +232,23 @@ export function ConnectScreen() {
         ) : null}
       </Section>
 
+      {ble.verificationLog.length > 0 ? (
+        <Section eyebrow="Verify" title="BLE 검증 로그">
+          {ble.verificationLog
+            .slice(-5)
+            .reverse()
+            .map((entry) => (
+              <StatusRow
+                key={entry.id}
+                label={entry.label}
+                value={verificationLogTime(entry.atUnixMs)}
+                description={verificationLogDescription(entry)}
+                tone={verificationLogTone(entry)}
+              />
+            ))}
+        </Section>
+      ) : null}
+
       <Section eyebrow="Context" title="개인화 준비">
         <StatusRow
           label="Sober baseline"
@@ -300,6 +318,37 @@ type Summary = {
   latest: MeasurementRecord | null;
   failed: boolean;
 };
+
+type StatusRowTone = 'neutral' | 'safe' | 'caution' | 'danger';
+
+function verificationLogDescription(entry: BleVerificationLogEntry) {
+  return entry.sessionId ? `${entry.detail} · session=${entry.sessionId}` : entry.detail;
+}
+
+function verificationLogTime(atUnixMs: number) {
+  const date = new Date(atUnixMs);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+function verificationLogTone(entry: BleVerificationLogEntry): StatusRowTone {
+  if (entry.label === 'event:error') {
+    return 'danger';
+  }
+
+  if (entry.label === 'state:notify-ready' || entry.label === 'event:result') {
+    return 'safe';
+  }
+
+  if (entry.kind === 'command') {
+    return 'caution';
+  }
+
+  return 'neutral';
+}
 
 function bluetoothLabel(state: string) {
   if (state === 'PoweredOn') {

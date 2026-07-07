@@ -12,6 +12,7 @@ import type {
   ErrorCode,
   MeasurementProgress,
   MeasurementResult,
+  PhoneCommand,
   StatusKind,
 } from '@/lib/ble/model';
 import {
@@ -36,6 +37,14 @@ import {
   shouldUpdateSoberBaseline,
 } from '@/lib/personalization/baseline-acceptance';
 import { buildPhoneContext, readBaseline, writeBaseline } from '@/lib/storage/profile';
+import {
+  appendBleVerificationLog,
+  bleCommandLogEntry,
+  bleEventLogEntry,
+  bleStateLogEntry,
+  type BleVerificationLogEntry,
+  type BleVerificationLogInput,
+} from '@/lib/ble/verification-log';
 
 export type { BleMeasurementPhase } from '@/lib/ble/measurement-phase';
 
@@ -67,6 +76,7 @@ export type BleSessionSnapshot = {
   deviceErrorCode: ErrorCode | null;
   message: string | null;
   contextSentSessionId: string | null;
+  verificationLog: BleVerificationLogEntry[];
   mockMode: boolean;
 };
 
@@ -85,6 +95,7 @@ const initialSnapshot: BleSessionSnapshot = {
   deviceErrorCode: null,
   message: null,
   contextSentSessionId: null,
+  verificationLog: [],
   mockMode: false,
 };
 
@@ -194,7 +205,7 @@ class BleSessionStore {
       );
       this.scheduleNotifyReadyTimeout(device.id);
 
-      await this.client.send({ cmd: 'time', unix_time_ms: Date.now() });
+      await this.sendCommand({ cmd: 'time', unix_time_ms: Date.now() });
     } catch (error) {
       this.fail(error);
     }
@@ -266,9 +277,13 @@ class BleSessionStore {
       return;
     }
 
+    const command: PhoneCommand = { cmd: 'cancel', session_id: sessionId };
+
     if (this.snapshot.mockMode) {
+      this.logVerification(bleCommandLogEntry(command));
       this.cancelledSessionIds.add(sessionId);
       this.clearMockTimers();
+      this.logVerification(bleStateLogEntry('state:cancelled', 'mock device cancelled', sessionId));
       this.set({
         measurementPhase: 'error',
         progress: null,
@@ -290,7 +305,7 @@ class BleSessionStore {
 
     try {
       this.cancelledSessionIds.add(sessionId);
-      await this.client.send({ cmd: 'cancel', session_id: sessionId });
+      await this.sendCommand(command);
     } catch (error) {
       this.fail(error);
     }
@@ -304,7 +319,10 @@ class BleSessionStore {
       return;
     }
 
+    const command: PhoneCommand = { cmd: 'start', kind };
+
     if (this.snapshot.mockMode) {
+      this.logVerification(bleCommandLogEntry(command));
       await this.startMockMeasurement(kind);
       return;
     }
@@ -334,7 +352,7 @@ class BleSessionStore {
     });
 
     try {
-      await this.client.send({ cmd: 'start', kind });
+      await this.sendCommand(command);
     } catch (error) {
       this.fail(error);
     }
@@ -357,12 +375,25 @@ class BleSessionStore {
   };
 
   private async handleEvent(event: DeviceEvent) {
+    this.logVerification(bleEventLogEntry(event));
+
     switch (event.event) {
       case 'status':
+        const pendingConnectedDevice = this.consumePendingConnectedDevice();
         const connectedDevice = connectedDeviceAfterNotifySubscriptionReady({
           currentConnectedDevice: this.snapshot.connectedDevice,
-          pendingConnectedDevice: this.consumePendingConnectedDevice(),
+          pendingConnectedDevice,
         });
+
+        if (pendingConnectedDevice && connectedDevice) {
+          this.logVerification(
+            bleStateLogEntry(
+              'state:notify-ready',
+              `${connectedDevice.name} status=${event.status}`,
+              event.active_session_id
+            )
+          );
+        }
 
         this.set({
           connectedDevice,
@@ -460,7 +491,7 @@ class BleSessionStore {
 
     try {
       if (event.sync_time) {
-        await this.client.send({ cmd: 'time', unix_time_ms: Date.now() });
+        await this.sendCommand({ cmd: 'time', unix_time_ms: Date.now() });
       }
 
       if (event.needs_context) {
@@ -470,7 +501,7 @@ class BleSessionStore {
           return;
         }
 
-        await this.client.send({ cmd: 'context', ...context });
+        await this.sendCommand({ cmd: 'context', ...context });
         this.set({
           measurementPhase: 'measuring',
           contextSentSessionId: event.session_id,
@@ -516,7 +547,7 @@ class BleSessionStore {
     });
 
     if (this.client && resultSaved) {
-      await this.client.send({ cmd: 'ack', session_id: event.session_id }).catch(() => {});
+      await this.sendCommand({ cmd: 'ack', session_id: event.session_id }).catch(() => {});
     }
   }
 
@@ -571,6 +602,22 @@ class BleSessionStore {
 
   private canUseBluetooth() {
     return this.snapshot.bluetoothState === 'PoweredOn';
+  }
+
+  private async sendCommand(command: PhoneCommand) {
+    this.logVerification(bleCommandLogEntry(command));
+
+    if (!this.client) {
+      return;
+    }
+
+    await this.client.send(command);
+  }
+
+  private logVerification(input: BleVerificationLogInput) {
+    this.set({
+      verificationLog: appendBleVerificationLog(this.snapshot.verificationLog, input),
+    });
   }
 
   private isActiveMeasurement() {

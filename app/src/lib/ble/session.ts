@@ -473,12 +473,12 @@ class BleSessionStore {
     const kind = this.snapshot.activeMeasurementKind;
 
     try {
-      await saveMeasurement(recordFromResult(event, kind));
+      const { inserted } = await saveMeasurement(recordFromResult(event, kind));
 
       if (kind === 'baseline') {
         baselineAccepted = shouldUpdateSoberBaseline(event);
 
-        if (baselineAccepted) {
+        if (baselineAccepted && inserted) {
           await saveBaselineFromResult(event);
         }
       }

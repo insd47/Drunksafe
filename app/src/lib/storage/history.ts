@@ -1,25 +1,16 @@
-import type { HistoryEntry, MeasurementResult, Risk } from '@/lib/ble/model';
+import type { HistoryEntry, Risk } from '@/lib/ble/model';
+import {
+  insertMeasurementRecord,
+  measurementHistoryLimit,
+  recordFromResult,
+  type MeasurementRecord,
+} from '@/lib/storage/history-records';
 import { readJson, writeJson } from '@/lib/storage/json';
 
 const historyKey = 'drunksafe.history.v1';
-const historyLimit = 50;
 
-export type MeasurementKind = 'measurement' | 'baseline';
-
-export type MeasurementRecord = {
-  id: string;
-  kind: MeasurementKind;
-  session_id: string;
-  measured_at_unix_ms: number;
-  alcohol_mg_l_x1000: number;
-  bac_milli_percent: number | null;
-  bac_upper_milli_percent: number | null;
-  sober_time_minutes: number | null;
-  risk: Risk;
-  confidence_percent: number;
-  pulse_bpm: number | null;
-  pulse_stable: boolean | null;
-};
+export { insertMeasurementRecord, recordFromResult };
+export type { MeasurementKind, MeasurementRecord } from '@/lib/storage/history-records';
 
 export async function readHistory() {
   return readJson<MeasurementRecord[]>(
@@ -61,31 +52,14 @@ export async function saveMeasurement(record: MeasurementRecord) {
   }
 
   const history = await readHistory();
-  const next = [record, ...history.filter((item) => item.id !== record.id)].slice(0, historyLimit);
+  const next = insertMeasurementRecord(history, record);
+
+  if (next === history) {
+    return { inserted: false };
+  }
 
   await writeJson(historyKey, next);
-}
-
-export function recordFromResult(
-  result: MeasurementResult,
-  kind: MeasurementKind
-): MeasurementRecord {
-  const measuredAt = result.measured_at_unix_ms ?? Date.now();
-
-  return {
-    id: `${kind}:${result.session_id}:${measuredAt}`,
-    kind,
-    session_id: result.session_id,
-    measured_at_unix_ms: measuredAt,
-    alcohol_mg_l_x1000: result.alcohol.mg_l_x1000,
-    bac_milli_percent: result.bac_milli_percent,
-    bac_upper_milli_percent: result.bac_upper_milli_percent,
-    sober_time_minutes: result.sober_time_minutes,
-    risk: result.risk,
-    confidence_percent: result.confidence_percent,
-    pulse_bpm: result.pulse?.bpm ?? null,
-    pulse_stable: result.pulse?.stable ?? null,
-  };
+  return { inserted: true };
 }
 
 function isMeasurementHistory(value: unknown): value is MeasurementRecord[] {
@@ -97,7 +71,7 @@ function sanitizeMeasurementHistory(value: unknown) {
     return null;
   }
 
-  return value.filter(isMeasurementRecord).slice(0, historyLimit);
+  return value.filter(isMeasurementRecord).slice(0, measurementHistoryLimit);
 }
 
 function isMeasurementRecord(value: unknown): value is MeasurementRecord {
@@ -155,5 +129,5 @@ function clampReadLimit(limit: number) {
     return 0;
   }
 
-  return Math.max(0, Math.min(limit, historyLimit));
+  return Math.max(0, Math.min(limit, measurementHistoryLimit));
 }

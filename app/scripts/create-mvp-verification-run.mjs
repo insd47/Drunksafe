@@ -166,6 +166,7 @@ ${requiredEvidenceFields.map((field) => `| ${field} |  |`).join('\n')}
 - [ ] \`measurement_result.measured_at_unix_ms\` 채워짐
 - [ ] 결과 저장 상태가 \`저장됨\`
 - [ ] 히스토리 최신 기록이 결과 화면과 일치
+- [ ] 반복 위험 샘플에서 129/109/지역 센터 개선 안내가 표시됨
 
 증거:
 
@@ -175,6 +176,7 @@ ${requiredEvidenceFields.map((field) => `| ${field} |  |`).join('\n')}
 - Risk:
 - Sober-time estimate:
 - History 화면 캡처:
+- 반복 위험 샘플 개선 안내 캡처:
 
 ### 5. 보드 버튼 시작
 
@@ -229,6 +231,10 @@ function run() {
     return;
   }
 
+  if (!args.has('--allow-dirty')) {
+    assertCleanMainStatus(data.status);
+  }
+
   const outPath = outputPathForRun(data);
   if (existsSync(outPath) && !args.has('--force')) {
     throw new Error(`verification run file already exists: ${outPath}`);
@@ -244,6 +250,25 @@ function runGit(repoDir, args) {
     cwd: repoDir,
     encoding: 'utf8',
   }).trim();
+}
+
+export function isCleanMainStatus(status) {
+  return status.trim() === '## main...origin/main';
+}
+
+export function assertCleanMainStatus(status) {
+  if (isCleanMainStatus(status)) {
+    return;
+  }
+
+  throw new Error(
+    [
+      'MVP evidence run files must be created from a clean main...origin/main checkout.',
+      'Use --print to inspect the draft template without writing a file, or --allow-dirty only for non-MVP draft notes.',
+      '',
+      status,
+    ].join('\n')
+  );
 }
 
 function listSerialPorts() {
@@ -276,5 +301,10 @@ function formatList(items) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  run();
+  try {
+    run();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

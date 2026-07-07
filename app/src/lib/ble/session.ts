@@ -17,7 +17,13 @@ import {
   mockProgressPlan,
 } from '@/lib/ble/mock';
 import { hasActiveMeasurement, type BleMeasurementPhase } from '@/lib/ble/measurement-phase';
-import { statusMessageAfterNotify, terminalDeviceErrorPatch } from '@/lib/ble/session-patches';
+import {
+  activeSessionIdAfterStatusNotify,
+  disconnectSessionPatch,
+  interruptedMeasurementPatch,
+  statusMessageAfterNotify,
+  terminalDeviceErrorPatch,
+} from '@/lib/ble/session-patches';
 import { recordFromResult, saveMeasurement, type MeasurementKind } from '@/lib/storage/history';
 import { buildPhoneContext, readBaseline, writeBaseline } from '@/lib/storage/profile';
 
@@ -205,13 +211,13 @@ class BleSessionStore {
       this.clearMockTimers();
       this.set({
         connectionPhase: this.snapshot.bluetoothState === 'Unsupported' ? 'unsupported' : 'idle',
-        measurementPhase: 'idle',
         connectedDevice: null,
         deviceStatus: null,
-        activeSessionId: null,
-        progress: null,
-        message: null,
         mockMode: false,
+        ...disconnectSessionPatch({
+          result: this.snapshot.result,
+          resultSaved: this.snapshot.resultSaved,
+        }),
       });
       return;
     }
@@ -225,12 +231,12 @@ class BleSessionStore {
     await this.client.disconnect();
     this.set({
       connectionPhase: this.canUseBluetooth() ? 'idle' : this.snapshot.connectionPhase,
-      measurementPhase: 'idle',
       connectedDevice: null,
       deviceStatus: null,
-      activeSessionId: null,
-      progress: null,
-      message: null,
+      ...disconnectSessionPatch({
+        result: this.snapshot.result,
+        resultSaved: this.snapshot.resultSaved,
+      }),
     });
   };
 
@@ -335,7 +341,12 @@ class BleSessionStore {
       case 'status':
         this.set({
           deviceStatus: event.status,
-          activeSessionId: event.active_session_id,
+          activeSessionId: activeSessionIdAfterStatusNotify({
+            status: event.status,
+            measurementPhase: this.snapshot.measurementPhase,
+            currentActiveSessionId: this.snapshot.activeSessionId,
+            notifiedActiveSessionId: event.active_session_id,
+          }),
           connectionPhase: 'connected',
           message: statusMessageAfterNotify({
             status: event.status,
@@ -506,13 +517,17 @@ class BleSessionStore {
       patch.message = '이 환경에서는 BLE를 사용할 수 없습니다.';
     } else if (state !== 'PoweredOn') {
       this.clearEventMonitor();
+      const message = 'Bluetooth를 켜야 장치를 찾을 수 있습니다.';
+
       patch.connectionPhase = 'bluetooth_off';
       patch.connectedDevice = null;
       patch.deviceStatus = null;
-      patch.measurementPhase = this.isActiveMeasurement()
-        ? 'error'
-        : this.snapshot.measurementPhase;
-      patch.message = 'Bluetooth를 켜야 장치를 찾을 수 있습니다.';
+
+      if (this.isActiveMeasurement()) {
+        Object.assign(patch, interruptedMeasurementPatch(message));
+      } else {
+        patch.message = message;
+      }
     } else if (
       this.snapshot.connectionPhase === 'bluetooth_off' ||
       this.snapshot.connectionPhase === 'unsupported'
@@ -536,14 +551,14 @@ class BleSessionStore {
     const message = error instanceof Error ? error.message : 'BLE 작업에 실패했습니다.';
     const unsupported = /available only in native builds|unsupported/i.test(message);
     const measurementFailed = this.isActiveMeasurement();
+    const sessionPatch = measurementFailed ? interruptedMeasurementPatch(message) : { message };
 
     this.clearEventMonitor();
     this.set({
       connectionPhase: unsupported ? 'unsupported' : 'error',
       connectedDevice: null,
       deviceStatus: null,
-      measurementPhase: measurementFailed ? 'error' : this.snapshot.measurementPhase,
-      message,
+      ...sessionPatch,
     });
   }
 

@@ -107,3 +107,17 @@ test('active route keeps BLE notify progress copy', () => {
     'BLE notify를 기다리는 중입니다.'
   );
 });
+
+test('terminal route shows the last interruption message', () => {
+  assert.equal(
+    measurementReadinessDescription({
+      routeMatchesActive: true,
+      activeMeasurement: false,
+      hasResult: false,
+      message: '측정 중 연결이 해제되었습니다.',
+      blocker: 'not_connected',
+      contextLoadFailed: false,
+    }),
+    '측정 중 연결이 해제되었습니다.'
+  );
+});

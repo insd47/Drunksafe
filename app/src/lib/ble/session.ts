@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 import { DrunksafeBleClient, type DrunksafeBleDevice } from '@/lib/ble/client';
 import {
+  canRequestBleScan,
   connectedDeviceAfterNotifySubscriptionReady,
   notifySubscriptionPendingMessage,
   notifySubscriptionReadyTimeoutMs,
@@ -26,7 +27,7 @@ import {
 import { hasActiveMeasurement, type BleMeasurementPhase } from '@/lib/ble/measurement-phase';
 import {
   activeSessionIdAfterStatusNotify,
-  disconnectSessionPatch,
+  disconnectOrInterruptSessionPatch,
   interruptedMeasurementPatch,
   statusMessageAfterNotify,
   terminalDeviceErrorPatch,
@@ -145,7 +146,7 @@ class BleSessionStore {
   startScan = async () => {
     this.initialize();
 
-    if (!this.client || !this.canUseBluetooth()) {
+    if (!this.client || !canRequestBleScan(this.snapshot.bluetoothState)) {
       return;
     }
 
@@ -243,6 +244,13 @@ class BleSessionStore {
 
   disconnect = async () => {
     this.clearNotifyReadyWait();
+    const activeMeasurement = this.isActiveMeasurement();
+    const sessionPatch = disconnectOrInterruptSessionPatch({
+      activeMeasurement,
+      result: this.snapshot.result,
+      resultSaved: this.snapshot.resultSaved,
+      interruptedMessage: '측정 중 연결이 해제되었습니다.',
+    });
 
     if (this.snapshot.mockMode) {
       this.clearMockTimers();
@@ -251,10 +259,7 @@ class BleSessionStore {
         connectedDevice: null,
         deviceStatus: null,
         mockMode: false,
-        ...disconnectSessionPatch({
-          result: this.snapshot.result,
-          resultSaved: this.snapshot.resultSaved,
-        }),
+        ...sessionPatch,
       });
       return;
     }
@@ -270,10 +275,7 @@ class BleSessionStore {
       connectionPhase: this.canUseBluetooth() ? 'idle' : this.snapshot.connectionPhase,
       connectedDevice: null,
       deviceStatus: null,
-      ...disconnectSessionPatch({
-        result: this.snapshot.result,
-        resultSaved: this.snapshot.resultSaved,
-      }),
+      ...sessionPatch,
     });
   };
 

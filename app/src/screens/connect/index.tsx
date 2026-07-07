@@ -7,6 +7,7 @@ import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { Separator } from '@/components/separator';
 import { StatusRow } from '@/components/status-row';
+import { canRequestBleScan } from '@/lib/ble/connection-readiness';
 import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
 import { measurementStartBlocker, measurementStartBlockerMessage } from '@/lib/ble/start-readiness';
@@ -80,7 +81,7 @@ export function ConnectScreen() {
 
   const contextReady = summary.baselineReady || summary.profileReady;
   const scanDisabled =
-    ble.mockMode || ble.connectionPhase === 'connecting' || ble.bluetoothState !== 'PoweredOn';
+    ble.mockMode || ble.connectionPhase === 'connecting' || !canRequestBleScan(ble.bluetoothState);
   const startBlocker = measurementStartBlocker({
     connected: Boolean(ble.connectedDevice),
     activeMeasurement: hasActiveMeasurement(ble),
@@ -451,6 +452,10 @@ function bluetoothLabel(state: string) {
     return '미지원';
   }
 
+  if (state === 'Unauthorized') {
+    return '권한 필요';
+  }
+
   return '꺼짐';
 }
 
@@ -461,6 +466,10 @@ function bluetoothTone(state: string) {
 
   if (state === 'Unsupported') {
     return 'danger';
+  }
+
+  if (state === 'Unauthorized') {
+    return 'caution';
   }
 
   return 'caution';

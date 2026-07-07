@@ -174,11 +174,13 @@ MVP 완료는 다음 증거가 모두 있을 때만 선언한다.
 아래 항목은 코드 완화가 `main`에 들어갔다. MVP 완료 판정은 여전히 실제 보드에서
 해당 시나리오를 재현하고 로그/화면 증거를 남긴 뒤에만 가능하다.
 
-| 항목                         | 코드 완화 상태                                                                                   | 실기기 통과 증거                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Notify subscription race     | #46에서 펌웨어 status replay와 앱 notify-ready 승격 대기를 추가했다.                             | 연결 직후 첫 status 수신 전에는 start가 막히고, 연결 후 start가 context timeout 없이 시작된다.            |
-| 측정 중 cancel 지연          | #48에서 측정 future와 cancel polling future를 경합시키고 alcohol sensor cancel cleanup을 넣었다. | 측정 중 `측정 취소` 후 1초 안에 `device_error(cancelled)`가 도착하고 다음 측정이 정상 시작된다.           |
-| Chunk reassembly stale state | #47에서 앱 event assembler reset과 monitor generation guard를 추가했다.                          | reconnect 또는 board reboot 후 큰 result notify가 섞이지 않고 정상 파싱되며, 다음 측정 result가 저장된다. |
+| 항목                         | 코드 완화 상태                                                                                                                                  | 실기기 통과 증거                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Notify subscription race     | #46에서 펌웨어 status replay와 앱 notify-ready 승격 대기를 추가했고, #58에서 CCCD write response 이후 replay notify를 보내도록 순서를 보강했다. | 연결 직후 첫 status 수신 전에는 start가 막히고, 연결 후 start가 context timeout 없이 시작된다.            |
+| 측정 중 cancel 지연          | #48에서 측정 future와 cancel polling future를 경합시키고 alcohol sensor cancel cleanup을 넣었다.                                                | 측정 중 `측정 취소` 후 1초 안에 `device_error(cancelled)`가 도착하고 다음 측정이 정상 시작된다.           |
+| Chunk reassembly stale state | #47에서 앱 event assembler reset과 monitor generation guard를 추가했다.                                                                         | reconnect 또는 board reboot 후 큰 result notify가 섞이지 않고 정상 파싱되며, 다음 측정 result가 저장된다. |
+| PPG 실패 시 결과 차단        | #56에서 PPG 측정 실패가 알코올 결과를 버리지 않도록 `pulse_bpm`을 optional로 바꾸고 BLE/OLED 표시를 보강했다.                                   | PPG 값이 없거나 불안정해도 알코올 result가 앱에 표시되고 히스토리에 저장되며, BPM은 빈 값으로 표시된다.   |
+| ZE29 work mode 잔류          | #57에서 정상 결과, timeout, 센서 오류 이후에도 ZE29 work mode를 best-effort로 끄도록 했다.                                                      | baseline, 일반 측정, 보드 버튼 측정을 연속 실행해도 다음 측정이 센서 상태 잔류 없이 시작된다.             |
 
 ## 9. 실기기 실행 기록 양식
 

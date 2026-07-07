@@ -36,7 +36,10 @@ pub fn result(display: &mut DisplayDevice<'_>, measurement: Measurement) -> Resu
             format_args!("ALC {}.{:03} MG/L", alcohol / 1000, alcohol % 1000),
         );
 
-        canvas.centered(42, format_args!("BPM {bpm}"))
+        match bpm {
+            Some(bpm) => canvas.centered(42, format_args!("BPM {bpm}")),
+            None => canvas.centered(42, format_args!("BPM --")),
+        }
     })?;
     Ok(())
 }

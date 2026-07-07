@@ -36,8 +36,20 @@ const firmwareMeasureModSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'measure', 'mod.rs'),
   'utf8'
 );
+const firmwareMeasureMeasurementSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'measure', 'measurement.rs'),
+  'utf8'
+);
 const firmwareMeasureRunSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'measure', 'run.rs'),
+  'utf8'
+);
+const firmwareBleAnalysisSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'ble', 'analysis.rs'),
+  'utf8'
+);
+const firmwareScreenRenderSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'screen', 'render.rs'),
   'utf8'
 );
 const firmwareAlcoholSource = readFileSync(
@@ -247,6 +259,20 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   assert.ok(firmwareAlcoholChannelSource.includes('const MAX_DRAIN_BYTES: usize = FRAME_LEN * 4'));
   assert.ok(firmwareAlcoholChannelSource.includes('while drained < MAX_DRAIN_BYTES'));
   assert.ok(firmwareAlcoholChannelSource.includes('pub async fn drain_pending'));
+});
+
+test('firmware alcohol result can complete when pulse is unavailable', () => {
+  assert.ok(firmwareMeasureMeasurementSource.includes('pulse_bpm: Option<u16>'));
+  assert.ok(
+    firmwareMeasureMeasurementSource.includes('pub const fn pulse_bpm(&self) -> Option<u16>')
+  );
+  assert.ok(firmwareMeasureModSource.includes('let alcohol = alcohol?;'));
+  assert.ok(firmwareMeasureModSource.includes('Err(error) => {'));
+  assert.ok(firmwareMeasureModSource.includes('continuing with alcohol result'));
+  assert.ok(firmwareMeasureModSource.includes('Ok(Measurement::new(alcohol, pulse))'));
+  assert.equal(firmwareMeasureModSource.includes('Measurement::new(alcohol?, pulse?)'), false);
+  assert.ok(firmwareBleAnalysisSource.includes('pulse: pulse_bpm.map'));
+  assert.ok(firmwareScreenRenderSource.includes('format_args!("BPM --")'));
 });
 
 test('device event fixtures parse through the app validator', () => {

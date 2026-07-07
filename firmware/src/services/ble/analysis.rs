@@ -37,7 +37,7 @@ pub fn measurement_result(
         alcohol: Alcohol {
             mg_l_x1000: alcohol_mg_l_x1000,
         },
-        pulse: Some(Pulse {
+        pulse: pulse_bpm.map(|pulse_bpm| Pulse {
             bpm: pulse_bpm as f32,
             stable: true,
             confidence_percent: pulse_confidence_percent(context, pulse_bpm),
@@ -133,7 +133,7 @@ fn risk_from_upper_bac(bac_upper_milli_percent: u16) -> Risk {
     }
 }
 
-fn confidence_percent(context: Option<&PhoneContext>, pulse_bpm: u16) -> u8 {
+fn confidence_percent(context: Option<&PhoneContext>, pulse_bpm: Option<u16>) -> u8 {
     let mut confidence = 55_u8;
 
     if let Some(context) = context {
@@ -153,7 +153,7 @@ fn confidence_percent(context: Option<&PhoneContext>, pulse_bpm: u16) -> u8 {
             confidence = confidence.saturating_add(5);
         }
 
-        if let Some(resting_bpm) = context.resting_bpm {
+        if let (Some(resting_bpm), Some(pulse_bpm)) = (context.resting_bpm, pulse_bpm) {
             let delta = pulse_bpm.abs_diff(resting_bpm);
 
             if delta <= 20 {
@@ -161,6 +161,8 @@ fn confidence_percent(context: Option<&PhoneContext>, pulse_bpm: u16) -> u8 {
             } else {
                 confidence = confidence.saturating_sub(10);
             }
+        } else if context.resting_bpm.is_some() {
+            confidence = confidence.saturating_sub(5);
         }
     }
 

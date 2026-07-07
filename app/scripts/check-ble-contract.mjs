@@ -32,6 +32,22 @@ const firmwareBleModSource = readFileSync(
   'utf8'
 );
 const firmwareMainSource = readFileSync(join(repoDir, 'firmware', 'src', 'main.rs'), 'utf8');
+const firmwareMeasureModSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'measure', 'mod.rs'),
+  'utf8'
+);
+const firmwareMeasureRunSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'measure', 'run.rs'),
+  'utf8'
+);
+const firmwareAlcoholSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'devices', 'alcohol', 'mod.rs'),
+  'utf8'
+);
+const firmwareAlcoholChannelSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'devices', 'alcohol', 'channel.rs'),
+  'utf8'
+);
 const appBleClientSource = readFileSync(join(appDir, 'src', 'lib', 'ble', 'client.ts'), 'utf8');
 
 test('app BLE protocol version and GATT UUIDs match the contract fixture', () => {
@@ -132,6 +148,105 @@ test('firmware runtime keeps context wait and final result messages ordered', ()
   for (let index = 1; index < order.length; index += 1) {
     assert.ok(order[index] > order[index - 1]);
   }
+});
+
+test('firmware measurement loop polls cancel while sensors are active', () => {
+  const runUntilCancelledIndex = indexOfRequired(
+    firmwareMainSource,
+    'measure.run_until_cancelled(wait_for_measurement_cancel(&ble, &session_id))'
+  );
+  const cancelledBranchIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'Ok(MeasureRun::Cancelled)',
+    runUntilCancelledIndex
+  );
+  const cancelledErrorIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'ble::device_error(Some(session_id.clone()), ErrorCode::Cancelled)',
+    cancelledBranchIndex
+  );
+  const idleStatusIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'ble::device_status(StatusKind::Idle, None)',
+    cancelledErrorIndex
+  );
+  const mainOrder = [
+    runUntilCancelledIndex,
+    cancelledBranchIndex,
+    cancelledErrorIndex,
+    idleStatusIndex,
+  ];
+
+  for (let index = 1; index < mainOrder.length; index += 1) {
+    assert.ok(mainOrder[index] > mainOrder[index - 1]);
+  }
+
+  const cancelFutureIndex = indexOfRequired(
+    firmwareMainSource,
+    'async fn wait_for_measurement_cancel'
+  );
+  const cancelDrainIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'measurement_cancel_requested(ble, session_id)',
+    cancelFutureIndex
+  );
+  const cancelSleepIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'Timer::after(MEASUREMENT_CANCEL_POLL).await',
+    cancelDrainIndex
+  );
+  assert.ok(cancelFutureIndex < cancelDrainIndex);
+  assert.ok(cancelDrainIndex < cancelSleepIndex);
+
+  assert.ok(firmwareMeasureModSource.includes('pub enum MeasureRun'));
+  assert.ok(firmwareMeasureModSource.includes('pub async fn run_until_cancelled'));
+  assert.ok(firmwareMeasureModSource.includes('join(run::pulse(pulse), run::alcohol(alcohol))'));
+  assert.ok(firmwareMeasureModSource.includes('select(self.run(), cancel).await'));
+  const cancelSelectIndex = indexOfRequired(firmwareMeasureModSource, 'Either::Second(()) => {');
+  const alcoholStopIndex = indexOfRequiredAfter(
+    firmwareMeasureModSource,
+    'self.alcohol.stop_after_cancel().await?',
+    cancelSelectIndex
+  );
+  const cancelledReturnIndex = indexOfRequiredAfter(
+    firmwareMeasureModSource,
+    'Ok(MeasureRun::Cancelled)',
+    alcoholStopIndex
+  );
+  assert.ok(cancelSelectIndex < alcoholStopIndex);
+  assert.ok(alcoholStopIndex < cancelledReturnIndex);
+  assert.equal(firmwareMainSource.includes('cancelled_after_measurement'), false);
+  assert.ok(firmwareMeasureRunSource.includes('pub async fn pulse'));
+  assert.ok(firmwareMeasureRunSource.includes('pub async fn alcohol'));
+  assert.ok(firmwareAlcoholSource.includes('pub async fn stop_after_cancel'));
+  const preDrainIndex = indexOfRequired(
+    firmwareAlcoholSource,
+    'self.channel.drain_pending().await?'
+  );
+  const firstStopIndex = indexOfRequiredAfter(
+    firmwareAlcoholSource,
+    'let first = self.work(false).await',
+    preDrainIndex
+  );
+  const secondStopIndex = indexOfRequiredAfter(
+    firmwareAlcoholSource,
+    'let second = self.work(false).await',
+    firstStopIndex
+  );
+  const postDrainIndex = indexOfRequiredAfter(
+    firmwareAlcoholSource,
+    'self.channel.drain_pending().await?',
+    secondStopIndex
+  );
+  assert.ok(preDrainIndex < firstStopIndex);
+  assert.ok(firstStopIndex < secondStopIndex);
+  assert.ok(secondStopIndex < postDrainIndex);
+  assert.ok(firmwareAlcoholSource.includes('let first = self.work(false).await'));
+  assert.ok(firmwareAlcoholSource.includes('let second = self.work(false).await'));
+  assert.ok(firmwareAlcoholChannelSource.includes('const DRAIN_QUIET_TIMEOUT'));
+  assert.ok(firmwareAlcoholChannelSource.includes('const MAX_DRAIN_BYTES: usize = FRAME_LEN * 4'));
+  assert.ok(firmwareAlcoholChannelSource.includes('while drained < MAX_DRAIN_BYTES'));
+  assert.ok(firmwareAlcoholChannelSource.includes('pub async fn drain_pending'));
 });
 
 test('device event fixtures parse through the app validator', () => {

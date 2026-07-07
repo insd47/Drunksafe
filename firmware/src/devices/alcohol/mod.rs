@@ -44,4 +44,18 @@ impl<'d> AlcoholDevice<'d> {
 
         Ok(())
     }
+
+    pub async fn stop_after_cancel(&mut self) -> Result<()> {
+        self.channel.drain_pending().await?;
+
+        let first = self.work(false).await;
+        let second = self.work(false).await;
+
+        self.channel.drain_pending().await?;
+
+        match (first, second) {
+            (_, Ok(())) => Ok(()),
+            (Err(error), Err(_)) | (Ok(()), Err(error)) => Err(error),
+        }
+    }
 }

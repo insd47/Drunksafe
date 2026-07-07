@@ -217,7 +217,7 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   const cancelSelectIndex = indexOfRequired(firmwareMeasureModSource, 'Either::Second(()) => {');
   const alcoholStopIndex = indexOfRequiredAfter(
     firmwareMeasureModSource,
-    'self.alcohol.stop_after_cancel().await?',
+    'self.alcohol.stop_work().await?',
     cancelSelectIndex
   );
   const cancelledReturnIndex = indexOfRequiredAfter(
@@ -229,8 +229,41 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   assert.ok(alcoholStopIndex < cancelledReturnIndex);
   assert.equal(firmwareMainSource.includes('cancelled_after_measurement'), false);
   assert.ok(firmwareMeasureRunSource.includes('pub async fn pulse'));
-  assert.ok(firmwareMeasureRunSource.includes('pub async fn alcohol'));
-  assert.ok(firmwareAlcoholSource.includes('pub async fn stop_after_cancel'));
+  const alcoholRunIndex = indexOfRequired(firmwareMeasureRunSource, 'pub async fn alcohol');
+  const alcoholWakeIndex = indexOfRequiredAfter(
+    firmwareMeasureRunSource,
+    'device.work(true).await?',
+    alcoholRunIndex
+  );
+  const alcoholResultIndex = indexOfRequiredAfter(
+    firmwareMeasureRunSource,
+    'let result = alcohol_result(device).await',
+    alcoholWakeIndex
+  );
+  const alcoholStopAfterRunIndex = indexOfRequiredAfter(
+    firmwareMeasureRunSource,
+    'device.stop_work().await',
+    alcoholResultIndex
+  );
+  const alcoholReturnIndex = indexOfRequiredAfter(
+    firmwareMeasureRunSource,
+    '\n    result\n',
+    alcoholStopAfterRunIndex
+  );
+  const alcoholResultFnIndex = indexOfRequiredAfter(
+    firmwareMeasureRunSource,
+    'async fn alcohol_result',
+    alcoholReturnIndex
+  );
+  assert.ok(alcoholRunIndex < alcoholWakeIndex);
+  assert.ok(alcoholWakeIndex < alcoholResultIndex);
+  assert.ok(alcoholResultIndex < alcoholStopAfterRunIndex);
+  assert.ok(alcoholStopAfterRunIndex < alcoholReturnIndex);
+  assert.ok(alcoholReturnIndex < alcoholResultFnIndex);
+  assert.ok(
+    firmwareMeasureRunSource.includes('failed to stop alcohol sensor work mode after measurement')
+  );
+  assert.ok(firmwareAlcoholSource.includes('pub async fn stop_work'));
   const preDrainIndex = indexOfRequired(
     firmwareAlcoholSource,
     'self.channel.drain_pending().await?'

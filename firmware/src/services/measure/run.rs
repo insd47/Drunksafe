@@ -29,6 +29,16 @@ pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
 
 pub async fn alcohol(device: &mut AlcoholDevice<'_>) -> Result<u16> {
     device.work(true).await?;
+    let result = alcohol_result(device).await;
+
+    if let Err(error) = device.stop_work().await {
+        log::warn!("failed to stop alcohol sensor work mode after measurement: {error}");
+    }
+
+    result
+}
+
+async fn alcohol_result(device: &mut AlcoholDevice<'_>) -> Result<u16> {
     let started = Instant::now();
 
     loop {

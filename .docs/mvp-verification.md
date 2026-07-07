@@ -187,6 +187,13 @@ MVP 완료는 다음 증거가 모두 있을 때만 선언한다.
 검증자는 아래 표를 복사해 각 실기기 실행마다 채운다. 한 실행에서 실패한 항목이 있으면
 해당 commit은 MVP 완료 증거로 쓰지 않는다.
 
+실행 전에는 아래 명령으로 현재 commit, 최근 PR, serial port 상태가 포함된 기록 파일을 만들 수 있다.
+
+```sh
+cd app
+pnpm mvp:evidence-template
+```
+
 | 항목                    | 값  |
 | ----------------------- | --- |
 | Verification date/time  |     |

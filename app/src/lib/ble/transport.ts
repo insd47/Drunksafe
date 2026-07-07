@@ -5,6 +5,8 @@ export const maxBleJsonPayloadBytes = 180;
 
 const defaultChunkDataBytes = 64;
 const chunkFrameOverheadReserveBytes = 96;
+export const maxBleTransportChunks = 64;
+export const minimumChunkedBlePayloadBytes = 120;
 let nextFrameSequence = 0;
 
 type ChunkFrame = {
@@ -35,8 +37,13 @@ export function serializePhoneCommandFrames(
     Math.min(defaultChunkDataBytes, maxPayloadBytes - chunkFrameOverheadReserveBytes)
   );
   const frameId = createFrameId();
+  const chunks = chunkPayload(payload, chunkDataBytes);
 
-  return chunkPayload(payload, chunkDataBytes).map((data, index, chunks) =>
+  if (chunks.length > maxBleTransportChunks) {
+    throw new Error('BLE transport chunk count exceeds configured limit');
+  }
+
+  return chunks.map((data, index) =>
     serializeFrame(
       {
         frame: 'phone_command_chunk',

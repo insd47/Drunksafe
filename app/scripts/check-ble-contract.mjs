@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url';
 
 import { decodeUtf8Base64, encodeUtf8Base64, utf8ByteLength } from '@/lib/ble/codec';
 import { parseDeviceEvent, protocolVersion, toPhoneCommandPayload } from '@/lib/ble/model';
-import { DeviceEventFrameAssembler, serializePhoneCommandFrames } from '@/lib/ble/transport';
+import {
+  DeviceEventFrameAssembler,
+  maxBleTransportChunks,
+  minimumChunkedBlePayloadBytes,
+  serializePhoneCommandFrames,
+} from '@/lib/ble/transport';
 import { drunksafeBle } from '@/lib/ble/uuids';
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -141,6 +146,28 @@ test('phone context is chunked into bounded BLE command frames', () => {
   });
 
   assert.deepEqual(JSON.parse(chunks.join('')), contextCommand);
+});
+
+test('phone context requires a chunk-capable BLE payload size', () => {
+  const contextCommand = contract.phoneCommands.find((command) => command.cmd === 'context');
+  assert.ok(contextCommand);
+
+  assert.throws(
+    () => serializePhoneCommandFrames(contextCommand, 20),
+    /BLE transport chunk count exceeds configured limit/
+  );
+  assert.throws(
+    () => serializePhoneCommandFrames(contextCommand, 97),
+    /BLE transport chunk count exceeds configured limit/
+  );
+
+  const frames = serializePhoneCommandFrames(contextCommand, minimumChunkedBlePayloadBytes);
+
+  assert.ok(frames.length <= maxBleTransportChunks);
+
+  for (const frame of frames) {
+    assert.ok(utf8ByteLength(frame) <= minimumChunkedBlePayloadBytes);
+  }
 });
 
 test('device event chunk frames reassemble before parsing', () => {

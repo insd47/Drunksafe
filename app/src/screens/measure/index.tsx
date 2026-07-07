@@ -39,6 +39,12 @@ export function MeasureScreen() {
     result: ble.result,
   });
   const activeStep = routeResult ? 'done' : routeProgress?.step;
+  const canCancel =
+    ble.connectedDevice &&
+    ble.activeSessionId !== null &&
+    (ble.measurementPhase === 'starting' ||
+      ble.measurementPhase === 'waiting_context' ||
+      ble.measurementPhase === 'measuring');
   const resultHref = routeResult
     ? `/results/${routeResult.session_id}`
     : isBaseline
@@ -92,6 +98,15 @@ export function MeasureScreen() {
           label="측정 시작"
           onPress={() => {
             void ble.startMeasurement(isBaseline ? 'baseline' : 'measurement');
+          }}
+        />
+      ) : null}
+      {canCancel ? (
+        <ActionButton
+          label="측정 취소"
+          variant="secondary"
+          onPress={() => {
+            void ble.cancelMeasurement();
           }}
         />
       ) : null}

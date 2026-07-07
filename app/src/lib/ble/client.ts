@@ -45,6 +45,7 @@ export class DrunksafeBleClient {
   private maxWritePayloadBytes = maxBleJsonPayloadBytes;
   private deviceId: string | null = null;
   private eventSubscription: Subscription | null = null;
+  private eventMonitorGeneration = 0;
 
   constructor(manager = new BleManager()) {
     this.manager = manager;
@@ -126,11 +127,17 @@ export class DrunksafeBleClient {
     const deviceId = this.requireDeviceId();
 
     this.eventSubscription?.remove();
+    this.eventAssembler.reset();
+    const eventMonitorGeneration = this.advanceEventMonitorGeneration();
     this.eventSubscription = this.manager.monitorCharacteristicForDevice(
       deviceId,
       drunksafeBle.serviceUuid,
       drunksafeBle.deviceEventCharacteristicUuid,
       (error, characteristic) => {
+        if (eventMonitorGeneration !== this.eventMonitorGeneration) {
+          return;
+        }
+
         if (error) {
           onError?.(toError(error));
           return;
@@ -188,8 +195,15 @@ export class DrunksafeBleClient {
   }
 
   private clearEventMonitor() {
+    this.advanceEventMonitorGeneration();
     this.eventSubscription?.remove();
     this.eventSubscription = null;
+    this.eventAssembler.reset();
+  }
+
+  private advanceEventMonitorGeneration() {
+    this.eventMonitorGeneration += 1;
+    return this.eventMonitorGeneration;
   }
 
   private async cancelTransactions() {

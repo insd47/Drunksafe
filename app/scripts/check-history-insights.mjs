@@ -26,6 +26,10 @@ test('single danger result recommends rest but not support escalation', () => {
   assert.equal(insight.totalCount, 1);
   assert.equal(insight.dangerCount, 1);
   assert.equal(insight.guidanceLevel, 'rest');
+  assert.deepEqual(
+    insight.guidanceActions.map((action) => action.value),
+    ['운전 중지', '휴식 후']
+  );
 });
 
 test('repeated danger results recommend support resources', () => {
@@ -40,6 +44,10 @@ test('repeated danger results recommend support resources', () => {
   assert.equal(insight.guidanceLevel, 'support');
   assert.equal(insight.averageBacUpperMilliPercent, 39);
   assert.equal(insight.peakBacUpperMilliPercent, 42);
+  assert.deepEqual(
+    insight.guidanceActions.map((action) => action.value),
+    ['129', '109', '상담 예약']
+  );
 });
 
 test('frequent safe records do not recommend support resources', () => {
@@ -55,6 +63,10 @@ test('frequent safe records do not recommend support resources', () => {
 
   assert.equal(insight.totalCount, 4);
   assert.equal(insight.guidanceLevel, 'none');
+  assert.deepEqual(
+    insight.guidanceActions.map((action) => action.value),
+    ['유지']
+  );
 });
 
 test('frequent mixed risk records recommend support resources', () => {

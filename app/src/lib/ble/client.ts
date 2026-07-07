@@ -10,6 +10,7 @@ import {
 
 import { decodeUtf8Base64, encodeUtf8Base64 } from '@/lib/ble/codec';
 import { parseDeviceEvent, type DeviceEvent, type PhoneCommand } from '@/lib/ble/model';
+import { ensureDrunksafeBlePermissions } from '@/lib/ble/permissions';
 import {
   DeviceEventFrameAssembler,
   maxBleJsonPayloadBytes,
@@ -58,6 +59,7 @@ export class DrunksafeBleClient {
   }
 
   async startScan({ onDevice, onError }: ScanCallbacks, options: ScanOptions = {}) {
+    await ensureDrunksafeBlePermissions();
     await this.stopScan();
 
     const serviceFilter = options.useServiceFilter === true ? [drunksafeBle.serviceUuid] : null;
@@ -86,6 +88,7 @@ export class DrunksafeBleClient {
   }
 
   async connect(deviceId: string) {
+    await ensureDrunksafeBlePermissions();
     await this.stopScan();
 
     let device = await this.manager.connectToDevice(deviceId, { timeout: 10000 });

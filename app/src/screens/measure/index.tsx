@@ -45,6 +45,14 @@ export function MeasureScreen() {
     (ble.measurementPhase === 'starting' ||
       ble.measurementPhase === 'waiting_context' ||
       ble.measurementPhase === 'measuring');
+  const canStartMeasurement =
+    ble.connectedDevice && (ble.measurementPhase === 'idle' || ble.measurementPhase === 'error');
+  const nextMeasurementKind =
+    ble.measurementPhase === 'error'
+      ? ble.activeMeasurementKind
+      : isBaseline
+        ? 'baseline'
+        : 'measurement';
   const resultHref = routeResult
     ? `/results/${routeResult.session_id}`
     : isBaseline
@@ -93,11 +101,11 @@ export function MeasureScreen() {
         })}
       </Section>
 
-      {ble.connectedDevice && ble.measurementPhase === 'idle' ? (
+      {canStartMeasurement ? (
         <ActionButton
-          label="측정 시작"
+          label={ble.measurementPhase === 'error' ? '다시 측정' : '측정 시작'}
           onPress={() => {
-            void ble.startMeasurement(isBaseline ? 'baseline' : 'measurement');
+            void ble.startMeasurement(nextMeasurementKind);
           }}
         />
       ) : null}

@@ -88,6 +88,27 @@ test('firmware replays status when a client enables event notify', () => {
     firmwareGattSource,
     'state.last_status = Some(event.clone());'
   );
+  const writeArmIndex = indexOfRequired(firmwareGattSource, 'GattsEvent::Write {');
+  const handleIndex = indexOfRequiredAfter(
+    firmwareGattSource,
+    'let (handled, status_replay) = self.handle_write',
+    writeArmIndex
+  );
+  const responseIndex = indexOfRequiredAfter(
+    firmwareGattSource,
+    'self.send_write_response(',
+    handleIndex
+  );
+  const replayNotifyIndex = indexOfRequiredAfter(
+    firmwareGattSource,
+    'if let Some(event) = status_replay',
+    responseIndex
+  );
+  const notifyIndex = indexOfRequiredAfter(
+    firmwareGattSource,
+    'self.notify(&event)?;',
+    replayNotifyIndex
+  );
   const cccdIndex = indexOfRequired(
     firmwareGattSource,
     'if Some(handle) == state.event_cccd_handle'
@@ -97,12 +118,24 @@ test('firmware replays status when a client enables event notify', () => {
     firmwareGattSource,
     'super::device_status(super::StatusKind::Connected, None)'
   );
-  const notifyIndex = indexOfRequired(firmwareGattSource, 'self.notify(&event)?;');
+  const handleWriteIndex = indexOfRequired(firmwareGattSource, 'fn handle_write(');
+  const writeResponseIndex = indexOfRequiredAfter(
+    firmwareGattSource,
+    'fn send_write_response',
+    handleWriteIndex
+  );
+  const handleWriteBody = firmwareGattSource.slice(handleWriteIndex, writeResponseIndex);
 
+  assert.ok(writeArmIndex < handleIndex);
+  assert.ok(handleIndex < responseIndex);
+  assert.ok(responseIndex < replayNotifyIndex);
+  assert.ok(replayNotifyIndex < notifyIndex);
   assert.ok(notifyCacheIndex < cccdIndex);
   assert.ok(cccdIndex < replayIndex);
   assert.ok(replayIndex < fallbackIndex);
-  assert.ok(fallbackIndex < notifyIndex);
+  assert.ok(handleWriteBody.includes('Ok((true, subscribe_status))'));
+  assert.ok(handleWriteBody.includes('Ok((false, None))'));
+  assert.equal(handleWriteBody.includes('self.notify(&event)?;'), false);
 });
 
 function device(id) {
@@ -119,6 +152,16 @@ function indexOfRequired(source, pattern) {
 
   if (index < 0) {
     throw new Error(`Pattern was not found: ${pattern}`);
+  }
+
+  return index;
+}
+
+function indexOfRequiredAfter(source, pattern, afterIndex) {
+  const index = source.indexOf(pattern, afterIndex);
+
+  if (index < 0) {
+    throw new Error(`Pattern was not found after ${afterIndex}: ${pattern}`);
   }
 
   return index;

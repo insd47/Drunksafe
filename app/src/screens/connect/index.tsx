@@ -253,6 +253,22 @@ export function ConnectScreen() {
               tone={verificationEvidence.notifyReadyAtUnixMs ? 'safe' : 'neutral'}
             />
             <StatusRow
+              label="시간 동기화"
+              value={
+                verificationEvidence.timeSyncAtUnixMs
+                  ? verificationLogTime(verificationEvidence.timeSyncAtUnixMs)
+                  : '대기'
+              }
+              description="cmd:time write가 성공한 시점입니다."
+              tone={verificationEvidence.timeSyncAtUnixMs ? 'safe' : 'neutral'}
+            />
+            <StatusRow
+              label="Context 전송"
+              value={evidenceSessionValue(verificationEvidence.contextSessionId)}
+              description="cmd:context write가 성공한 세션입니다."
+              tone={evidenceSessionTone(verificationEvidence.contextSessionId)}
+            />
+            <StatusRow
               label="Baseline 세션"
               value={evidenceSessionValue(verificationEvidence.baselineSessionId)}
               description="event:started kind=baseline 증거입니다."

@@ -168,12 +168,39 @@ MVP 완료는 다음 증거가 모두 있을 때만 선언한다.
 - 실제 BLE 연결은 되지만 측정 result가 앱 히스토리에 저장되지 않는다.
 - 센서가 고정값 또는 오류만 반환하는데 시연 시나리오에서 이를 명시하지 않았다.
 
-## 8. 완료 전 남은 고위험 항목
+## 8. 완료 전 고위험 항목 상태
 
-실기기 검증 전에 아래 항목을 코드로 해결하거나, 실제 보드 로그로 문제가 없음을 확인해야 한다.
+아래 항목은 코드 완화가 `main`에 들어갔다. MVP 완료 판정은 여전히 실제 보드에서
+해당 시나리오를 재현하고 로그/화면 증거를 남긴 뒤에만 가능하다.
 
-| 항목                         | 위험                                                                                                             | 완료 기준                                                                                                |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Notify subscription race     | 앱이 notify 구독 완료 전에 `start`를 보낼 수 있으면 `measurement_started`를 놓치고 context timeout이 날 수 있다. | 구독 준비 handshaking 또는 첫 status catch-up 이벤트가 있고, 앱은 그 전까지 start를 막는다.              |
-| 측정 중 cancel 지연          | 펌웨어가 `measure.run()` 안에서 센서 완료/timeout까지 blocking되면 앱의 cancel이 즉시 반영되지 않는다.           | 측정 loop가 cancel을 주기적으로 확인하고, cancel 시 `device_error(cancelled)`가 짧은 시간 안에 도착한다. |
-| Chunk reassembly stale state | reconnect 또는 board reboot 후 chunk id가 재사용되면 앱의 남은 chunk state와 충돌할 수 있다.                     | 앱은 monitor/disconnect마다 assembler를 reset하고, 펌웨어 chunk id는 boot/session nonce를 포함한다.      |
+| 항목                         | 코드 완화 상태                                                                                   | 실기기 통과 증거                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Notify subscription race     | #46에서 펌웨어 status replay와 앱 notify-ready 승격 대기를 추가했다.                             | 연결 직후 첫 status 수신 전에는 start가 막히고, 연결 후 start가 context timeout 없이 시작된다.            |
+| 측정 중 cancel 지연          | #48에서 측정 future와 cancel polling future를 경합시키고 alcohol sensor cancel cleanup을 넣었다. | 측정 중 `측정 취소` 후 1초 안에 `device_error(cancelled)`가 도착하고 다음 측정이 정상 시작된다.           |
+| Chunk reassembly stale state | #47에서 앱 event assembler reset과 monitor generation guard를 추가했다.                          | reconnect 또는 board reboot 후 큰 result notify가 섞이지 않고 정상 파싱되며, 다음 측정 result가 저장된다. |
+
+## 9. 실기기 실행 기록 양식
+
+검증자는 아래 표를 복사해 각 실기기 실행마다 채운다. 한 실행에서 실패한 항목이 있으면
+해당 commit은 MVP 완료 증거로 쓰지 않는다.
+
+| 항목                    | 값  |
+| ----------------------- | --- |
+| Verification date/time  |     |
+| Git commit              |     |
+| PR range                |     |
+| Firmware build command  |     |
+| App build/run method    |     |
+| Test phone / OS         |     |
+| Board / sensor wiring   |     |
+| Monitor log path        |     |
+| Screen recording path   |     |
+| Notify-ready evidence   |     |
+| Baseline session id     |     |
+| Measurement session id  |     |
+| Board-button session id |     |
+| Cancel session id       |     |
+| Cancel latency          |     |
+| Reconnect/reboot result |     |
+| Result                  |     |
+| Follow-up issue / PR    |     |

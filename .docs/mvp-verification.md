@@ -188,6 +188,7 @@ MVP 완료는 다음 증거가 모두 있을 때만 선언한다.
 해당 commit은 MVP 완료 증거로 쓰지 않는다.
 
 실행 전에는 아래 명령으로 현재 commit, 최근 PR, serial port 상태가 포함된 기록 파일을 만들 수 있다.
+이 명령은 `main...origin/main` 외 dirty 상태에서는 파일 생성을 막는다.
 
 ```sh
 cd app

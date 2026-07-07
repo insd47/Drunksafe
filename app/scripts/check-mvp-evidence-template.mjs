@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   collectMvpVerificationRunData,
+  assertCleanMainStatus,
+  isCleanMainStatus,
   outputPathForRun,
   renderMvpVerificationRun,
   requiredEvidenceFields,
@@ -34,6 +36,8 @@ test('MVP evidence run template covers every required evidence field', () => {
   assert.match(markdown, /Notify subscription race/);
   assert.match(markdown, /ZE29 work mode 잔류/);
   assert.match(markdown, /ESP32 후보 serial port/);
+  assert.match(markdown, /129\/109\/지역 센터/);
+  assert.match(markdown, /반복 위험 샘플 개선 안내 캡처/);
 });
 
 test('MVP evidence run collector records current git and serial context', () => {
@@ -47,6 +51,25 @@ test('MVP evidence run collector records current git and serial context', () => 
   assert.equal(data.createdAt, '2026-07-07T00:00:00.000Z');
   assert.ok(Array.isArray(data.serialPorts));
   assert.ok(Array.isArray(data.likelyEsp32SerialPorts));
+});
+
+test('MVP evidence run files require a clean main checkout by default', () => {
+  assert.equal(isCleanMainStatus('## main...origin/main'), true);
+  assert.equal(isCleanMainStatus('## feature/mvp-evidence-run-template'), false);
+  assert.equal(
+    isCleanMainStatus(`## main...origin/main
+ M .DS_Store`),
+    false
+  );
+
+  assert.doesNotThrow(() => assertCleanMainStatus('## main...origin/main'));
+  assert.throws(
+    () =>
+      assertCleanMainStatus(`## main...origin/main
+ M .DS_Store
+?? matches_move`),
+    /clean main\.\.\.origin\/main checkout/
+  );
 });
 
 test('MVP evidence run output path is timestamped by commit', () => {

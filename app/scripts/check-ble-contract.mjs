@@ -27,6 +27,11 @@ const firmwareTransportSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'ble', 'transport.rs'),
   'utf8'
 );
+const firmwareBleModSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'ble', 'mod.rs'),
+  'utf8'
+);
+const firmwareMainSource = readFileSync(join(repoDir, 'firmware', 'src', 'main.rs'), 'utf8');
 
 test('app BLE protocol version and GATT UUIDs match the contract fixture', () => {
   assert.equal(protocolVersion, contract.protocolVersion);
@@ -91,6 +96,41 @@ test('firmware serde enum names match the contract fixture', () => {
     readRustStructFields(firmwareTransportSource, 'ChunkFrame'),
     contract.payloadKinds.transportFrameFields
   );
+});
+
+test('firmware measurement progress plan covers every app-visible step in order', () => {
+  const plan = readRustProgressPlan(firmwareBleModSource, 'MEASUREMENT_PROGRESS_PLAN');
+
+  assert.deepEqual(
+    plan.map((item) => item.step),
+    contract.enums.measurementStep
+  );
+  assert.equal(plan[0].percent, 5);
+  assert.equal(plan.at(-1).percent, 100);
+
+  for (let index = 1; index < plan.length; index += 1) {
+    assert.ok(plan[index].percent > plan[index - 1].percent);
+  }
+});
+
+test('firmware runtime keeps context wait and final result messages ordered', () => {
+  const order = [
+    'ble::measurement_started(session_id.clone(), source, kind)',
+    'let context = wait_for_context(&ble, &session_id)',
+    'notify_progress(&ble, &session_id, MeasurementStep::Preparing)',
+    'notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor)',
+    'notify_progress(&ble, &session_id, MeasurementStep::WaitingBreath)',
+    'notify_progress(&ble, &session_id, MeasurementStep::SamplingBreath)',
+    'notify_progress(&ble, &session_id, MeasurementStep::SamplingPulse)',
+    'notify_progress(&ble, &session_id, MeasurementStep::Analyzing)',
+    'notify_progress(&ble, &session_id, MeasurementStep::Done)',
+    'ble::measurement_result(',
+    'ble::device_status(StatusKind::ResultReady, Some(session_id))',
+  ].map((pattern) => indexOfRequired(firmwareMainSource, pattern));
+
+  for (let index = 1; index < order.length; index += 1) {
+    assert.ok(order[index] > order[index - 1]);
+  }
 });
 
 test('device event fixtures parse through the app validator', () => {
@@ -318,6 +358,16 @@ function readRustConstValue(source, name) {
   return match[1].trim();
 }
 
+function indexOfRequired(source, pattern) {
+  const index = source.indexOf(pattern);
+
+  if (index < 0) {
+    throw new Error(`Pattern was not found: ${pattern}`);
+  }
+
+  return index;
+}
+
 function readRustEnumSnakeValues(source, enumName) {
   const enumBody = readRustEnumBody(source, enumName);
   const variants = [];
@@ -333,6 +383,38 @@ function readRustEnumSnakeValues(source, enumName) {
   }
 
   return variants;
+}
+
+function readRustProgressPlan(source, name) {
+  const planStart = source.indexOf(`pub const ${name}:`);
+
+  if (planStart < 0) {
+    throw new Error(`Rust progress plan ${name} was not found`);
+  }
+
+  const planEnd = source.indexOf('];', planStart);
+
+  if (planEnd < 0) {
+    throw new Error(`Rust progress plan ${name} is not closed`);
+  }
+
+  const body = source.slice(planStart, planEnd);
+  const items = [];
+  const itemPattern = /\(MeasurementStep::([A-Z][A-Za-z0-9_]*),\s*(\d+)\)/g;
+  let match;
+
+  while ((match = itemPattern.exec(body))) {
+    items.push({
+      step: toSnakeCase(match[1]),
+      percent: Number.parseInt(match[2], 10),
+    });
+  }
+
+  if (items.length === 0) {
+    throw new Error(`Rust progress plan ${name} has no readable items`);
+  }
+
+  return items;
 }
 
 function readRustEnumBody(source, enumName) {

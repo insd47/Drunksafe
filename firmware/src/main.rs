@@ -2,7 +2,7 @@ use error::Result;
 use esp_idf_svc::hal::task::block_on;
 use services::ble::{
     self, BleService, ErrorCode, MeasurementKind, MeasurementStep, PhoneCommand, PhoneContext,
-    Source, StatusKind,
+    Source, StatusKind, MEASUREMENT_PROGRESS_PLAN,
 };
 use services::measure::MeasureService;
 use services::screen::{ScreenService, View};
@@ -77,10 +77,6 @@ fn main() -> Result<()> {
                 &ble,
                 ble::measurement_started(session_id.clone(), source, kind),
             );
-            notify_ble(
-                &ble,
-                ble::measurement_progress(session_id.clone(), MeasurementStep::Preparing, 5),
-            );
 
             let context = wait_for_context(&ble, &session_id);
 
@@ -103,10 +99,11 @@ fn main() -> Result<()> {
                 continue;
             }
 
-            notify_ble(
-                &ble,
-                ble::measurement_progress(session_id.clone(), MeasurementStep::WaitingBreath, 20),
-            );
+            notify_progress(&ble, &session_id, MeasurementStep::Preparing);
+            notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor);
+            notify_progress(&ble, &session_id, MeasurementStep::WaitingBreath);
+            notify_progress(&ble, &session_id, MeasurementStep::SamplingBreath);
+            notify_progress(&ble, &session_id, MeasurementStep::SamplingPulse);
 
             screen.show(View::Measuring);
             let result = block_on(measure.run());
@@ -123,14 +120,8 @@ fn main() -> Result<()> {
                         continue;
                     }
 
-                    notify_ble(
-                        &ble,
-                        ble::measurement_progress(
-                            session_id.clone(),
-                            MeasurementStep::Analyzing,
-                            90,
-                        ),
-                    );
+                    notify_progress(&ble, &session_id, MeasurementStep::Analyzing);
+                    notify_progress(&ble, &session_id, MeasurementStep::Done);
                     notify_ble(
                         &ble,
                         ble::measurement_result(
@@ -170,6 +161,21 @@ fn notify_ble(ble: &BleService, event: ble::DeviceEvent) {
     if let Err(error) = ble.notify(&event) {
         log::warn!("BLE notify failed: {error}");
     }
+}
+
+fn notify_progress(ble: &BleService, session_id: &str, step: MeasurementStep) {
+    let percent = progress_percent(step);
+    notify_ble(
+        ble,
+        ble::measurement_progress(session_id.to_owned(), step, percent),
+    );
+}
+
+fn progress_percent(step: MeasurementStep) -> u8 {
+    MEASUREMENT_PROGRESS_PLAN
+        .iter()
+        .find_map(|(candidate, percent)| (*candidate == step).then_some(*percent))
+        .unwrap_or(0)
 }
 
 enum SessionContext {

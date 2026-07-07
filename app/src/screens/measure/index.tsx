@@ -7,6 +7,7 @@ import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
 import type { MeasurementStep } from '@/lib/ble/model';
+import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { resolveMeasureRoute } from '@/lib/ble/measure-route';
 import { useBleSession } from '@/lib/ble/session';
 
@@ -40,11 +41,7 @@ export function MeasureScreen() {
   });
   const activeStep = routeResult ? 'done' : routeProgress?.step;
   const canCancel =
-    ble.connectedDevice &&
-    ble.activeSessionId !== null &&
-    (ble.measurementPhase === 'starting' ||
-      ble.measurementPhase === 'waiting_context' ||
-      ble.measurementPhase === 'measuring');
+    ble.connectedDevice && ble.activeSessionId !== null && hasActiveMeasurement(ble);
   const canStartMeasurement =
     ble.connectedDevice && (ble.measurementPhase === 'idle' || ble.measurementPhase === 'error');
   const nextMeasurementKind =

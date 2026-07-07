@@ -16,8 +16,11 @@ import {
   mockBleDevice,
   mockProgressPlan,
 } from '@/lib/ble/mock';
+import { hasActiveMeasurement, type BleMeasurementPhase } from '@/lib/ble/measurement-phase';
 import { recordFromResult, saveMeasurement, type MeasurementKind } from '@/lib/storage/history';
 import { buildPhoneContext, readBaseline, writeBaseline } from '@/lib/storage/profile';
+
+export type { BleMeasurementPhase } from '@/lib/ble/measurement-phase';
 
 type Removable = {
   remove: () => void;
@@ -30,14 +33,6 @@ export type BleConnectionPhase =
   | 'connecting'
   | 'connected'
   | 'unsupported'
-  | 'error';
-
-export type BleMeasurementPhase =
-  | 'idle'
-  | 'starting'
-  | 'waiting_context'
-  | 'measuring'
-  | 'result'
   | 'error';
 
 export type BleSessionSnapshot = {
@@ -276,6 +271,13 @@ class BleSessionStore {
   };
 
   startMeasurement = async (kind: MeasurementKind = 'measurement') => {
+    if (this.isActiveMeasurement()) {
+      this.set({
+        message: '이미 측정이 진행 중입니다.',
+      });
+      return;
+    }
+
     if (this.snapshot.mockMode) {
       await this.startMockMeasurement(kind);
       return;
@@ -527,11 +529,7 @@ class BleSessionStore {
   }
 
   private isActiveMeasurement() {
-    return (
-      this.snapshot.measurementPhase === 'starting' ||
-      this.snapshot.measurementPhase === 'waiting_context' ||
-      this.snapshot.measurementPhase === 'measuring'
-    );
+    return hasActiveMeasurement(this.snapshot);
   }
 
   private fail(error: unknown) {

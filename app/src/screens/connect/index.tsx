@@ -7,6 +7,7 @@ import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { Separator } from '@/components/separator';
 import { StatusRow } from '@/components/status-row';
+import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
 import {
   formatBac,
@@ -74,10 +75,7 @@ export function ConnectScreen() {
   const contextReady = summary.baselineReady || summary.profileReady;
   const scanDisabled =
     ble.mockMode || ble.connectionPhase === 'connecting' || ble.bluetoothState !== 'PoweredOn';
-  const measurementDisabled =
-    !ble.connectedDevice ||
-    ble.measurementPhase === 'starting' ||
-    ble.measurementPhase === 'waiting_context';
+  const measurementDisabled = !ble.connectedDevice || hasActiveMeasurement(ble);
   const showMockConnection =
     !ble.connectedDevice &&
     (ble.bluetoothState === 'Unsupported' ||

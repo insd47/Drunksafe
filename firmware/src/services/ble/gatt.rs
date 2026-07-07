@@ -236,12 +236,16 @@ impl GattServer {
                 value,
                 ..
             } => {
-                let handled = self.handle_write(conn_id, handle, offset, value)?;
+                let (handled, status_replay) = self.handle_write(conn_id, handle, offset, value)?;
 
                 if handled {
                     self.send_write_response(
                         gatt_if, conn_id, trans_id, handle, offset, need_rsp, is_prep, value,
                     )?;
+                }
+
+                if let Some(event) = status_replay {
+                    self.notify(&event)?;
                 }
             }
             _ => {}
@@ -417,7 +421,7 @@ impl GattServer {
         handle: Handle,
         offset: u16,
         value: &[u8],
-    ) -> Result<bool, EspError> {
+    ) -> Result<(bool, Option<DeviceEvent>), EspError> {
         let mut command = None;
         let mut subscribe_status = None;
 
@@ -464,7 +468,7 @@ impl GattServer {
         };
 
         if !handled {
-            return Ok(false);
+            return Ok((false, None));
         }
 
         if let Some(command) = command {
@@ -473,11 +477,7 @@ impl GattServer {
             }
         }
 
-        if let Some(event) = subscribe_status {
-            self.notify(&event)?;
-        }
-
-        Ok(true)
+        Ok((true, subscribe_status))
     }
 
     #[allow(clippy::too_many_arguments)]

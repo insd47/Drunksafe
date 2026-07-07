@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   activeSessionIdAfterStatusNotify,
+  disconnectOrInterruptSessionPatch,
   disconnectSessionPatch,
   idleSessionPatch,
   interruptedMeasurementPatch,
@@ -68,6 +69,22 @@ test('disconnect session patch clears saved live results', () => {
   assert.equal(patch.activeSessionId, null);
   assert.equal(patch.result, null);
   assert.equal(patch.resultSaved, false);
+});
+
+test('disconnect during an active measurement leaves an interruption message', () => {
+  const patch = disconnectOrInterruptSessionPatch({
+    activeMeasurement: true,
+    result: null,
+    resultSaved: false,
+    interruptedMessage: '측정 중 연결이 해제되었습니다.',
+  });
+
+  assert.equal(patch.measurementPhase, 'error');
+  assert.equal(patch.progress, null);
+  assert.equal(patch.result, null);
+  assert.equal(patch.resultSaved, false);
+  assert.equal(patch.contextSentSessionId, null);
+  assert.match(patch.message, /연결이 해제/);
 });
 
 test('interrupted measurement patch clears stale progress and result artifacts', () => {

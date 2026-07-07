@@ -45,6 +45,10 @@ export type InterruptedMeasurementPatch = {
   message: string;
 };
 
+export type DisconnectOrInterruptSessionPatch =
+  | DisconnectSessionPatch
+  | InterruptedMeasurementPatch;
+
 export function terminalDeviceErrorPatch(event: DeviceError, message: string): TerminalErrorPatch {
   return {
     measurementPhase: 'error',
@@ -93,6 +97,24 @@ export function disconnectSessionPatch({
   }
 
   return idleSessionPatch();
+}
+
+export function disconnectOrInterruptSessionPatch({
+  activeMeasurement,
+  result,
+  resultSaved,
+  interruptedMessage,
+}: {
+  activeMeasurement: boolean;
+  result: MeasurementResult | null;
+  resultSaved: boolean;
+  interruptedMessage: string;
+}): DisconnectOrInterruptSessionPatch {
+  if (activeMeasurement) {
+    return interruptedMeasurementPatch(interruptedMessage);
+  }
+
+  return disconnectSessionPatch({ result, resultSaved });
 }
 
 export function interruptedMeasurementPatch(message: string): InterruptedMeasurementPatch {

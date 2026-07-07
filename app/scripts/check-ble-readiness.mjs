@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  canRequestBleScan,
   connectedDeviceAfterNotifySubscriptionReady,
   notifySubscriptionPendingMessage,
   notifySubscriptionReadyTimeoutMs,
@@ -14,6 +15,10 @@ import {
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const repoDir = dirname(appDir);
 const sessionSource = readFileSync(join(appDir, 'src', 'lib', 'ble', 'session.ts'), 'utf8');
+const connectScreenSource = readFileSync(
+  join(appDir, 'src', 'screens', 'connect', 'index.tsx'),
+  'utf8'
+);
 const firmwareGattSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'ble', 'gatt.rs'),
   'utf8'
@@ -40,6 +45,15 @@ test('app keeps a BLE device pending until the first status notify arrives', () 
   assert.match(notifySubscriptionPendingMessage, /notify 구독 확인/);
   assert.match(notifySubscriptionTimeoutMessage, /구독 확인 시간이 초과/);
   assert.ok(notifySubscriptionReadyTimeoutMs >= 1000);
+});
+
+test('unauthorized Bluetooth state can still request scan permissions', () => {
+  assert.equal(canRequestBleScan('PoweredOn'), true);
+  assert.equal(canRequestBleScan('Unauthorized'), true);
+  assert.equal(canRequestBleScan('PoweredOff'), false);
+  assert.equal(canRequestBleScan('Unsupported'), false);
+  assert.match(sessionSource, /canRequestBleScan\(this\.snapshot\.bluetoothState\)/);
+  assert.match(connectScreenSource, /!canRequestBleScan\(ble\.bluetoothState\)/);
 });
 
 test('app waits for notify readiness before enabling connected controls', () => {

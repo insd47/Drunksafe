@@ -4,6 +4,10 @@ export const notifySubscriptionReadyTimeoutMs = 3000;
 export const notifySubscriptionPendingMessage = 'BLE notify 구독 확인을 기다리는 중입니다.';
 export const notifySubscriptionTimeoutMessage = 'BLE notify 구독 확인 시간이 초과됐습니다.';
 
+export function canRequestBleScan(bluetoothState: string) {
+  return bluetoothState === 'PoweredOn' || bluetoothState === 'Unauthorized';
+}
+
 export function connectedDeviceAfterNotifySubscriptionReady({
   currentConnectedDevice,
   pendingConnectedDevice,

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   maxSoberBaselineAlcoholMgLX1000,
@@ -8,6 +11,12 @@ import {
   shouldAcceptSoberBaselineSample,
   shouldUpdateSoberBaseline,
 } from '@/lib/personalization/baseline-acceptance';
+
+const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const onboardingSource = readFileSync(
+  join(appDir, 'src', 'screens', 'onboarding', 'index.tsx'),
+  'utf8'
+);
 
 test('sober baseline accepts only low safe alcohol results', () => {
   assert.equal(shouldUpdateSoberBaseline(result({ risk: 'safe', alcohol: 8 })), true);
@@ -68,6 +77,12 @@ test('baseline result copy distinguishes history save from baseline acceptance',
     savedResultMessage({ kind: 'measurement', baselineAccepted: null }),
     '결과를 히스토리에 저장했습니다.'
   );
+});
+
+test('onboarding refreshes saved baseline evidence when the screen focuses', () => {
+  assert.match(onboardingSource, /useFocusEffect/);
+  assert.match(onboardingSource, /Promise\.all\(\[readProfile\(\), readBaseline\(\)\]\)/);
+  assert.ok(onboardingSource.indexOf('useFocusEffect') < onboardingSource.indexOf('setBaseline'));
 });
 
 function result({ risk, alcohol }) {

@@ -58,6 +58,10 @@ export function measurementReadinessDescription({
     return message ?? 'BLE notify를 기다리는 중입니다.';
   }
 
+  if (routeMatchesActive && message) {
+    return message;
+  }
+
   if (contextLoadFailed) {
     return '로컬 context를 불러오지 못했습니다.';
   }

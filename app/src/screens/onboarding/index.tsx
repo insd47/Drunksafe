@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { ActionButton } from '@/components/action-button';
@@ -26,31 +27,33 @@ export function OnboardingScreen() {
   const [baseline, setBaseline] = useState<UserBaseline>(emptyBaseline);
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle');
 
-  useEffect(() => {
-    let mounted = true;
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
 
-    Promise.all([readProfile(), readBaseline()])
-      .then(([profile, savedBaseline]) => {
-        if (!mounted) {
-          return;
-        }
+      Promise.all([readProfile(), readBaseline()])
+        .then(([profile, savedBaseline]) => {
+          if (!mounted) {
+            return;
+          }
 
-        setAge(profile.age_years?.toString() ?? '');
-        setHeight(profile.height_cm?.toString() ?? '');
-        setWeight(profile.weight_kg?.toString() ?? '');
-        setSex(profile.sex);
-        setBaseline(savedBaseline);
-      })
-      .catch(() => {
-        if (mounted) {
-          setSaveState('failed');
-        }
-      });
+          setAge(profile.age_years?.toString() ?? '');
+          setHeight(profile.height_cm?.toString() ?? '');
+          setWeight(profile.weight_kg?.toString() ?? '');
+          setSex(profile.sex);
+          setBaseline(savedBaseline);
+        })
+        .catch(() => {
+          if (mounted) {
+            setSaveState('failed');
+          }
+        });
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+      return () => {
+        mounted = false;
+      };
+    }, [])
+  );
 
   const profileComplete =
     isValidRequiredInt(age, 1, 130) &&

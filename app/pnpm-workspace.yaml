@@ -1,0 +1,5 @@
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+patchedDependencies:
+  expo-modules-jsi@56.0.11: patches/expo-modules-jsi@56.0.11.patch

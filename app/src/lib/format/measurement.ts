@@ -49,9 +49,9 @@ export function formatRisk(value: MeasurementRecord['risk']) {
 export function formatDrivingStatus(value: MeasurementRecord['risk']) {
   switch (value) {
     case 'safe':
-      return '운전 가능';
+      return '위험 낮음';
     case 'caution':
-      return '운전 주의';
+      return '운전 보류';
     case 'danger':
       return '운전 금지';
   }
@@ -60,11 +60,11 @@ export function formatDrivingStatus(value: MeasurementRecord['risk']) {
 export function formatDrivingDescription(value: MeasurementRecord['risk']) {
   switch (value) {
     case 'safe':
-      return '측정값 기준 위험 신호가 낮습니다.';
+      return '측정값 기준 알코올 위험 신호가 낮지만 운전 가능을 보증하지 않습니다.';
     case 'caution':
-      return '추가 휴식 후 재측정을 권장합니다.';
+      return '운전과 장비 운용은 보류하고 충분한 휴식 후 재측정하세요.';
     case 'danger':
-      return '현재 결과 기준 운전하지 마세요.';
+      return '법정 기준 이상 가능성이 있어 현재 결과 기준 운전하지 마세요.';
   }
 }
 

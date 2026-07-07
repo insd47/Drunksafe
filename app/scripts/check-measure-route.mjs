@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { protocolVersion } from '@/lib/ble/model';
-import { resolveMeasureRoute } from '@/lib/ble/measure-route';
+import { resolveMeasureRoute, shouldShowResultPreview } from '@/lib/ble/measure-route';
 
 test('baseline route follows the active baseline BLE session id', () => {
   const result = measurementResult('baseline-mock-123');
@@ -46,6 +46,30 @@ test('exact session routes still show their matching saved live result', () => {
 
   assert.equal(route.result, result);
   assert.equal(route.activeSessionId, 'fw-42');
+});
+
+test('result preview is hidden while a real measurement is active', () => {
+  assert.equal(
+    shouldShowResultPreview({
+      hasResult: false,
+      hasActiveMeasurement: true,
+    }),
+    false
+  );
+  assert.equal(
+    shouldShowResultPreview({
+      hasResult: false,
+      hasActiveMeasurement: false,
+    }),
+    true
+  );
+  assert.equal(
+    shouldShowResultPreview({
+      hasResult: true,
+      hasActiveMeasurement: false,
+    }),
+    false
+  );
 });
 
 function measurementResult(sessionId) {

@@ -8,7 +8,7 @@ import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
 import type { MeasurementStep } from '@/lib/ble/model';
 import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
-import { resolveMeasureRoute } from '@/lib/ble/measure-route';
+import { resolveMeasureRoute, shouldShowResultPreview } from '@/lib/ble/measure-route';
 import { useBleSession } from '@/lib/ble/session';
 
 const steps: MeasurementStep[] = [
@@ -40,8 +40,8 @@ export function MeasureScreen() {
     result: ble.result,
   });
   const activeStep = routeResult ? 'done' : routeProgress?.step;
-  const canCancel =
-    ble.connectedDevice && ble.activeSessionId !== null && hasActiveMeasurement(ble);
+  const measurementActive = hasActiveMeasurement(ble);
+  const canCancel = ble.connectedDevice && ble.activeSessionId !== null && measurementActive;
   const canStartMeasurement =
     ble.connectedDevice && (ble.measurementPhase === 'idle' || ble.measurementPhase === 'error');
   const nextMeasurementKind =
@@ -55,6 +55,10 @@ export function MeasureScreen() {
     : isBaseline
       ? '/results/baseline-demo'
       : '/results/demo-result';
+  const showPreviewLink = shouldShowResultPreview({
+    hasResult: Boolean(routeResult),
+    hasActiveMeasurement: measurementActive,
+  });
 
   useEffect(() => {
     initializeBle();
@@ -117,9 +121,12 @@ export function MeasureScreen() {
       ) : null}
       {routeResult ? (
         <ActionLink href={resultHref} label="결과 보기" />
-      ) : (
-        <ActionLink href={resultHref} label="결과 화면 미리보기" variant="secondary" />
-      )}
+      ) : showPreviewLink ? (
+        <ActionLink href={resultHref} label="데모 결과 미리보기" variant="secondary" />
+      ) : null}
+      {!ble.connectedDevice ? (
+        <ActionLink href="/" label="장치 연결로 돌아가기" variant="secondary" />
+      ) : null}
     </Screen>
   );
 }

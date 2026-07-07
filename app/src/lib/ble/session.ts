@@ -1,6 +1,12 @@
 import { useSyncExternalStore } from 'react';
 
 import { DrunksafeBleClient, type DrunksafeBleDevice } from '@/lib/ble/client';
+import {
+  connectedDeviceAfterNotifySubscriptionReady,
+  notifySubscriptionPendingMessage,
+  notifySubscriptionReadyTimeoutMs,
+  notifySubscriptionTimeoutMessage,
+} from '@/lib/ble/connection-readiness';
 import type {
   DeviceEvent,
   ErrorCode,
@@ -86,6 +92,8 @@ class BleSessionStore {
   private client: DrunksafeBleClient | null = null;
   private stateSubscription: Removable | null = null;
   private eventSubscription: Removable | null = null;
+  private pendingConnectedDevice: DrunksafeBleDevice | null = null;
+  private notifyReadyTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly mockTimers = new Set<ReturnType<typeof setTimeout>>();
   private readonly cancelledSessionIds = new Set<string>();
   private readonly listeners = new Set<() => void>();
@@ -123,6 +131,7 @@ class BleSessionStore {
       return;
     }
 
+    this.clearNotifyReadyWait();
     this.set({
       connectionPhase: 'scanning',
       devices: [],
@@ -161,6 +170,7 @@ class BleSessionStore {
       return;
     }
 
+    this.clearNotifyReadyWait();
     this.set({
       connectionPhase: 'connecting',
       message: 'Drunksafe 장치에 연결하는 중입니다.',
@@ -168,19 +178,21 @@ class BleSessionStore {
 
     try {
       const device = await this.client.connect(deviceId);
-      this.eventSubscription?.remove();
+      this.clearEventMonitor();
+      this.pendingConnectedDevice = device;
+      this.set({
+        connectionPhase: 'connecting',
+        connectedDevice: null,
+        deviceStatus: null,
+        message: notifySubscriptionPendingMessage,
+      });
       this.eventSubscription = this.client.monitorEvents(
         (event) => {
           void this.handleEvent(event);
         },
         (error) => this.fail(error)
       );
-
-      this.set({
-        connectionPhase: 'connected',
-        connectedDevice: device,
-        message: '장치가 연결됐습니다.',
-      });
+      this.scheduleNotifyReadyTimeout(device.id);
 
       await this.client.send({ cmd: 'time', unix_time_ms: Date.now() });
     } catch (error) {
@@ -189,6 +201,7 @@ class BleSessionStore {
   };
 
   connectMockDevice = async () => {
+    this.clearNotifyReadyWait();
     this.clearMockTimers();
     this.eventSubscription?.remove();
     this.eventSubscription = null;
@@ -211,6 +224,8 @@ class BleSessionStore {
   };
 
   disconnect = async () => {
+    this.clearNotifyReadyWait();
+
     if (this.snapshot.mockMode) {
       this.clearMockTimers();
       this.set({
@@ -326,6 +341,7 @@ class BleSessionStore {
   };
 
   destroy = async () => {
+    this.clearNotifyReadyWait();
     this.clearMockTimers();
     this.eventSubscription?.remove();
     this.eventSubscription = null;
@@ -343,7 +359,13 @@ class BleSessionStore {
   private async handleEvent(event: DeviceEvent) {
     switch (event.event) {
       case 'status':
+        const connectedDevice = connectedDeviceAfterNotifySubscriptionReady({
+          currentConnectedDevice: this.snapshot.connectedDevice,
+          pendingConnectedDevice: this.consumePendingConnectedDevice(),
+        });
+
         this.set({
+          connectedDevice,
           deviceStatus: event.status,
           activeSessionId: activeSessionIdAfterStatusNotify({
             status: event.status,
@@ -516,12 +538,14 @@ class BleSessionStore {
     const patch: Partial<BleSessionSnapshot> = { bluetoothState: state };
 
     if (state === 'Unsupported') {
+      this.clearNotifyReadyWait();
       this.clearEventMonitor();
       patch.connectionPhase = 'unsupported';
       patch.connectedDevice = null;
       patch.deviceStatus = null;
       patch.message = '이 환경에서는 BLE를 사용할 수 없습니다.';
     } else if (state !== 'PoweredOn') {
+      this.clearNotifyReadyWait();
       this.clearEventMonitor();
       const message = 'Bluetooth를 켜야 장치를 찾을 수 있습니다.';
 
@@ -559,6 +583,7 @@ class BleSessionStore {
     const measurementFailed = this.isActiveMeasurement();
     const sessionPatch = measurementFailed ? interruptedMeasurementPatch(message) : { message };
 
+    this.clearNotifyReadyWait();
     this.clearEventMonitor();
     this.set({
       connectionPhase: unsupported ? 'unsupported' : 'error',
@@ -611,6 +636,35 @@ class BleSessionStore {
   private clearMockTimers() {
     this.mockTimers.forEach((timer) => clearTimeout(timer));
     this.mockTimers.clear();
+  }
+
+  private scheduleNotifyReadyTimeout(deviceId: string) {
+    this.clearNotifyReadyTimer();
+    this.notifyReadyTimer = setTimeout(() => {
+      if (this.pendingConnectedDevice?.id === deviceId) {
+        this.fail(new Error(notifySubscriptionTimeoutMessage));
+      }
+    }, notifySubscriptionReadyTimeoutMs);
+  }
+
+  private consumePendingConnectedDevice() {
+    const device = this.pendingConnectedDevice;
+    this.pendingConnectedDevice = null;
+    this.clearNotifyReadyTimer();
+
+    return device;
+  }
+
+  private clearNotifyReadyWait() {
+    this.pendingConnectedDevice = null;
+    this.clearNotifyReadyTimer();
+  }
+
+  private clearNotifyReadyTimer() {
+    if (this.notifyReadyTimer) {
+      clearTimeout(this.notifyReadyTimer);
+      this.notifyReadyTimer = null;
+    }
   }
 
   private set(patch: Partial<BleSessionSnapshot>) {

@@ -9,7 +9,12 @@ import {
   bleCommandLogEntry,
   bleEventLogEntry,
   bleStateLogEntry,
+  emptyBleVerificationEvidenceSummary,
+  isBleVerificationAckCorrelated,
   maxBleVerificationLogEntries,
+  updateBleVerificationEvidenceWithCommand,
+  updateBleVerificationEvidenceWithEvent,
+  updateBleVerificationEvidenceWithState,
 } from '@/lib/ble/verification-log';
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -179,11 +184,145 @@ test('cancel evidence can derive latency from command and terminal error entries
   assert.equal(cancelError.atUnixMs - cancelCommand.atUnixMs, 460);
 });
 
+test('verification evidence summary keeps MVP proof fields beyond bounded timeline', () => {
+  let entries = [];
+  let summary = emptyBleVerificationEvidenceSummary;
+
+  const appendState = (input, atUnixMs) => {
+    entries = appendBleVerificationLog(entries, input, atUnixMs);
+    summary = updateBleVerificationEvidenceWithState(summary, input, atUnixMs);
+  };
+
+  const appendCommand = (command, atUnixMs) => {
+    entries = appendBleVerificationLog(entries, bleCommandLogEntry(command), atUnixMs);
+    summary = updateBleVerificationEvidenceWithCommand(summary, command, atUnixMs);
+  };
+
+  const appendEvent = (event, atUnixMs) => {
+    entries = appendBleVerificationLog(entries, bleEventLogEntry(event), atUnixMs);
+    summary = updateBleVerificationEvidenceWithEvent(summary, event, atUnixMs);
+  };
+
+  appendState(bleStateLogEntry('state:notify-ready', 'Drunksafe status=connected'), 1800000000000);
+  appendEvent(
+    {
+      event: 'measurement_started',
+      v: 7,
+      session_id: 'baseline-1',
+      source: 'phone',
+      kind: 'baseline',
+      history_limit: 8,
+      needs_context: true,
+      sync_time: true,
+    },
+    1800000000100
+  );
+  appendEvent(
+    {
+      event: 'measurement_progress',
+      v: 7,
+      session_id: 'baseline-1',
+      step: 'preparing',
+      percent: 5,
+    },
+    1800000000200
+  );
+
+  for (let index = 0; index < maxBleVerificationLogEntries + 2; index += 1) {
+    appendEvent(
+      {
+        event: 'measurement_progress',
+        v: 7,
+        session_id: 'baseline-1',
+        step: 'sampling_pulse',
+        percent: Math.min(99, index + 10),
+      },
+      1800000000300 + index
+    );
+  }
+
+  appendEvent(
+    {
+      event: 'measurement_started',
+      v: 7,
+      session_id: 'measure-1',
+      source: 'board_button',
+      kind: 'measurement',
+      history_limit: 8,
+      needs_context: true,
+      sync_time: true,
+    },
+    1800000000400
+  );
+  appendCommand({ cmd: 'cancel', session_id: 'measure-1' }, 1800000000500);
+  appendEvent(
+    {
+      event: 'device_error',
+      v: 7,
+      session_id: 'measure-1',
+      code: 'cancelled',
+    },
+    1800000000980
+  );
+  appendEvent(
+    {
+      event: 'measurement_result',
+      v: 7,
+      session_id: 'measure-2',
+      kind: 'measurement',
+      measured_at_unix_ms: 1800000001000,
+      alcohol: {
+        mg_l_x1000: 120,
+      },
+      pulse: null,
+      bac_milli_percent: 25,
+      bac_upper_milli_percent: 31,
+      sober_time_minutes: 90,
+      risk: 'caution',
+      confidence_percent: 80,
+    },
+    1800000001100
+  );
+  appendCommand({ cmd: 'ack', session_id: 'measure-2' }, 1800000001200);
+
+  assert.equal(entries.length, maxBleVerificationLogEntries);
+  assert.ok(entries.every((entry) => entry.label !== 'state:notify-ready'));
+  assert.deepEqual(summary, {
+    notifyReadyAtUnixMs: 1800000000000,
+    baselineSessionId: 'baseline-1',
+    measurementSessionId: 'measure-1',
+    boardButtonSessionId: 'measure-1',
+    resultSessionId: 'measure-2',
+    ackSessionId: 'measure-2',
+    cancelSessionId: 'measure-1',
+    cancelCommandAtUnixMs: 1800000000500,
+    cancelErrorSessionId: 'measure-1',
+    cancelLatencyMs: 480,
+  });
+  assert.equal(isBleVerificationAckCorrelated(summary), true);
+
+  const mismatch = updateBleVerificationEvidenceWithCommand(
+    {
+      ...summary,
+      resultSessionId: 'measure-2',
+      ackSessionId: null,
+    },
+    { cmd: 'ack', session_id: 'other-session' },
+    1800000001300
+  );
+
+  assert.equal(isBleVerificationAckCorrelated(mismatch), false);
+});
+
 test('BLE session and connect screen expose the verification timeline', () => {
   assert.match(sessionSource, /verificationLog: BleVerificationLogEntry\[\]/);
   assert.match(sessionSource, /bleEventLogEntry\(event\)/);
   assert.match(sessionSource, /bleCommandLogEntry\(command\)/);
   assert.match(sessionSource, /state:notify-ready/);
+  assert.match(sessionSource, /verificationEvidence: BleVerificationEvidenceSummary/);
   assert.match(connectScreenSource, /BLE 검증 로그/);
+  assert.match(connectScreenSource, /MVP 증거 누적/);
+  assert.match(connectScreenSource, /ble\.verificationEvidence/);
+  assert.match(connectScreenSource, /isBleVerificationAckCorrelated/);
   assert.match(connectScreenSource, /ble\.verificationLog/);
 });

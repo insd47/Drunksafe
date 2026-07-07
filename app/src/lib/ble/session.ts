@@ -42,6 +42,11 @@ import {
   bleCommandLogEntry,
   bleEventLogEntry,
   bleStateLogEntry,
+  emptyBleVerificationEvidenceSummary,
+  updateBleVerificationEvidenceWithCommand,
+  updateBleVerificationEvidenceWithEvent,
+  updateBleVerificationEvidenceWithState,
+  type BleVerificationEvidenceSummary,
   type BleVerificationLogEntry,
   type BleVerificationLogInput,
 } from '@/lib/ble/verification-log';
@@ -77,6 +82,7 @@ export type BleSessionSnapshot = {
   message: string | null;
   contextSentSessionId: string | null;
   verificationLog: BleVerificationLogEntry[];
+  verificationEvidence: BleVerificationEvidenceSummary;
   mockMode: boolean;
 };
 
@@ -96,6 +102,7 @@ const initialSnapshot: BleSessionSnapshot = {
   message: null,
   contextSentSessionId: null,
   verificationLog: [],
+  verificationEvidence: emptyBleVerificationEvidenceSummary,
   mockMode: false,
 };
 
@@ -280,10 +287,10 @@ class BleSessionStore {
     const command: PhoneCommand = { cmd: 'cancel', session_id: sessionId };
 
     if (this.snapshot.mockMode) {
-      this.logVerification(bleCommandLogEntry(command));
+      this.logCommand(command);
       this.cancelledSessionIds.add(sessionId);
       this.clearMockTimers();
-      this.logVerification(bleStateLogEntry('state:cancelled', 'mock device cancelled', sessionId));
+      this.logState('state:cancelled', 'mock device cancelled', sessionId);
       this.set({
         measurementPhase: 'error',
         progress: null,
@@ -322,7 +329,7 @@ class BleSessionStore {
     const command: PhoneCommand = { cmd: 'start', kind };
 
     if (this.snapshot.mockMode) {
-      this.logVerification(bleCommandLogEntry(command));
+      this.logCommand(command);
       await this.startMockMeasurement(kind);
       return;
     }
@@ -375,7 +382,7 @@ class BleSessionStore {
   };
 
   private async handleEvent(event: DeviceEvent) {
-    this.logVerification(bleEventLogEntry(event));
+    this.logEvent(event);
 
     switch (event.event) {
       case 'status':
@@ -386,12 +393,10 @@ class BleSessionStore {
         });
 
         if (pendingConnectedDevice && connectedDevice) {
-          this.logVerification(
-            bleStateLogEntry(
-              'state:notify-ready',
-              `${connectedDevice.name} status=${event.status}`,
-              event.active_session_id
-            )
+          this.logState(
+            'state:notify-ready',
+            `${connectedDevice.name} status=${event.status}`,
+            event.active_session_id
           );
         }
 
@@ -605,7 +610,7 @@ class BleSessionStore {
   }
 
   private async sendCommand(command: PhoneCommand) {
-    this.logVerification(bleCommandLogEntry(command));
+    this.logCommand(command);
 
     if (!this.client) {
       return;
@@ -614,9 +619,56 @@ class BleSessionStore {
     await this.client.send(command);
   }
 
-  private logVerification(input: BleVerificationLogInput) {
+  private logCommand(command: PhoneCommand) {
+    const atUnixMs = Date.now();
+    const input = bleCommandLogEntry(command);
+
     this.set({
-      verificationLog: appendBleVerificationLog(this.snapshot.verificationLog, input),
+      verificationLog: appendBleVerificationLog(
+        this.snapshot.verificationLog,
+        { ...input, atUnixMs },
+        atUnixMs
+      ),
+      verificationEvidence: updateBleVerificationEvidenceWithCommand(
+        this.snapshot.verificationEvidence,
+        command,
+        atUnixMs
+      ),
+    });
+  }
+
+  private logEvent(event: DeviceEvent) {
+    const atUnixMs = Date.now();
+    const input = bleEventLogEntry(event);
+
+    this.set({
+      verificationLog: appendBleVerificationLog(
+        this.snapshot.verificationLog,
+        { ...input, atUnixMs },
+        atUnixMs
+      ),
+      verificationEvidence: updateBleVerificationEvidenceWithEvent(
+        this.snapshot.verificationEvidence,
+        event,
+        atUnixMs
+      ),
+    });
+  }
+
+  private logState(label: string, detail: string, sessionId: string | null = null) {
+    const atUnixMs = Date.now();
+    const input: BleVerificationLogInput = {
+      ...bleStateLogEntry(label, detail, sessionId),
+      atUnixMs,
+    };
+
+    this.set({
+      verificationLog: appendBleVerificationLog(this.snapshot.verificationLog, input, atUnixMs),
+      verificationEvidence: updateBleVerificationEvidenceWithState(
+        this.snapshot.verificationEvidence,
+        input,
+        atUnixMs
+      ),
     });
   }
 

@@ -10,7 +10,11 @@ import { StatusRow } from '@/components/status-row';
 import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
 import { measurementStartBlocker, measurementStartBlockerMessage } from '@/lib/ble/start-readiness';
-import type { BleVerificationLogEntry } from '@/lib/ble/verification-log';
+import {
+  isBleVerificationAckCorrelated,
+  type BleVerificationEvidenceSummary,
+  type BleVerificationLogEntry,
+} from '@/lib/ble/verification-log';
 import {
   formatBac,
   formatDrivingStatus,
@@ -84,6 +88,8 @@ export function ConnectScreen() {
     mockMode: ble.mockMode,
   });
   const measurementDisabled = startBlocker !== null;
+  const verificationEvidence = ble.verificationEvidence;
+  const ackCorrelated = isBleVerificationAckCorrelated(verificationEvidence);
   const showMockConnection =
     !ble.connectedDevice &&
     (ble.bluetoothState === 'Unsupported' ||
@@ -233,20 +239,71 @@ export function ConnectScreen() {
       </Section>
 
       {ble.verificationLog.length > 0 ? (
-        <Section eyebrow="Verify" title="BLE 검증 로그">
-          {ble.verificationLog
-            .slice(-5)
-            .reverse()
-            .map((entry) => (
-              <StatusRow
-                key={entry.id}
-                label={entry.label}
-                value={verificationLogTime(entry.atUnixMs)}
-                description={verificationLogDescription(entry)}
-                tone={verificationLogTone(entry)}
-              />
-            ))}
-        </Section>
+        <>
+          <Section eyebrow="Evidence" title="MVP 증거 누적">
+            <StatusRow
+              label="Notify 준비"
+              value={
+                verificationEvidence.notifyReadyAtUnixMs
+                  ? verificationLogTime(verificationEvidence.notifyReadyAtUnixMs)
+                  : '대기'
+              }
+              description="첫 status notify 수신 후 연결 승격을 확인합니다."
+              tone={verificationEvidence.notifyReadyAtUnixMs ? 'safe' : 'neutral'}
+            />
+            <StatusRow
+              label="Baseline 세션"
+              value={evidenceSessionValue(verificationEvidence.baselineSessionId)}
+              description="event:started kind=baseline 증거입니다."
+              tone={evidenceSessionTone(verificationEvidence.baselineSessionId)}
+            />
+            <StatusRow
+              label="일반 측정"
+              value={evidenceSessionValue(verificationEvidence.measurementSessionId)}
+              description="event:started kind=measurement 증거입니다."
+              tone={evidenceSessionTone(verificationEvidence.measurementSessionId)}
+            />
+            <StatusRow
+              label="보드 버튼"
+              value={evidenceSessionValue(verificationEvidence.boardButtonSessionId)}
+              description="event:started source=board_button 증거입니다."
+              tone={evidenceSessionTone(verificationEvidence.boardButtonSessionId)}
+            />
+            <StatusRow
+              label="취소 응답"
+              value={evidenceCancelLatencyValue(verificationEvidence.cancelLatencyMs)}
+              description="cmd:cancel부터 device_error(cancelled)까지의 시간입니다."
+              tone={evidenceCancelLatencyTone(verificationEvidence.cancelLatencyMs)}
+            />
+            <StatusRow
+              label="결과 세션"
+              value={evidenceSessionValue(verificationEvidence.resultSessionId)}
+              description="event:result를 수신한 세션입니다."
+              tone={evidenceSessionTone(verificationEvidence.resultSessionId)}
+            />
+            <StatusRow
+              label="저장 ACK"
+              value={evidenceSessionValue(verificationEvidence.ackSessionId)}
+              description="결과와 같은 세션일 때 저장 ACK 증거로 봅니다."
+              tone={evidenceAckTone(verificationEvidence, ackCorrelated)}
+            />
+          </Section>
+
+          <Section eyebrow="Verify" title="BLE 검증 로그">
+            {ble.verificationLog
+              .slice(-5)
+              .reverse()
+              .map((entry) => (
+                <StatusRow
+                  key={entry.id}
+                  label={entry.label}
+                  value={verificationLogTime(entry.atUnixMs)}
+                  description={verificationLogDescription(entry)}
+                  tone={verificationLogTone(entry)}
+                />
+              ))}
+          </Section>
+        </>
       ) : null}
 
       <Section eyebrow="Context" title="개인화 준비">
@@ -348,6 +405,41 @@ function verificationLogTone(entry: BleVerificationLogEntry): StatusRowTone {
   }
 
   return 'neutral';
+}
+
+function evidenceSessionValue(sessionId: string | null) {
+  return sessionId ?? '-';
+}
+
+function evidenceSessionTone(sessionId: string | null): StatusRowTone {
+  return sessionId ? 'safe' : 'neutral';
+}
+
+function evidenceCancelLatencyValue(
+  cancelLatencyMs: BleVerificationEvidenceSummary['cancelLatencyMs']
+) {
+  return cancelLatencyMs === null ? '-' : `${cancelLatencyMs}ms`;
+}
+
+function evidenceCancelLatencyTone(
+  cancelLatencyMs: BleVerificationEvidenceSummary['cancelLatencyMs']
+): StatusRowTone {
+  if (cancelLatencyMs === null) {
+    return 'neutral';
+  }
+
+  return cancelLatencyMs <= 1000 ? 'safe' : 'caution';
+}
+
+function evidenceAckTone(
+  verificationEvidence: BleVerificationEvidenceSummary,
+  ackCorrelated: boolean
+): StatusRowTone {
+  if (!verificationEvidence.ackSessionId) {
+    return 'neutral';
+  }
+
+  return ackCorrelated ? 'safe' : 'caution';
 }
 
 function bluetoothLabel(state: string) {

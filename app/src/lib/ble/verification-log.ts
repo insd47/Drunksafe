@@ -15,6 +15,32 @@ export type BleVerificationLogInput = Omit<BleVerificationLogEntry, 'id' | 'atUn
   atUnixMs?: number;
 };
 
+export type BleVerificationEvidenceSummary = {
+  notifyReadyAtUnixMs: number | null;
+  baselineSessionId: string | null;
+  measurementSessionId: string | null;
+  boardButtonSessionId: string | null;
+  resultSessionId: string | null;
+  ackSessionId: string | null;
+  cancelSessionId: string | null;
+  cancelCommandAtUnixMs: number | null;
+  cancelErrorSessionId: string | null;
+  cancelLatencyMs: number | null;
+};
+
+export const emptyBleVerificationEvidenceSummary: BleVerificationEvidenceSummary = {
+  notifyReadyAtUnixMs: null,
+  baselineSessionId: null,
+  measurementSessionId: null,
+  boardButtonSessionId: null,
+  resultSessionId: null,
+  ackSessionId: null,
+  cancelSessionId: null,
+  cancelCommandAtUnixMs: null,
+  cancelErrorSessionId: null,
+  cancelLatencyMs: null,
+};
+
 export const maxBleVerificationLogEntries = 20;
 
 export function appendBleVerificationLog(
@@ -126,6 +152,89 @@ export function bleStateLogEntry(
     detail,
     sessionId,
   };
+}
+
+export function updateBleVerificationEvidenceWithCommand(
+  summary: BleVerificationEvidenceSummary,
+  command: PhoneCommand,
+  atUnixMs: number
+): BleVerificationEvidenceSummary {
+  switch (command.cmd) {
+    case 'cancel':
+      return {
+        ...summary,
+        cancelSessionId: command.session_id,
+        cancelCommandAtUnixMs: atUnixMs,
+        cancelErrorSessionId: null,
+        cancelLatencyMs: null,
+      };
+    case 'ack':
+      return {
+        ...summary,
+        ackSessionId: command.session_id,
+      };
+    default:
+      return summary;
+  }
+}
+
+export function updateBleVerificationEvidenceWithEvent(
+  summary: BleVerificationEvidenceSummary,
+  event: DeviceEvent,
+  atUnixMs: number
+): BleVerificationEvidenceSummary {
+  switch (event.event) {
+    case 'measurement_started':
+      return {
+        ...summary,
+        baselineSessionId: event.kind === 'baseline' ? event.session_id : summary.baselineSessionId,
+        measurementSessionId:
+          event.kind === 'measurement' ? event.session_id : summary.measurementSessionId,
+        boardButtonSessionId:
+          event.source === 'board_button' ? event.session_id : summary.boardButtonSessionId,
+      };
+    case 'measurement_result':
+      return {
+        ...summary,
+        resultSessionId: event.session_id,
+      };
+    case 'device_error':
+      if (
+        event.code === 'cancelled' &&
+        event.session_id &&
+        summary.cancelCommandAtUnixMs !== null &&
+        summary.cancelSessionId === event.session_id
+      ) {
+        return {
+          ...summary,
+          cancelErrorSessionId: event.session_id,
+          cancelLatencyMs: Math.max(0, atUnixMs - summary.cancelCommandAtUnixMs),
+        };
+      }
+
+      return summary;
+    default:
+      return summary;
+  }
+}
+
+export function updateBleVerificationEvidenceWithState(
+  summary: BleVerificationEvidenceSummary,
+  input: BleVerificationLogInput,
+  atUnixMs: number
+): BleVerificationEvidenceSummary {
+  if (input.label !== 'state:notify-ready') {
+    return summary;
+  }
+
+  return {
+    ...summary,
+    notifyReadyAtUnixMs: atUnixMs,
+  };
+}
+
+export function isBleVerificationAckCorrelated(summary: BleVerificationEvidenceSummary) {
+  return Boolean(summary.resultSessionId && summary.ackSessionId === summary.resultSessionId);
 }
 
 function nullableNumber(value: number | null) {

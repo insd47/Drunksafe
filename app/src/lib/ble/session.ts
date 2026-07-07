@@ -319,7 +319,7 @@ class BleSessionStore {
     });
 
     try {
-      await this.client.send({ cmd: 'start' });
+      await this.client.send({ cmd: 'start', kind });
     } catch (error) {
       this.fail(error);
     }
@@ -404,14 +404,9 @@ class BleSessionStore {
   private async handleMeasurementStarted(
     event: Extract<DeviceEvent, { event: 'measurement_started' }>
   ) {
-    const activeMeasurementKind =
-      this.snapshot.measurementPhase === 'starting'
-        ? this.snapshot.activeMeasurementKind
-        : 'measurement';
-
     this.set({
       measurementPhase: event.needs_context ? 'waiting_context' : 'measuring',
-      activeMeasurementKind,
+      activeMeasurementKind: event.kind,
       activeSessionId: event.session_id,
       progress: null,
       result: null,
@@ -470,10 +465,10 @@ class BleSessionStore {
   ) {
     let resultSaved = true;
     let baselineAccepted: boolean | null = null;
-    const kind = this.snapshot.activeMeasurementKind;
+    const kind = event.kind;
 
     try {
-      const { inserted } = await saveMeasurement(recordFromResult(event, kind));
+      const { inserted } = await saveMeasurement(recordFromResult(event));
 
       if (kind === 'baseline') {
         baselineAccepted = shouldUpdateSoberBaseline(event);
@@ -587,7 +582,7 @@ class BleSessionStore {
       message: '시뮬레이터 측정을 시작했습니다.',
     });
 
-    await this.handleEvent(createMockStartedEvent(sessionId));
+    await this.handleEvent(createMockStartedEvent(sessionId, kind));
 
     if (this.cancelledSessionIds.has(sessionId) || !this.isActiveMeasurement()) {
       return;

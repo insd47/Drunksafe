@@ -1,8 +1,8 @@
-import type { MeasurementResult, Risk } from '@/lib/ble/model';
+import type { MeasurementKind, MeasurementResult, Risk } from '@/lib/ble/model';
 
 export const measurementHistoryLimit = 50;
 
-export type MeasurementKind = 'measurement' | 'baseline';
+export type { MeasurementKind } from '@/lib/ble/model';
 
 export type MeasurementRecord = {
   id: string;
@@ -21,7 +21,7 @@ export type MeasurementRecord = {
 
 export function recordFromResult(
   result: MeasurementResult,
-  kind: MeasurementKind
+  kind: MeasurementKind = result.kind
 ): MeasurementRecord {
   const measuredAt = result.measured_at_unix_ms ?? Date.now();
 

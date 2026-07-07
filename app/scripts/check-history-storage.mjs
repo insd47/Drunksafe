@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { insertMeasurementRecord } from '@/lib/storage/history-records';
+import { protocolVersion } from '@/lib/ble/model';
+import { insertMeasurementRecord, recordFromResult } from '@/lib/storage/history-records';
+
+test('record from result uses the BLE result kind without external session memory', () => {
+  const result = measurementResult({ kind: 'baseline' });
+  const record = recordFromResult(result);
+
+  assert.equal(record.kind, 'baseline');
+  assert.equal(record.id, 'baseline:fw-baseline:1798848000000');
+});
 
 test('history insert is idempotent for repeated result notify from the same session', () => {
   const first = record({ id: 'measurement:fw-1:1000', session_id: 'fw-1', measured_at: 1000 });
@@ -81,5 +90,23 @@ function record({ id, kind = 'measurement', session_id, measured_at = 1000, alco
     confidence_percent: 82,
     pulse_bpm: null,
     pulse_stable: null,
+  };
+}
+
+function measurementResult({ kind }) {
+  return {
+    v: protocolVersion,
+    session_id: 'fw-baseline',
+    kind,
+    measured_at_unix_ms: 1798848000000,
+    alcohol: {
+      mg_l_x1000: 8,
+    },
+    pulse: null,
+    bac_milli_percent: 2,
+    bac_upper_milli_percent: 3,
+    sober_time_minutes: 0,
+    risk: 'safe',
+    confidence_percent: 82,
   };
 }

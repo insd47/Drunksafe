@@ -13,6 +13,7 @@ import { parseDeviceEvent, type DeviceEvent, type PhoneCommand } from '@/lib/ble
 import {
   DeviceEventFrameAssembler,
   maxBleJsonPayloadBytes,
+  minimumChunkedBlePayloadBytes,
   serializePhoneCommandFrames,
 } from '@/lib/ble/transport';
 import { drunksafeBle } from '@/lib/ble/uuids';
@@ -216,15 +217,29 @@ export class DrunksafeBleClient {
   }
 
   private async requestPreferredMtu(device: Device) {
-    try {
-      const mtuDevice = await this.manager.requestMTUForDevice(device.id, preferredMtu);
-      this.maxWritePayloadBytes = Math.min(maxBleJsonPayloadBytes, Math.max(20, mtuDevice.mtu - 3));
+    let mtuDevice: Device;
 
-      return mtuDevice;
+    try {
+      mtuDevice = await this.manager.requestMTUForDevice(device.id, preferredMtu);
     } catch {
+      if (process.env.EXPO_OS === 'android') {
+        throw new Error('BLE MTU 협상에 실패해 측정 context를 안정적으로 전송할 수 없습니다.');
+      }
+
       this.maxWritePayloadBytes = maxBleJsonPayloadBytes;
       return device;
     }
+
+    const writePayloadBytes = mtuDevice.mtu - 3;
+
+    if (writePayloadBytes < minimumChunkedBlePayloadBytes) {
+      throw new Error(
+        `BLE MTU가 너무 작아 측정 context를 전송할 수 없습니다. 최소 ${minimumChunkedBlePayloadBytes} byte payload가 필요합니다.`
+      );
+    }
+
+    this.maxWritePayloadBytes = Math.min(maxBleJsonPayloadBytes, writePayloadBytes);
+    return mtuDevice;
   }
 }
 

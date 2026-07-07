@@ -3,12 +3,15 @@ import test from 'node:test';
 
 import {
   maxSoberBaselineAlcoholMgLX1000,
+  baselineResultDescription,
   savedResultMessage,
+  shouldAcceptSoberBaselineSample,
   shouldUpdateSoberBaseline,
 } from '@/lib/personalization/baseline-acceptance';
 
 test('sober baseline accepts only low safe alcohol results', () => {
   assert.equal(shouldUpdateSoberBaseline(result({ risk: 'safe', alcohol: 8 })), true);
+  assert.equal(shouldAcceptSoberBaselineSample({ risk: 'safe', alcohol_mg_l_x1000: 8 }), true);
   assert.equal(
     shouldUpdateSoberBaseline(
       result({
@@ -32,6 +35,24 @@ test('sober baseline rejects high or risky baseline sessions', () => {
   );
   assert.equal(shouldUpdateSoberBaseline(result({ risk: 'caution', alcohol: 20 })), false);
   assert.equal(shouldUpdateSoberBaseline(result({ risk: 'danger', alcohol: 20 })), false);
+});
+
+test('baseline result copy explains whether the sample updates sober baseline', () => {
+  assert.equal(
+    baselineResultDescription({ risk: 'safe', alcohol_mg_l_x1000: 8 }),
+    '개인 sober 기준값에 반영 가능한 결과입니다.'
+  );
+  assert.equal(
+    baselineResultDescription({
+      risk: 'safe',
+      alcohol_mg_l_x1000: maxSoberBaselineAlcoholMgLX1000 + 1,
+    }),
+    '히스토리에는 저장하지만 sober baseline에는 반영하지 않습니다.'
+  );
+  assert.equal(
+    baselineResultDescription({ risk: 'caution', alcohol_mg_l_x1000: 8 }),
+    '히스토리에는 저장하지만 sober baseline에는 반영하지 않습니다.'
+  );
 });
 
 test('baseline result copy distinguishes history save from baseline acceptance', () => {

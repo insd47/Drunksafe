@@ -25,6 +25,10 @@ import {
   terminalDeviceErrorPatch,
 } from '@/lib/ble/session-patches';
 import { recordFromResult, saveMeasurement, type MeasurementKind } from '@/lib/storage/history';
+import {
+  savedResultMessage,
+  shouldUpdateSoberBaseline,
+} from '@/lib/personalization/baseline-acceptance';
 import { buildPhoneContext, readBaseline, writeBaseline } from '@/lib/storage/profile';
 
 export type { BleMeasurementPhase } from '@/lib/ble/measurement-phase';
@@ -465,13 +469,18 @@ class BleSessionStore {
     event: Extract<DeviceEvent, { event: 'measurement_result' }>
   ) {
     let resultSaved = true;
+    let baselineAccepted: boolean | null = null;
     const kind = this.snapshot.activeMeasurementKind;
 
     try {
       await saveMeasurement(recordFromResult(event, kind));
 
       if (kind === 'baseline') {
-        await saveBaselineFromResult(event);
+        baselineAccepted = shouldUpdateSoberBaseline(event);
+
+        if (baselineAccepted) {
+          await saveBaselineFromResult(event);
+        }
       }
     } catch {
       resultSaved = false;
@@ -484,7 +493,9 @@ class BleSessionStore {
       progress: null,
       result: event,
       resultSaved,
-      message: resultSaved ? '결과를 히스토리에 저장했습니다.' : '결과 저장에 실패했습니다.',
+      message: resultSaved
+        ? savedResultMessage({ kind, baselineAccepted })
+        : '결과 저장에 실패했습니다.',
     });
 
     if (this.client && resultSaved) {

@@ -326,3 +326,17 @@ test('BLE session and connect screen expose the verification timeline', () => {
   assert.match(connectScreenSource, /isBleVerificationAckCorrelated/);
   assert.match(connectScreenSource, /ble\.verificationLog/);
 });
+
+test('real BLE commands are logged only after the write succeeds', () => {
+  const sendCommandSource = sessionSource.match(
+    /private async sendCommand\(command: PhoneCommand\) \{[\s\S]*?\n  \}/
+  )?.[0];
+
+  assert.ok(sendCommandSource);
+  assert.match(sendCommandSource, /await this\.client\.send\(command\);/);
+  assert.match(sendCommandSource, /this\.logCommand\(command\);/);
+  assert.ok(
+    sendCommandSource.indexOf('await this.client.send(command);') <
+      sendCommandSource.indexOf('this.logCommand(command);')
+  );
+});

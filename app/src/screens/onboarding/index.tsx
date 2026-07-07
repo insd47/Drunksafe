@@ -139,7 +139,7 @@ export function OnboardingScreen() {
         />
         <View className="gap-2 py-3">
           <Text className="text-sm font-medium text-gray-950">성별</Text>
-          <View className="flex-row gap-2">
+          <View accessibilityLabel="성별" accessibilityRole="radiogroup" className="flex-row gap-2">
             <Segment label="남성" selected={sex === 'male'} onPress={() => setSex('male')} />
             <Segment label="여성" selected={sex === 'female'} onPress={() => setSex('female')} />
           </View>
@@ -189,6 +189,10 @@ function ProfileInput({ label, placeholder, suffix, value, onChangeText }: Profi
 function Segment({ label, selected, onPress }: SegmentProps) {
   return (
     <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       className={
         selected
           ? 'h-10 flex-1 items-center justify-center border border-gray-950 bg-gray-950 px-3'

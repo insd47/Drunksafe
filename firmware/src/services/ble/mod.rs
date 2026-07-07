@@ -18,6 +18,16 @@ pub use transport::{
     DEVICE_NAME, MAX_BLE_JSON_PAYLOAD_BYTES, PHONE_COMMAND_CHARACTERISTIC_UUID, SERVICE_UUID,
 };
 
+pub const MEASUREMENT_PROGRESS_PLAN: [(MeasurementStep, u8); 7] = [
+    (MeasurementStep::Preparing, 5),
+    (MeasurementStep::WarmingSensor, 15),
+    (MeasurementStep::WaitingBreath, 25),
+    (MeasurementStep::SamplingBreath, 50),
+    (MeasurementStep::SamplingPulse, 75),
+    (MeasurementStep::Analyzing, 90),
+    (MeasurementStep::Done, 100),
+];
+
 /// 새 측정 세션 이벤트를 만든다.
 #[allow(dead_code)]
 pub fn measurement_started(

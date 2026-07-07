@@ -19,6 +19,7 @@ import {
   formatRisk,
   riskTone,
 } from '@/lib/format/measurement';
+import { baselineResultDescription } from '@/lib/personalization/baseline-acceptance';
 import {
   readMeasurementById,
   recordFromResult,
@@ -125,7 +126,7 @@ export function ResultScreen() {
               value={formatRisk(record.risk)}
               description={
                 kind === 'baseline'
-                  ? '개인 sober 기준값으로 저장할 수 있습니다.'
+                  ? baselineResultDescription(record)
                   : '보수적 BAC 상한 기준으로 판단했습니다.'
               }
               tone={riskTone(record.risk)}
@@ -207,7 +208,10 @@ export function ResultScreen() {
         disabled
         onPress={() => {}}
       />
-      <ActionLink href="/history" label="히스토리에 저장된 기록 보기" />
+      <ActionLink
+        href={kind === 'baseline' ? '/onboarding' : '/history'}
+        label={kind === 'baseline' ? '온보딩에서 baseline 확인' : '히스토리에 저장된 기록 보기'}
+      />
       <ActionLink href="/" label="연결 화면으로 돌아가기" variant="secondary" />
     </Screen>
   );

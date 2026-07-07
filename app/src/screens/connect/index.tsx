@@ -9,6 +9,7 @@ import { Separator } from '@/components/separator';
 import { StatusRow } from '@/components/status-row';
 import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
+import { measurementStartBlocker, measurementStartBlockerMessage } from '@/lib/ble/start-readiness';
 import {
   formatBac,
   formatDrivingStatus,
@@ -75,7 +76,13 @@ export function ConnectScreen() {
   const contextReady = summary.baselineReady || summary.profileReady;
   const scanDisabled =
     ble.mockMode || ble.connectionPhase === 'connecting' || ble.bluetoothState !== 'PoweredOn';
-  const measurementDisabled = !ble.connectedDevice || hasActiveMeasurement(ble);
+  const startBlocker = measurementStartBlocker({
+    connected: Boolean(ble.connectedDevice),
+    activeMeasurement: hasActiveMeasurement(ble),
+    contextReady,
+    mockMode: ble.mockMode,
+  });
+  const measurementDisabled = startBlocker !== null;
   const showMockConnection =
     !ble.connectedDevice &&
     (ble.bluetoothState === 'Unsupported' ||
@@ -92,6 +99,10 @@ export function ConnectScreen() {
   };
 
   const handleStartMeasurement = () => {
+    if (startBlocker) {
+      return;
+    }
+
     void ble.startMeasurement();
     router.push(`/measure/${ble.activeSessionId ?? 'live'}`);
   };
@@ -148,7 +159,11 @@ export function ConnectScreen() {
         <StatusRow
           label="측정"
           value={measurementLabel(ble.measurementPhase)}
-          description={ble.activeSessionId ?? '아직 활성 세션이 없습니다.'}
+          description={
+            measurementStartBlockerMessage(startBlocker) ??
+            ble.activeSessionId ??
+            '아직 활성 세션이 없습니다.'
+          }
           tone={
             ble.measurementPhase === 'error'
               ? 'danger'

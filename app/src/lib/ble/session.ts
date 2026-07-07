@@ -81,6 +81,7 @@ class BleSessionStore {
   private stateSubscription: Removable | null = null;
   private eventSubscription: Removable | null = null;
   private readonly mockTimers = new Set<ReturnType<typeof setTimeout>>();
+  private readonly cancelledSessionIds = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private snapshot = initialSnapshot;
 
@@ -237,6 +238,43 @@ class BleSessionStore {
     });
   };
 
+  cancelMeasurement = async () => {
+    const sessionId = this.snapshot.activeSessionId;
+
+    if (!sessionId || !this.isActiveMeasurement()) {
+      return;
+    }
+
+    if (this.snapshot.mockMode) {
+      this.cancelledSessionIds.add(sessionId);
+      this.clearMockTimers();
+      this.set({
+        measurementPhase: 'error',
+        progress: null,
+        result: null,
+        resultSaved: false,
+        deviceErrorCode: 'cancelled',
+        message: errorMessage('cancelled'),
+      });
+      return;
+    }
+
+    if (!this.client) {
+      return;
+    }
+
+    this.set({
+      message: '측정 취소를 요청했습니다.',
+    });
+
+    try {
+      this.cancelledSessionIds.add(sessionId);
+      await this.client.send({ cmd: 'cancel', session_id: sessionId });
+    } catch (error) {
+      this.fail(error);
+    }
+  };
+
   startMeasurement = async (kind: MeasurementKind = 'measurement') => {
     if (this.snapshot.mockMode) {
       await this.startMockMeasurement(kind);
@@ -258,11 +296,13 @@ class BleSessionStore {
     this.set({
       measurementPhase: 'starting',
       activeMeasurementKind: kind,
+      activeSessionId: null,
       progress: null,
       result: null,
       resultSaved: false,
       deviceErrorCode: null,
       message: '측정 시작 명령을 보냈습니다.',
+      contextSentSessionId: null,
     });
 
     try {
@@ -301,6 +341,10 @@ class BleSessionStore {
         await this.handleMeasurementStarted(event);
         return;
       case 'measurement_progress':
+        if (this.cancelledSessionIds.has(event.session_id)) {
+          return;
+        }
+
         this.set({
           measurementPhase: event.step === 'done' ? 'result' : 'measuring',
           activeSessionId: event.session_id,
@@ -309,9 +353,27 @@ class BleSessionStore {
         });
         return;
       case 'measurement_result':
+        if (this.cancelledSessionIds.has(event.session_id)) {
+          this.cancelledSessionIds.delete(event.session_id);
+          this.set({
+            measurementPhase: 'error',
+            activeSessionId: event.session_id,
+            progress: null,
+            result: null,
+            resultSaved: false,
+            deviceErrorCode: 'cancelled',
+            message: errorMessage('cancelled'),
+          });
+          return;
+        }
+
+        this.cancelledSessionIds.delete(event.session_id);
         await this.handleMeasurementResult(event);
         return;
       case 'device_error':
+        if (event.session_id) {
+          this.cancelledSessionIds.delete(event.session_id);
+        }
         this.set({
           measurementPhase: 'error',
           activeSessionId: event.session_id,
@@ -344,6 +406,11 @@ class BleSessionStore {
     if (this.snapshot.mockMode) {
       if (event.needs_context) {
         await buildPhoneContext(event.session_id, event.history_limit);
+
+        if (this.cancelledSessionIds.has(event.session_id)) {
+          return;
+        }
+
         this.set({
           measurementPhase: 'measuring',
           contextSentSessionId: event.session_id,
@@ -364,6 +431,11 @@ class BleSessionStore {
 
       if (event.needs_context) {
         const context = await buildPhoneContext(event.session_id, event.history_limit);
+
+        if (this.cancelledSessionIds.has(event.session_id)) {
+          return;
+        }
+
         await this.client.send({ cmd: 'context', ...context });
         this.set({
           measurementPhase: 'measuring',
@@ -493,6 +565,10 @@ class BleSessionStore {
 
     await this.handleEvent(createMockStartedEvent(sessionId));
 
+    if (this.cancelledSessionIds.has(sessionId) || !this.isActiveMeasurement()) {
+      return;
+    }
+
     mockProgressPlan.forEach((progress) => {
       this.scheduleMockEvent(async () => {
         await this.handleEvent(createMockProgressEvent(sessionId, progress.step, progress.percent));
@@ -546,6 +622,7 @@ export function useBleSession() {
     connect: bleSession.connect,
     connectMockDevice: bleSession.connectMockDevice,
     disconnect: bleSession.disconnect,
+    cancelMeasurement: bleSession.cancelMeasurement,
     startMeasurement: bleSession.startMeasurement,
     destroy: bleSession.destroy,
   };

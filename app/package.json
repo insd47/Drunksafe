@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "packageManager": "pnpm@10.24.0",
   "scripts": {
-    "test": "pnpm test:ble-contract && pnpm test:profile-context && pnpm test:measure-route && pnpm test:measurement-phase && pnpm test:history-insights",
+    "test": "pnpm test:ble-contract && pnpm test:profile-context && pnpm test:measure-route && pnpm test:measurement-phase && pnpm test:history-insights && pnpm test:ble-session-patches",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "test:ble-contract": "tsx --tsconfig tsconfig.json scripts/check-ble-contract.mjs",
     "test:measure-route": "tsx --tsconfig tsconfig.json scripts/check-measure-route.mjs",
     "test:measurement-phase": "tsx --tsconfig tsconfig.json scripts/check-measurement-phase.mjs",
     "test:history-insights": "tsx --tsconfig tsconfig.json scripts/check-history-insights.mjs",
+    "test:ble-session-patches": "tsx --tsconfig tsconfig.json scripts/check-ble-session-patches.mjs",
     "test:profile-context": "tsx --tsconfig tsconfig.json scripts/check-profile-context.mjs",
     "format": "eslint \"**/*.{js,jsx,ts,tsx}\" --fix && prettier \"**/*.{js,jsx,ts,tsx,json}\" --write"
   },

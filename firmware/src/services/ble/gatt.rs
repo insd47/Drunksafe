@@ -92,6 +92,7 @@ struct State {
     response: GattResponse,
     phone_transport: PhoneCommandTransport,
     event_transport: DeviceEventTransport,
+    last_status: Option<DeviceEvent>,
 }
 
 #[derive(Clone)]
@@ -115,6 +116,11 @@ impl GattServer {
     fn notify(&self, event: &DeviceEvent) -> Result<(), EspError> {
         let targets = {
             let mut state = self.state.lock().unwrap();
+
+            if let DeviceEvent::Status(_) = event {
+                state.last_status = Some(event.clone());
+            }
+
             let Some(gatt_if) = state.gatt_if else {
                 return Ok(());
             };
@@ -412,37 +418,63 @@ impl GattServer {
         offset: u16,
         value: &[u8],
     ) -> Result<bool, EspError> {
-        let mut state = self.state.lock().unwrap();
+        let mut command = None;
+        let mut subscribe_status = None;
 
-        if Some(handle) == state.event_cccd_handle {
-            if offset == 0 && value.len() == 2 {
-                let value = u16::from_le_bytes([value[0], value[1]]);
+        let handled = {
+            let mut state = self.state.lock().unwrap();
 
-                if let Some(conn) = state
-                    .connections
-                    .iter_mut()
-                    .find(|conn| conn.conn_id == conn_id)
-                {
-                    conn.subscribed = value == NOTIFY_ENABLED || value == INDICATE_ENABLED;
-                    info!("BLE client subscribed={}", conn.subscribed);
+            if Some(handle) == state.event_cccd_handle {
+                if offset == 0 && value.len() == 2 {
+                    let value = u16::from_le_bytes([value[0], value[1]]);
+                    let subscribed = value == NOTIFY_ENABLED || value == INDICATE_ENABLED;
+                    let mut connection_updated = false;
+
+                    if let Some(conn) = state
+                        .connections
+                        .iter_mut()
+                        .find(|conn| conn.conn_id == conn_id)
+                    {
+                        conn.subscribed = subscribed;
+                        connection_updated = true;
+                        info!("BLE client subscribed={}", conn.subscribed);
+                    }
+
+                    if connection_updated && subscribed {
+                        subscribe_status = Some(state.last_status.clone().unwrap_or_else(|| {
+                            super::device_status(super::StatusKind::Connected, None)
+                        }));
+                    }
                 }
+
+                true
+            } else if Some(handle) == state.command_handle {
+                match state.phone_transport.accept(value) {
+                    Ok(Some(accepted)) => {
+                        command = Some(accepted);
+                    }
+                    Ok(None) => {}
+                    Err(error) => warn!("invalid BLE command payload: {error}"),
+                }
+
+                true
+            } else {
+                false
             }
+        };
 
-            return Ok(true);
-        }
-
-        if Some(handle) != state.command_handle {
+        if !handled {
             return Ok(false);
         }
 
-        match state.phone_transport.accept(value) {
-            Ok(Some(command)) => {
-                if self.command_tx.send(command).is_err() {
-                    warn!("dropping BLE command because main loop receiver is gone");
-                }
+        if let Some(command) = command {
+            if self.command_tx.send(command).is_err() {
+                warn!("dropping BLE command because main loop receiver is gone");
             }
-            Ok(None) => {}
-            Err(error) => warn!("invalid BLE command payload: {error}"),
+        }
+
+        if let Some(event) = subscribe_status {
+            self.notify(&event)?;
         }
 
         Ok(true)

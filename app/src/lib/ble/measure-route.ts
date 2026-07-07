@@ -36,3 +36,13 @@ export function resolveMeasureRoute(snapshot: MeasureRouteSnapshot) {
     routeMatchesActive: tracksActiveSession || snapshot.routeSessionId === snapshot.activeSessionId,
   };
 }
+
+export function shouldShowResultPreview({
+  hasResult,
+  hasActiveMeasurement,
+}: {
+  hasResult: boolean;
+  hasActiveMeasurement: boolean;
+}) {
+  return !hasResult && !hasActiveMeasurement;
+}

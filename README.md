@@ -51,6 +51,7 @@ flowchart LR
 서버를 전제로 하지 않는 구조입니다. 보드 버튼으로 측정을 시작하면 펌웨어가 Bluetooth LE로 앱에 측정 컨텍스트를 요청하고, 앱은 최근 측정 히스토리와 개인 기준값을 전달합니다. 펌웨어는 보정과 측정을 수행한 뒤 결과를 앱으로 전송하고, 앱은 결과와 히스토리를 사용자 중심으로 저장합니다.
 
 측정 컨텍스트, BLE 통신 모델, 저장 ERD는 [.docs/measurement-communication-model.md](.docs/measurement-communication-model.md)에 정리되어 있습니다.
+MVP 완료 판정을 위한 실기기 검증 절차는 [.docs/mvp-verification.md](.docs/mvp-verification.md)에 둡니다.
 
 ## 기술 스택
 

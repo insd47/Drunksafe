@@ -1,10 +1,11 @@
+use embassy_time::{Duration as EmbassyDuration, Timer};
 use error::Result;
 use esp_idf_svc::hal::task::block_on;
 use services::ble::{
     self, BleService, ErrorCode, MeasurementKind, MeasurementStep, PhoneCommand, PhoneContext,
     Source, StatusKind, MEASUREMENT_PROGRESS_PLAN,
 };
-use services::measure::MeasureService;
+use services::measure::{MeasureRun, MeasureService};
 use services::screen::{ScreenService, View};
 use std::time::{Duration, Instant};
 
@@ -15,6 +16,7 @@ mod utils;
 
 const IDLE_POLL: Duration = Duration::from_millis(20);
 const CONTEXT_WAIT: Duration = Duration::from_secs(5);
+const MEASUREMENT_CANCEL_POLL: EmbassyDuration = EmbassyDuration::from_millis(20);
 
 fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -106,20 +108,12 @@ fn main() -> Result<()> {
             notify_progress(&ble, &session_id, MeasurementStep::SamplingPulse);
 
             screen.show(View::Measuring);
-            let result = block_on(measure.run());
+            let result = block_on(
+                measure.run_until_cancelled(wait_for_measurement_cancel(&ble, &session_id)),
+            );
 
             match result {
-                Ok(measurement) => {
-                    if cancelled_after_measurement(&ble, &session_id) {
-                        notify_ble(
-                            &ble,
-                            ble::device_error(Some(session_id.clone()), ErrorCode::Cancelled),
-                        );
-                        notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
-                        screen.show(View::Home);
-                        continue;
-                    }
-
+                Ok(MeasureRun::Completed(measurement)) => {
                     notify_progress(&ble, &session_id, MeasurementStep::Analyzing);
                     notify_progress(&ble, &session_id, MeasurementStep::Done);
                     notify_ble(
@@ -136,6 +130,15 @@ fn main() -> Result<()> {
                         ble::device_status(StatusKind::ResultReady, Some(session_id)),
                     );
                     screen.show(View::Result(measurement));
+                }
+                Ok(MeasureRun::Cancelled) => {
+                    notify_ble(
+                        &ble,
+                        ble::device_error(Some(session_id.clone()), ErrorCode::Cancelled),
+                    );
+                    notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
+                    screen.show(View::Home);
+                    continue;
                 }
                 Err(error) => {
                     let error_code = ble_error_code(&error);
@@ -239,7 +242,17 @@ fn wait_for_context(ble: &BleService, session_id: &str) -> SessionContext {
     SessionContext::TimedOut
 }
 
-fn cancelled_after_measurement(ble: &BleService, session_id: &str) -> bool {
+async fn wait_for_measurement_cancel(ble: &BleService, session_id: &str) {
+    loop {
+        if measurement_cancel_requested(ble, session_id) {
+            return;
+        }
+
+        Timer::after(MEASUREMENT_CANCEL_POLL).await;
+    }
+}
+
+fn measurement_cancel_requested(ble: &BleService, session_id: &str) -> bool {
     let mut cancelled = false;
 
     while let Some(command) = ble.try_recv_command() {

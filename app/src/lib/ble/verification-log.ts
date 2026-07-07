@@ -17,6 +17,9 @@ export type BleVerificationLogInput = Omit<BleVerificationLogEntry, 'id' | 'atUn
 
 export type BleVerificationEvidenceSummary = {
   notifyReadyAtUnixMs: number | null;
+  timeSyncAtUnixMs: number | null;
+  contextSessionId: string | null;
+  contextCommandAtUnixMs: number | null;
   baselineSessionId: string | null;
   measurementSessionId: string | null;
   boardButtonSessionId: string | null;
@@ -30,6 +33,9 @@ export type BleVerificationEvidenceSummary = {
 
 export const emptyBleVerificationEvidenceSummary: BleVerificationEvidenceSummary = {
   notifyReadyAtUnixMs: null,
+  timeSyncAtUnixMs: null,
+  contextSessionId: null,
+  contextCommandAtUnixMs: null,
   baselineSessionId: null,
   measurementSessionId: null,
   boardButtonSessionId: null,
@@ -160,6 +166,17 @@ export function updateBleVerificationEvidenceWithCommand(
   atUnixMs: number
 ): BleVerificationEvidenceSummary {
   switch (command.cmd) {
+    case 'time':
+      return {
+        ...summary,
+        timeSyncAtUnixMs: atUnixMs,
+      };
+    case 'context':
+      return {
+        ...summary,
+        contextSessionId: command.session_id,
+        contextCommandAtUnixMs: atUnixMs,
+      };
     case 'cancel':
       return {
         ...summary,

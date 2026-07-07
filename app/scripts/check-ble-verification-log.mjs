@@ -254,6 +254,21 @@ test('verification evidence summary keeps MVP proof fields beyond bounded timeli
     },
     1800000000400
   );
+  appendCommand({ cmd: 'time', unix_time_ms: 1800000000450 }, 1800000000450);
+  appendCommand(
+    {
+      cmd: 'context',
+      v: 7,
+      session_id: 'measure-1',
+      phone_time_unix_ms: 1800000000460,
+      recent: [],
+      sober_alcohol_mg_l_x1000: null,
+      sober_alcohol_mad_mg_l_x1000: null,
+      elimination_mg_l_per_hour_x1000: 62,
+      resting_bpm: null,
+    },
+    1800000000460
+  );
   appendCommand({ cmd: 'cancel', session_id: 'measure-1' }, 1800000000500);
   appendEvent(
     {
@@ -289,6 +304,9 @@ test('verification evidence summary keeps MVP proof fields beyond bounded timeli
   assert.ok(entries.every((entry) => entry.label !== 'state:notify-ready'));
   assert.deepEqual(summary, {
     notifyReadyAtUnixMs: 1800000000000,
+    timeSyncAtUnixMs: 1800000000450,
+    contextSessionId: 'measure-1',
+    contextCommandAtUnixMs: 1800000000460,
     baselineSessionId: 'baseline-1',
     measurementSessionId: 'measure-1',
     boardButtonSessionId: 'measure-1',
@@ -322,6 +340,8 @@ test('BLE session and connect screen expose the verification timeline', () => {
   assert.match(sessionSource, /verificationEvidence: BleVerificationEvidenceSummary/);
   assert.match(connectScreenSource, /BLE 검증 로그/);
   assert.match(connectScreenSource, /MVP 증거 누적/);
+  assert.match(connectScreenSource, /시간 동기화/);
+  assert.match(connectScreenSource, /Context 전송/);
   assert.match(connectScreenSource, /ble\.verificationEvidence/);
   assert.match(connectScreenSource, /isBleVerificationAckCorrelated/);
   assert.match(connectScreenSource, /ble\.verificationLog/);

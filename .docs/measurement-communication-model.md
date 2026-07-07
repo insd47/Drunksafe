@@ -109,7 +109,7 @@ SOLID 관점:
 
 공개 액션:
 
-- `ble::measurement_started(session_id)`: 보드 버튼으로 시작된 측정 세션 이벤트 DTO를 만든다.
+- `ble::measurement_started(session_id, source, kind)`: 보드 또는 앱에서 시작된 측정 세션 이벤트 DTO를 만든다.
 
 GATT transport 계약:
 
@@ -135,10 +135,11 @@ GATT transport 계약:
 BLE 모델은 다음 정도만 가진다.
 
 - `DeviceStatus`: 연결 직후와 runtime 상태 변경 시 장치 상태를 전달한다.
-- `MeasurementStarted`: 보드 또는 앱에서 새 측정 세션을 열고, 필요한 히스토리 개수와 시간 동기화 여부를 요청한다.
+- `PhoneCommand::Start`: 앱에서 일반 측정 또는 sober baseline 측정을 시작한다. `kind`는 `measurement` 또는 `baseline`이다.
+- `MeasurementStarted`: 보드 또는 앱에서 새 측정 세션을 열고, `kind`, 필요한 히스토리 개수, 시간 동기화 여부를 요청한다.
 - `PhoneContext`: 앱이 최근 히스토리와 개인화에 필요한 파생 context만 보낸다.
 - `MeasurementProgress`: 측정 진행 단계와 percent만 전달한다.
-- `MeasurementResult`: 최종 측정 결과를 전달한다. BLE에는 `Alcohol`, `Pulse` 요약 DTO만 싣고 raw frame이나 알고리즘 내부 필드는 노출하지 않는다.
+- `MeasurementResult`: 최종 측정 결과와 `kind`를 전달한다. 앱은 세션 메모리 상태가 사라져도 이 필드로 baseline/일반 측정을 구분해 저장한다. BLE에는 `Alcohol`, `Pulse` 요약 DTO만 싣고 raw frame이나 알고리즘 내부 필드는 노출하지 않는다.
 - `DeviceError`: 앱이 조치할 수 있는 오류 코드를 전달한다.
 
 BLE 모델이 직접 소유하지 않는 것:

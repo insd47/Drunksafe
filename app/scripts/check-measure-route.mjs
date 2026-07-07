@@ -5,7 +5,7 @@ import { protocolVersion } from '@/lib/ble/model';
 import { resolveMeasureRoute, shouldShowResultPreview } from '@/lib/ble/measure-route';
 
 test('baseline route follows the active baseline BLE session id', () => {
-  const result = measurementResult('baseline-mock-123');
+  const result = measurementResult('baseline-mock-123', 'baseline');
   const route = resolveMeasureRoute({
     routeSessionId: 'baseline',
     activeMeasurementKind: 'baseline',
@@ -72,11 +72,12 @@ test('result preview is hidden while a real measurement is active', () => {
   );
 });
 
-function measurementResult(sessionId) {
+function measurementResult(sessionId, kind = 'measurement') {
   return {
     event: 'measurement_result',
     v: protocolVersion,
     session_id: sessionId,
+    kind,
     measured_at_unix_ms: 1798848000000,
     alcohol: {
       mg_l_x1000: 8,

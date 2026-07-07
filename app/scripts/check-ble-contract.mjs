@@ -59,6 +59,10 @@ test('firmware BLE protocol version and GATT constants match the contract fixtur
 test('firmware serde enum names match the contract fixture', () => {
   assert.deepEqual(readRustEnumSnakeValues(firmwareModelSource, 'Source'), contract.enums.source);
   assert.deepEqual(
+    readRustEnumSnakeValues(firmwareModelSource, 'MeasurementKind'),
+    contract.enums.measurementKind
+  );
+  assert.deepEqual(
     readRustEnumSnakeValues(firmwareModelSource, 'StatusKind'),
     contract.enums.statusKind
   );
@@ -104,6 +108,11 @@ test('app validator accepts every BLE enum value from the contract fixture', () 
     assert.equal(parseDeviceEvent(JSON.stringify(measurementStarted({ source }))).source, source);
   }
 
+  for (const kind of contract.enums.measurementKind) {
+    assert.equal(parseDeviceEvent(JSON.stringify(measurementStarted({ kind }))).kind, kind);
+    assert.equal(parseDeviceEvent(JSON.stringify(measurementResult({ kind }))).kind, kind);
+  }
+
   for (const step of contract.enums.measurementStep) {
     assert.equal(parseDeviceEvent(JSON.stringify(measurementProgress({ step }))).step, step);
   }
@@ -119,6 +128,11 @@ test('app validator accepts every BLE enum value from the contract fixture', () 
 
 test('phone command fixtures serialize through the app validator', () => {
   for (const command of contract.phoneCommands) {
+    assert.deepEqual(JSON.parse(toPhoneCommandPayload(command)), command);
+  }
+
+  for (const kind of contract.enums.measurementKind) {
+    const command = { cmd: 'start', kind };
     assert.deepEqual(JSON.parse(toPhoneCommandPayload(command)), command);
   }
 });
@@ -225,6 +239,7 @@ function measurementStarted(overrides = {}) {
     v: contract.protocolVersion,
     session_id: 'enum-fixture',
     source: 'phone',
+    kind: 'measurement',
     history_limit: 8,
     needs_context: true,
     sync_time: true,
@@ -248,6 +263,7 @@ function measurementResult(overrides = {}) {
     event: 'measurement_result',
     v: contract.protocolVersion,
     session_id: 'enum-fixture',
+    kind: 'measurement',
     measured_at_unix_ms: null,
     alcohol: {
       mg_l_x1000: 0,

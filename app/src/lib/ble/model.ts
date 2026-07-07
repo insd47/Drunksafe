@@ -1,6 +1,8 @@
-export const protocolVersion = 6;
+export const protocolVersion = 7;
 
 export type Source = 'board_button' | 'phone';
+
+export type MeasurementKind = 'measurement' | 'baseline';
 
 export type StatusKind =
   | 'idle'
@@ -42,6 +44,7 @@ export type MeasurementStarted = {
   v: number;
   session_id: string;
   source: Source;
+  kind: MeasurementKind;
   history_limit: number;
   needs_context: boolean;
   sync_time: boolean;
@@ -86,6 +89,7 @@ export type Pulse = {
 export type MeasurementResult = {
   v: number;
   session_id: string;
+  kind: MeasurementKind;
   measured_at_unix_ms: number | null;
   alcohol: Alcohol;
   pulse: Pulse | null;
@@ -103,7 +107,7 @@ export type DeviceError = {
 };
 
 export type PhoneCommand =
-  | { cmd: 'start' }
+  | { cmd: 'start'; kind: MeasurementKind }
   | ({ cmd: 'context' } & PhoneContext)
   | { cmd: 'cancel'; session_id: string }
   | { cmd: 'time'; unix_time_ms: number }
@@ -170,6 +174,7 @@ function isMeasurementStarted(value: Record<string, unknown>): value is DeviceEv
     hasProtocolVersion(value) &&
     isString(value.session_id) &&
     isSource(value.source) &&
+    isMeasurementKind(value.kind) &&
     isU8(value.history_limit) &&
     typeof value.needs_context === 'boolean' &&
     typeof value.sync_time === 'boolean'
@@ -189,6 +194,7 @@ function isMeasurementResult(value: Record<string, unknown>): value is DeviceEve
   return (
     hasProtocolVersion(value) &&
     isString(value.session_id) &&
+    isMeasurementKind(value.kind) &&
     isNullableU64(value.measured_at_unix_ms) &&
     isAlcohol(value.alcohol) &&
     isNullablePulse(value.pulse) &&
@@ -232,7 +238,7 @@ function isPhoneCommand(value: unknown): value is PhoneCommand {
 
   switch (value.cmd) {
     case 'start':
-      return true;
+      return isMeasurementKind(value.kind);
     case 'context':
       return isPhoneContext(value);
     case 'cancel':
@@ -274,6 +280,10 @@ function isHistoryEntry(value: unknown): value is HistoryEntry {
 
 function isSource(value: unknown): value is Source {
   return value === 'board_button' || value === 'phone';
+}
+
+function isMeasurementKind(value: unknown): value is MeasurementKind {
+  return value === 'measurement' || value === 'baseline';
 }
 
 function isStatusKind(value: unknown): value is StatusKind {

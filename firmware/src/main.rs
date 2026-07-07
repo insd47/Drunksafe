@@ -1,7 +1,8 @@
 use error::Result;
 use esp_idf_svc::hal::task::block_on;
 use services::ble::{
-    self, BleService, ErrorCode, MeasurementStep, PhoneCommand, PhoneContext, Source, StatusKind,
+    self, BleService, ErrorCode, MeasurementKind, MeasurementStep, PhoneCommand, PhoneContext,
+    Source, StatusKind,
 };
 use services::measure::MeasureService;
 use services::screen::{ScreenService, View};
@@ -34,12 +35,12 @@ fn main() -> Result<()> {
     notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
 
     loop {
-        let mut phone_start = false;
+        let mut phone_start = None;
 
         while let Some(command) = ble.try_recv_command() {
             match command {
-                PhoneCommand::Start => {
-                    phone_start = true;
+                PhoneCommand::Start { kind } => {
+                    phone_start = Some(kind);
                 }
                 PhoneCommand::Context(context) => {
                     log::info!("received phone context for session={}", context.session_id);
@@ -56,15 +57,15 @@ fn main() -> Result<()> {
             }
         }
 
-        let source = if trigger.pressed() {
-            Some(Source::BoardButton)
-        } else if phone_start {
-            Some(Source::Phone)
+        let start = if trigger.pressed() {
+            Some((Source::BoardButton, MeasurementKind::Measurement))
+        } else if let Some(kind) = phone_start {
+            Some((Source::Phone, kind))
         } else {
             None
         };
 
-        if let Some(source) = source {
+        if let Some((source, kind)) = start {
             session_seq = session_seq.wrapping_add(1);
             let session_id = format!("fw-{session_seq}");
 
@@ -72,7 +73,10 @@ fn main() -> Result<()> {
                 &ble,
                 ble::device_status(StatusKind::Measuring, Some(session_id.clone())),
             );
-            notify_ble(&ble, ble::measurement_started(session_id.clone(), source));
+            notify_ble(
+                &ble,
+                ble::measurement_started(session_id.clone(), source, kind),
+            );
             notify_ble(
                 &ble,
                 ble::measurement_progress(session_id.clone(), MeasurementStep::Preparing, 5),
@@ -129,7 +133,12 @@ fn main() -> Result<()> {
                     );
                     notify_ble(
                         &ble,
-                        ble::measurement_result(session_id.clone(), measurement, context.as_ref()),
+                        ble::measurement_result(
+                            session_id.clone(),
+                            kind,
+                            measurement,
+                            context.as_ref(),
+                        ),
                     );
                     notify_ble(
                         &ble,
@@ -197,7 +206,7 @@ fn wait_for_context(ble: &BleService, session_id: &str) -> SessionContext {
                 PhoneCommand::Time { unix_time_ms } => {
                     log::debug!("received phone time unix_ms={unix_time_ms}");
                 }
-                PhoneCommand::Start => {
+                PhoneCommand::Start { .. } => {
                     log::debug!("ignoring nested phone start while waiting for context");
                 }
                 PhoneCommand::Context(context) => {
@@ -240,7 +249,7 @@ fn cancelled_after_measurement(ble: &BleService, session_id: &str) -> bool {
             PhoneCommand::Ack { session_id } => {
                 log::debug!("received result ack for session={session_id}");
             }
-            PhoneCommand::Start => {
+            PhoneCommand::Start { .. } => {
                 log::debug!("ignoring phone start while finishing active measurement");
             }
             PhoneCommand::Context(context) => {

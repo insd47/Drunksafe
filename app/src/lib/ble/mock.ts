@@ -29,13 +29,15 @@ export function createMockSessionId(kind: MeasurementKind) {
 }
 
 export function createMockStartedEvent(
-  sessionId: string
+  sessionId: string,
+  kind: MeasurementKind
 ): Extract<DeviceEvent, { event: 'measurement_started' }> {
   return {
     event: 'measurement_started',
     v: protocolVersion,
     session_id: sessionId,
     source: 'phone',
+    kind,
     history_limit: 8,
     needs_context: true,
     sync_time: true,
@@ -66,6 +68,7 @@ export function createMockResultEvent(
     event: 'measurement_result',
     v: protocolVersion,
     session_id: sessionId,
+    kind,
     measured_at_unix_ms: Date.now(),
     alcohol: {
       mg_l_x1000: baseline ? 7 : 165,

@@ -2,7 +2,7 @@ use crate::devices::pulse;
 use serde::{Deserialize, Serialize};
 
 /// BLE payload schema version이다.
-pub const PROTOCOL_VERSION: u8 = 6;
+pub const PROTOCOL_VERSION: u8 = 7;
 
 /// 측정 세션을 시작한 입력 출처다.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -10,6 +10,14 @@ pub const PROTOCOL_VERSION: u8 = 6;
 pub enum Source {
     BoardButton,
     Phone,
+}
+
+/// 측정 결과가 일반 측정인지 sober baseline 측정인지 구분한다.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeasurementKind {
+    Measurement,
+    Baseline,
 }
 
 /// BLE로 노출하는 장치 상태 label이다. Runtime state machine의 원천은 아니다.
@@ -75,6 +83,7 @@ pub struct MeasurementStarted {
     pub v: u8,
     pub session_id: String,
     pub source: Source,
+    pub kind: MeasurementKind,
     pub history_limit: u8,
     pub needs_context: bool,
     pub sync_time: bool,
@@ -143,6 +152,7 @@ impl From<pulse::Analysis> for Pulse {
 pub struct MeasurementResult {
     pub v: u8,
     pub session_id: String,
+    pub kind: MeasurementKind,
     pub measured_at_unix_ms: Option<u64>,
     pub alcohol: Alcohol,
     pub pulse: Option<Pulse>,
@@ -166,7 +176,7 @@ pub struct DeviceError {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "cmd")]
 pub enum PhoneCommand {
-    Start,
+    Start { kind: MeasurementKind },
     Context(PhoneContext),
     Cancel { session_id: String },
     Time { unix_time_ms: u64 },

@@ -1,7 +1,7 @@
 use crate::services::measure::Measurement;
 
 use super::model::PROTOCOL_VERSION;
-use super::{Alcohol, DeviceEvent, MeasurementResult, PhoneContext, Pulse, Risk};
+use super::{Alcohol, DeviceEvent, MeasurementKind, MeasurementResult, PhoneContext, Pulse, Risk};
 
 const LEGAL_LIMIT_MILLI_PERCENT: u16 = 30;
 const CAUTION_MILLI_PERCENT: u16 = 15;
@@ -14,6 +14,7 @@ const MAX_SOBER_BASELINE_MAD_MG_L_X1000: u16 = 50;
 
 pub fn measurement_result(
     session_id: String,
+    kind: MeasurementKind,
     measurement: Measurement,
     context: Option<&PhoneContext>,
 ) -> DeviceEvent {
@@ -31,6 +32,7 @@ pub fn measurement_result(
     DeviceEvent::MeasurementResult(MeasurementResult {
         v: PROTOCOL_VERSION,
         session_id,
+        kind,
         measured_at_unix_ms: context.and_then(|context| context.phone_time_unix_ms),
         alcohol: Alcohol {
             mg_l_x1000: alcohol_mg_l_x1000,

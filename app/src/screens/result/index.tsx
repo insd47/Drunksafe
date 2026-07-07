@@ -43,11 +43,11 @@ export function ResultScreen() {
   const recordLoadState =
     liveResult || demoKind ? 'idle' : savedLookup.id === id ? savedLookup.state : 'loading';
   const liveRecord = useMemo(
-    () => (liveResult ? recordFromResult(liveResult, ble.activeMeasurementKind) : null),
-    [ble.activeMeasurementKind, liveResult]
+    () => (liveResult ? recordFromResult(liveResult) : null),
+    [liveResult]
   );
   const demoRecord = useMemo(
-    () => (demoKind ? recordFromResult(createDemoResult(demoKind), demoKind) : null),
+    () => (demoKind ? recordFromResult(createDemoResult(demoKind)) : null),
     [demoKind]
   );
   const record = liveRecord ?? savedRecord ?? demoRecord;
@@ -223,6 +223,7 @@ function createDemoResult(kind: MeasurementKind): MeasurementResult {
   return {
     v: protocolVersion,
     session_id: baseline ? 'baseline-demo' : 'demo-session',
+    kind,
     measured_at_unix_ms: Date.now(),
     alcohol: {
       mg_l_x1000: baseline ? 8 : 80,

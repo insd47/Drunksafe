@@ -72,8 +72,9 @@ test('baseline result copy distinguishes history save from baseline acceptance',
 
 function result({ risk, alcohol }) {
   return {
-    v: 6,
+    v: 7,
     session_id: `baseline-${risk}-${alcohol}`,
+    kind: 'baseline',
     measured_at_unix_ms: 1798848000000,
     alcohol: {
       mg_l_x1000: alcohol,

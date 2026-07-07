@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 6,
+  "protocolVersion": 7,
   "gatt": {
     "serviceUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12201",
     "deviceEventCharacteristicUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12202",
@@ -8,6 +8,7 @@
   },
   "enums": {
     "source": ["board_button", "phone"],
+    "measurementKind": ["measurement", "baseline"],
     "statusKind": [
       "idle",
       "connected",
@@ -51,7 +52,7 @@
   "deviceEvents": [
     {
       "event": "status",
-      "v": 6,
+      "v": 7,
       "status": "connected",
       "active_session_id": null,
       "battery_percent": 88,
@@ -59,24 +60,26 @@
     },
     {
       "event": "measurement_started",
-      "v": 6,
+      "v": 7,
       "session_id": "fw-fixture-1",
       "source": "phone",
+      "kind": "measurement",
       "history_limit": 8,
       "needs_context": true,
       "sync_time": true
     },
     {
       "event": "measurement_progress",
-      "v": 6,
+      "v": 7,
       "session_id": "fw-fixture-1",
       "step": "sampling_breath",
       "percent": 50
     },
     {
       "event": "measurement_result",
-      "v": 6,
+      "v": 7,
       "session_id": "fw-fixture-1",
+      "kind": "measurement",
       "measured_at_unix_ms": 1798848000000,
       "alcohol": {
         "mg_l_x1000": 165
@@ -94,14 +97,15 @@
     },
     {
       "event": "device_error",
-      "v": 6,
+      "v": 7,
       "session_id": "fw-fixture-1",
       "code": "context_timeout"
     }
   ],
   "phoneCommands": [
     {
-      "cmd": "start"
+      "cmd": "start",
+      "kind": "measurement"
     },
     {
       "cmd": "time",
@@ -109,7 +113,7 @@
     },
     {
       "cmd": "context",
-      "v": 6,
+      "v": 7,
       "session_id": "fw-fixture-1",
       "phone_time_unix_ms": 1798848000000,
       "recent": [

@@ -14,7 +14,7 @@ import {
 test('terminal device error clears stale measurement artifacts', () => {
   const patch = terminalDeviceErrorPatch(
     {
-      v: 6,
+      v: 7,
       session_id: 'fw-7',
       code: 'weak_breath',
     },
@@ -129,8 +129,9 @@ test('terminal status notify preserves result and error messages', () => {
 
 function measurementResult(sessionId) {
   return {
-    v: 6,
+    v: 7,
     session_id: sessionId,
+    kind: 'measurement',
     measured_at_unix_ms: 1798848000000,
     alcohol: {
       mg_l_x1000: 80,

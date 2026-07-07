@@ -8,9 +8,9 @@ pub use analysis::measurement_result;
 pub use gatt::BleService;
 #[allow(unused_imports)]
 pub use model::{
-    Alcohol, DeviceError, DeviceEvent, DeviceStatus, ErrorCode, HistoryEntry, MeasurementProgress,
-    MeasurementResult, MeasurementStarted, MeasurementStep, PhoneCommand, PhoneContext, Pulse,
-    Risk, Source, StatusKind,
+    Alcohol, DeviceError, DeviceEvent, DeviceStatus, ErrorCode, HistoryEntry, MeasurementKind,
+    MeasurementProgress, MeasurementResult, MeasurementStarted, MeasurementStep, PhoneCommand,
+    PhoneContext, Pulse, Risk, Source, StatusKind,
 };
 #[allow(unused_imports)]
 pub use transport::{
@@ -20,11 +20,16 @@ pub use transport::{
 
 /// 새 측정 세션 이벤트를 만든다.
 #[allow(dead_code)]
-pub fn measurement_started(session_id: String, source: Source) -> DeviceEvent {
+pub fn measurement_started(
+    session_id: String,
+    source: Source,
+    kind: MeasurementKind,
+) -> DeviceEvent {
     DeviceEvent::MeasurementStarted(MeasurementStarted {
         v: model::PROTOCOL_VERSION,
         session_id,
         source,
+        kind,
         history_limit: 8,
         needs_context: true,
         sync_time: true,

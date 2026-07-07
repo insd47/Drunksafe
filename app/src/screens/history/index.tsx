@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Link, useFocusEffect } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
+import { Platform, Pressable } from 'react-native';
 
 import { ActionLink } from '@/components/action-link';
 import { Screen } from '@/components/screen';
@@ -17,6 +17,7 @@ import { buildWeeklyHistoryInsight } from '@/lib/personalization/history-insight
 import { readHistory, type MeasurementRecord } from '@/lib/storage/history';
 
 export function HistoryScreen() {
+  const router = useRouter();
   const [records, setRecords] = useState<MeasurementRecord[]>([]);
   const [failed, setFailed] = useState(false);
   const insight = buildWeeklyHistoryInsight(records);
@@ -98,21 +99,7 @@ export function HistoryScreen() {
           <StatusRow label="기록" value="없음" description="저장된 일반 측정 결과가 없습니다." />
         ) : null}
         {records.map((record) => (
-          <Link
-            key={record.id}
-            href={{ pathname: '/results/[id]', params: { id: record.id } }}
-            asChild>
-            <Pressable>
-              <StatusRow
-                label={formatMeasuredAt(record.measured_at_unix_ms)}
-                value={formatDrivingStatus(record.risk)}
-                description={`${formatRisk(record.risk)} · ${formatBac(
-                  record.bac_upper_milli_percent ?? record.bac_milli_percent
-                )}`}
-                tone={riskTone(record.risk)}
-              />
-            </Pressable>
-          </Link>
+          <HistoryRecordRow key={record.id} record={record} router={router} />
         ))}
       </Section>
 
@@ -120,6 +107,48 @@ export function HistoryScreen() {
     </Screen>
   );
 }
+
+function HistoryRecordRow({ record, router }: HistoryRecordRowProps) {
+  const href = { pathname: '/results/[id]', params: { id: record.id } } as const;
+  const bac = formatBac(record.bac_upper_milli_percent ?? record.bac_milli_percent);
+  const risk = formatRisk(record.risk);
+  const drivingStatus = formatDrivingStatus(record.risk);
+  const label = `${formatMeasuredAt(record.measured_at_unix_ms)} ${drivingStatus}, ${risk}, BAC 상한 ${bac}`;
+  const content = (
+    <StatusRow
+      label={formatMeasuredAt(record.measured_at_unix_ms)}
+      value={drivingStatus}
+      description={`${risk} · ${bac}`}
+      tone={riskTone(record.risk)}
+    />
+  );
+
+  if (Platform.OS === 'web') {
+    return (
+      <Link href={href} asChild>
+        <Pressable accessibilityLabel={label} accessibilityRole="link">
+          {content}
+        </Pressable>
+      </Link>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="link"
+      onPress={() => {
+        router.navigate(href);
+      }}>
+      {content}
+    </Pressable>
+  );
+}
+
+type HistoryRecordRowProps = {
+  record: MeasurementRecord;
+  router: ReturnType<typeof useRouter>;
+};
 
 const guidanceLabel = {
   none: '기록 유지',

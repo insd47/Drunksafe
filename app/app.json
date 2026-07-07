@@ -13,6 +13,7 @@
         "react-native-ble-plx",
         {
           "bluetoothAlwaysPermission": "Allow Drunksafe to connect to nearby Bluetooth devices.",
+          "neverForLocation": true,
           "modes": ["central"],
           "isBackgroundEnabled": true
         }

@@ -610,13 +610,12 @@ class BleSessionStore {
   }
 
   private async sendCommand(command: PhoneCommand) {
-    this.logCommand(command);
-
     if (!this.client) {
-      return;
+      throw new Error('Drunksafe BLE device is not connected');
     }
 
     await this.client.send(command);
+    this.logCommand(command);
   }
 
   private logCommand(command: PhoneCommand) {

@@ -30,8 +30,18 @@ impl<'d> MeasureService<'d> {
         let pulse = &mut self.pulse;
         let alcohol = &mut self.alcohol;
         let (pulse, alcohol) = join(run::pulse(pulse), run::alcohol(alcohol)).await;
+        let alcohol = alcohol?;
+        let pulse = match pulse {
+            Ok(pulse) => Some(pulse),
+            Err(error) => {
+                log::warn!(
+                    "pulse measurement unavailable, continuing with alcohol result: {error}"
+                );
+                None
+            }
+        };
 
-        Ok(Measurement::new(alcohol?, pulse?))
+        Ok(Measurement::new(alcohol, pulse))
     }
 
     pub async fn run_until_cancelled(

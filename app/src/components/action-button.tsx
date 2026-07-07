@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils/cn';
 export function ActionButton({ label, variant = 'primary', disabled = false, onPress }: Props) {
   return (
     <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
       className={cn(
         'h-11 items-center justify-center border px-4',
         disabled ? 'border-gray-200 bg-gray-100' : variantClass[variant]

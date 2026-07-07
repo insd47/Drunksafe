@@ -1,16 +1,33 @@
-import { Link, type Href } from 'expo-router';
-import { Text, Pressable } from 'react-native';
+import { Link, useRouter, type Href } from 'expo-router';
+import { Platform, Pressable, Text } from 'react-native';
 
 import { cn } from '@/lib/utils/cn';
 
 export function ActionLink({ href, label, variant = 'primary' }: Props) {
+  const router = useRouter();
+  const className = cn('h-11 items-center justify-center border px-4', variantClass[variant]);
+  const textClassName = cn('text-sm font-semibold', textClass[variant]);
+
+  if (Platform.OS === 'web') {
+    return (
+      <Link href={href} asChild>
+        <Pressable className={className}>
+          <Text className={textClassName}>{label}</Text>
+        </Pressable>
+      </Link>
+    );
+  }
+
   return (
-    <Link href={href} asChild>
-      <Pressable
-        className={cn('h-11 items-center justify-center border px-4', variantClass[variant])}>
-        <Text className={cn('text-sm font-semibold', textClass[variant])}>{label}</Text>
-      </Pressable>
-    </Link>
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      className={className}
+      onPress={() => {
+        router.push(href);
+      }}>
+      <Text className={textClassName}>{label}</Text>
+    </Pressable>
   );
 }
 

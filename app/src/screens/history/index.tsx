@@ -82,6 +82,15 @@ export function HistoryScreen() {
               description={insight.guidanceBody}
               tone={guidanceTone[insight.guidanceLevel]}
             />
+            {insight.guidanceActions.map((action) => (
+              <StatusRow
+                key={action.label}
+                label={action.label}
+                value={action.value}
+                description={action.description}
+                tone={action.tone}
+              />
+            ))}
           </Section>
         </>
       ) : null}

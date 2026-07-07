@@ -17,6 +17,7 @@ import {
   mockProgressPlan,
 } from '@/lib/ble/mock';
 import { hasActiveMeasurement, type BleMeasurementPhase } from '@/lib/ble/measurement-phase';
+import { statusMessageAfterNotify, terminalDeviceErrorPatch } from '@/lib/ble/session-patches';
 import { recordFromResult, saveMeasurement, type MeasurementKind } from '@/lib/storage/history';
 import { buildPhoneContext, readBaseline, writeBaseline } from '@/lib/storage/profile';
 
@@ -336,7 +337,11 @@ class BleSessionStore {
           deviceStatus: event.status,
           activeSessionId: event.active_session_id,
           connectionPhase: 'connected',
-          message: null,
+          message: statusMessageAfterNotify({
+            status: event.status,
+            measurementPhase: this.snapshot.measurementPhase,
+            currentMessage: this.snapshot.message,
+          }),
         });
         return;
       case 'measurement_started':
@@ -376,12 +381,7 @@ class BleSessionStore {
         if (event.session_id) {
           this.cancelledSessionIds.delete(event.session_id);
         }
-        this.set({
-          measurementPhase: 'error',
-          activeSessionId: event.session_id,
-          deviceErrorCode: event.code,
-          message: errorMessage(event.code),
-        });
+        this.set(terminalDeviceErrorPatch(event, errorMessage(event.code)));
         return;
     }
   }

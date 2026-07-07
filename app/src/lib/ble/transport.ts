@@ -60,6 +60,10 @@ export function serializePhoneCommandFrames(
 export class DeviceEventFrameAssembler {
   private readonly entries = new Map<string, ChunkEntry>();
 
+  reset() {
+    this.entries.clear();
+  }
+
   accept(payload: string) {
     const value: unknown = JSON.parse(payload);
 

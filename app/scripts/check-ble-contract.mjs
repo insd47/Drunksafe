@@ -32,6 +32,7 @@ const firmwareBleModSource = readFileSync(
   'utf8'
 );
 const firmwareMainSource = readFileSync(join(repoDir, 'firmware', 'src', 'main.rs'), 'utf8');
+const appBleClientSource = readFileSync(join(appDir, 'src', 'lib', 'ble', 'client.ts'), 'utf8');
 
 test('app BLE protocol version and GATT UUIDs match the contract fixture', () => {
   assert.equal(protocolVersion, contract.protocolVersion);
@@ -229,16 +230,7 @@ test('device event chunk frames reassemble before parsing', () => {
   assert.ok(resultEvent);
 
   const payload = JSON.stringify(resultEvent);
-  const chunks = chunkByCharacters(payload, 48);
-  const frames = chunks.map((data, index) =>
-    JSON.stringify({
-      frame: 'device_event_chunk',
-      id: 'fixture-result',
-      index,
-      count: chunks.length,
-      data,
-    })
-  );
+  const frames = deviceEventChunkFrames(payload, 'fixture-result', 48);
   const assembler = new DeviceEventFrameAssembler();
 
   assert.equal(assembler.accept(frames[1]), null);
@@ -251,6 +243,72 @@ test('device event chunk frames reassemble before parsing', () => {
   const reassembled = assembler.accept(frames.at(-1));
   assert.equal(reassembled, payload);
   assert.deepEqual(parseDeviceEvent(reassembled), resultEvent);
+});
+
+test('device event assembler reset drops stale chunks from reused firmware frame ids', () => {
+  const oldPayload = JSON.stringify(deviceStatus({ firmware_version: 'old' }));
+  const newPayload = JSON.stringify(deviceStatus({ firmware_version: 'new' }));
+  const oldFrames = twoDeviceEventChunkFrames(oldPayload, 'fw-1');
+  const newFrames = twoDeviceEventChunkFrames(newPayload, 'fw-1');
+  const assembler = new DeviceEventFrameAssembler();
+
+  assert.equal(assembler.accept(oldFrames[0]), null);
+  assembler.reset();
+  assert.equal(assembler.accept(newFrames[1]), null);
+  assert.equal(assembler.accept(newFrames[0]), newPayload);
+});
+
+test('app BLE client clears assembler state and ignores stale monitor callbacks', () => {
+  const monitorIndex = indexOfRequired(appBleClientSource, 'monitorEvents(');
+  const generationFieldIndex = indexOfRequired(
+    appBleClientSource,
+    'private eventMonitorGeneration = 0;'
+  );
+  const monitorResetIndex = indexOfRequiredAfter(
+    appBleClientSource,
+    'this.eventAssembler.reset();',
+    monitorIndex
+  );
+  const monitorGenerationIndex = indexOfRequiredAfter(
+    appBleClientSource,
+    'const eventMonitorGeneration = this.advanceEventMonitorGeneration();',
+    monitorResetIndex
+  );
+  const monitorSubscribeIndex = indexOfRequiredAfter(
+    appBleClientSource,
+    'this.manager.monitorCharacteristicForDevice(',
+    monitorIndex
+  );
+  const staleGuardIndex = indexOfRequiredAfter(
+    appBleClientSource,
+    'if (eventMonitorGeneration !== this.eventMonitorGeneration) {',
+    monitorSubscribeIndex
+  );
+  const assemblerAcceptIndex = indexOfRequiredAfter(
+    appBleClientSource,
+    'this.eventAssembler.accept(',
+    staleGuardIndex
+  );
+  const clearIndex = indexOfRequired(appBleClientSource, 'private clearEventMonitor()');
+  const clearGenerationIndex = indexOfRequiredAfter(
+    appBleClientSource,
+    'this.advanceEventMonitorGeneration();',
+    clearIndex
+  );
+  const clearResetIndex = indexOfRequiredAfter(
+    appBleClientSource,
+    'this.eventAssembler.reset();',
+    clearIndex
+  );
+
+  assert.ok(generationFieldIndex < monitorIndex);
+  assert.ok(monitorIndex < monitorResetIndex);
+  assert.ok(monitorResetIndex < monitorGenerationIndex);
+  assert.ok(monitorGenerationIndex < monitorSubscribeIndex);
+  assert.ok(monitorSubscribeIndex < staleGuardIndex);
+  assert.ok(staleGuardIndex < assemblerAcceptIndex);
+  assert.ok(clearIndex < clearGenerationIndex);
+  assert.ok(clearGenerationIndex < clearResetIndex);
 });
 
 test('BLE base64 codec keeps JSON payload bytes stable at the API boundary', () => {
@@ -363,6 +421,16 @@ function indexOfRequired(source, pattern) {
 
   if (index < 0) {
     throw new Error(`Pattern was not found: ${pattern}`);
+  }
+
+  return index;
+}
+
+function indexOfRequiredAfter(source, pattern, afterIndex) {
+  const index = source.indexOf(pattern, afterIndex);
+
+  if (index < 0) {
+    throw new Error(`Pattern was not found after ${afterIndex}: ${pattern}`);
   }
 
   return index;
@@ -513,4 +581,33 @@ function chunkByCharacters(payload, maxCharacters) {
   }
 
   return chunks;
+}
+
+function deviceEventChunkFrames(payload, id, maxCharacters) {
+  const chunks = chunkByCharacters(payload, maxCharacters);
+
+  return chunks.map((data, index) =>
+    JSON.stringify({
+      frame: 'device_event_chunk',
+      id,
+      index,
+      count: chunks.length,
+      data,
+    })
+  );
+}
+
+function twoDeviceEventChunkFrames(payload, id) {
+  const midpoint = Math.ceil(payload.length / 2);
+  const chunks = [payload.slice(0, midpoint), payload.slice(midpoint)];
+
+  return chunks.map((data, index) =>
+    JSON.stringify({
+      frame: 'device_event_chunk',
+      id,
+      index,
+      count: chunks.length,
+      data,
+    })
+  );
 }

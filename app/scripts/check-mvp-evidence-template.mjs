@@ -36,6 +36,8 @@ test('MVP evidence run template covers every required evidence field', () => {
   assert.match(markdown, /Notify subscription race/);
   assert.match(markdown, /ZE29 work mode 잔류/);
   assert.match(markdown, /ESP32 후보 serial port/);
+  assert.match(markdown, /실기기 preflight/);
+  assert.match(markdown, /pnpm mvp:hardware-preflight/);
   assert.match(markdown, /129\/109\/지역 센터/);
   assert.match(markdown, /반복 위험 샘플 개선 안내 캡처/);
 });

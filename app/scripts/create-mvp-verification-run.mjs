@@ -44,6 +44,7 @@ const highRiskEvidence = [
 
 const verificationCommands = [
   ['Git 기준', 'git status --short --branch'],
+  ['실기기 preflight', 'cd app && pnpm mvp:hardware-preflight'],
   ['앱 테스트', 'cd app && pnpm test && pnpm lint && pnpm exec tsc --noEmit'],
   ['앱 iOS 번들', 'cd app && pnpm exec expo export -p ios --no-minify --clear'],
   ['앱 web 번들', 'cd app && pnpm exec expo export -p web --no-minify --clear'],
@@ -271,7 +272,7 @@ export function assertCleanMainStatus(status) {
   );
 }
 
-function listSerialPorts() {
+export function listSerialPorts() {
   try {
     return readdirSync('/dev')
       .filter((name) => name.startsWith('cu.') || name.startsWith('tty.'))
@@ -282,7 +283,7 @@ function listSerialPorts() {
   }
 }
 
-function listLikelyEsp32SerialPorts() {
+export function listLikelyEsp32SerialPorts() {
   return listSerialPorts().filter((port) =>
     /(usbserial|usbmodem|SLAB_USBtoUART|wchusbserial|cu\.usb|tty\.usb)/i.test(port)
   );

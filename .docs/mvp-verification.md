@@ -195,6 +195,13 @@ cd app
 pnpm mvp:evidence-template
 ```
 
+검증을 마친 뒤에는 생성된 실행 기록을 아래 명령으로 검사한다.
+
+```sh
+cd app
+pnpm mvp:evidence-check -- ../.docs/mvp-runs/<run-file>.md
+```
+
 | 항목                    | 값  |
 | ----------------------- | --- |
 | Verification date/time  |     |

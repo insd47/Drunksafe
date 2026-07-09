@@ -138,7 +138,8 @@ impl GattServer {
                     let max_payload_bytes = conn
                         .mtu
                         .map(|mtu| mtu.saturating_sub(3) as usize)
-                        .unwrap_or(super::MAX_BLE_JSON_PAYLOAD_BYTES);
+                        .unwrap_or(super::MAX_BLE_JSON_PAYLOAD_BYTES)
+                        .min(super::MAX_BLE_JSON_PAYLOAD_BYTES);
 
                     (conn.conn_id, max_payload_bytes)
                 })
@@ -387,6 +388,10 @@ impl GattServer {
             let mut state = self.state.lock().unwrap();
 
             if !state.connections.iter().any(|conn| conn.peer == addr) {
+                if state.connections.is_empty() {
+                    state.phone_transport.reset();
+                }
+
                 state.connections.push(Connection {
                     peer: addr,
                     conn_id,
@@ -409,6 +414,10 @@ impl GattServer {
                 .position(|Connection { peer, .. }| *peer == addr)
             {
                 state.connections.swap_remove(index);
+            }
+
+            if state.connections.is_empty() {
+                state.phone_transport.reset();
             }
         }
 

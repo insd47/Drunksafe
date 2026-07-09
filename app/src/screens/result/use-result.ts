@@ -17,13 +17,16 @@ export default function useResult(): ResultViewModel {
   const ble = useBleSession();
   const initializeBle = ble.initialize;
   const [lookup, setLookup] = useState(emptyLookup);
-  const liveResult = ble.result?.session_id === id ? ble.result : null;
   const demoKind = demoKindFromId(id);
   const savedRecord = lookup.id === id ? lookup.record : null;
-  const liveRecord = useMemo(
-    () => (liveResult ? recordFromResult(liveResult) : null),
-    [liveResult]
+  const sessionRecord = useMemo(
+    () => (ble.result ? recordFromResult(ble.result) : null),
+    [ble.result]
   );
+  const liveRecord =
+    sessionRecord && (id === sessionRecord.id || id === sessionRecord.session_id)
+      ? sessionRecord
+      : null;
   const demoRecord = useMemo(
     () => (demoKind ? recordFromResult(createDemoResult(demoKind)) : null),
     [demoKind]
@@ -37,14 +40,14 @@ export default function useResult(): ResultViewModel {
         ? 'preview'
         : 'missing';
   const loadState: RecordLoadState =
-    liveResult || demoKind ? 'idle' : lookup.id === id ? lookup.state : 'loading';
+    liveRecord || demoKind ? 'idle' : lookup.id === id ? lookup.state : 'loading';
 
   useEffect(() => {
     initializeBle();
   }, [initializeBle]);
 
   useEffect(() => {
-    if (!id || liveResult || demoKind) return;
+    if (!id || liveRecord || demoKind) return;
 
     let active = true;
 
@@ -59,7 +62,7 @@ export default function useResult(): ResultViewModel {
     return () => {
       active = false;
     };
-  }, [demoKind, id, liveResult]);
+  }, [demoKind, id, liveRecord]);
 
   return {
     record,

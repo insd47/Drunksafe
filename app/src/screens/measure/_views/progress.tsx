@@ -52,7 +52,7 @@ const stepLabels: Record<MeasurementStep, string> = {
 };
 
 interface Props {
-  activeStep?: MeasurementStep;
+  activeStep: MeasurementStep | undefined;
 }
 
 type StepState = '완료' | '진행 중' | '대기';

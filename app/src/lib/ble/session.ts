@@ -1,11 +1,19 @@
 import { useSyncExternalStore } from 'react';
 
-import BleSessionStore from '@/lib/ble/session/store';
+import { DrunksafeBleClient } from '@/lib/ble/client';
+import { persistMeasurementResult } from '@/lib/ble/session/persistence';
+import { BleSessionStore } from '@/lib/ble/session/store';
+import { buildPhoneContext } from '@/lib/storage/profile';
 
 export type { BleMeasurementPhase } from '@/lib/ble/measurement-phase';
 export type { BleConnectionPhase, BleSessionSnapshot } from '@/lib/ble/session/state';
 
-export const bleSession = new BleSessionStore();
+export const bleSession = new BleSessionStore({
+  createClient: () => new DrunksafeBleClient(),
+  buildContext: buildPhoneContext,
+  persistResult: persistMeasurementResult,
+  now: Date.now,
+});
 
 export function useBleSession() {
   const snapshot = useSyncExternalStore(

@@ -9,6 +9,7 @@ import { parseDeviceEvent, protocolVersion, toPhoneCommandPayload } from '@/lib/
 import {
   DeviceEventFrameAssembler,
   maxBleTransportChunks,
+  maxPendingDeviceEventFrames,
   minimumChunkedBlePayloadBytes,
   serializePhoneCommandFrames,
 } from '@/lib/ble/transport';
@@ -25,6 +26,10 @@ const firmwareModelSource = readFileSync(
 );
 const firmwareTransportSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'ble', 'transport.rs'),
+  'utf8'
+);
+const firmwareGattSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'ble', 'gatt.rs'),
   'utf8'
 );
 const firmwareBleModSource = readFileSync(
@@ -149,7 +154,7 @@ test('firmware measurement progress plan covers every app-visible step in order'
 test('firmware runtime keeps context wait and final result messages ordered', () => {
   const order = [
     'ble::measurement_started(session_id.clone(), source, kind)',
-    'let context = ble.wait_for_context(&session_id)',
+    'let context = match ble.wait_for_context(&session_id)',
     'notify_progress(&ble, &session_id, MeasurementStep::Preparing)',
     'notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor)',
     'notify_progress(&ble, &session_id, MeasurementStep::WaitingBreath)',
@@ -164,6 +169,49 @@ test('firmware runtime keeps context wait and final result messages ordered', ()
   for (let index = 1; index < order.length; index += 1) {
     assert.ok(order[index] > order[index - 1]);
   }
+});
+
+test('firmware drains phone starts before giving the board button priority', () => {
+  const phoneStartIndex = indexOfRequired(firmwareMainSource, 'let phone_start = ble.poll_start()');
+  const boardStartIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'if trigger.pressed()',
+    phoneStartIndex
+  );
+
+  assert.ok(phoneStartIndex < boardStartIndex);
+  assert.ok(firmwareMainSource.includes('phone_start.map(|kind| (Source::Phone, kind))'));
+});
+
+test('firmware treats context cancellation as a normal return to home', () => {
+  const cancelledIndex = indexOfRequired(firmwareMainSource, 'SessionContext::Cancelled =>');
+  const cancelledHomeIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'screen.show(View::Home)',
+    cancelledIndex
+  );
+  const timeoutIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'SessionContext::TimedOut =>',
+    cancelledHomeIndex
+  );
+  const timeoutFailureIndex = indexOfRequiredAfter(
+    firmwareMainSource,
+    'screen.show(View::Failed)',
+    timeoutIndex
+  );
+
+  assert.ok(cancelledIndex < cancelledHomeIndex);
+  assert.ok(cancelledHomeIndex < timeoutIndex);
+  assert.ok(timeoutIndex < timeoutFailureIndex);
+});
+
+test('firmware sober-time input never falls below the raw alcohol reading', () => {
+  assert.match(
+    firmwareBleAnalysisSource,
+    /let sober_time_alcohol = upper_alcohol\.max\(alcohol_mg_l_x1000\);/
+  );
+  assert.match(firmwareBleAnalysisSource, /estimate_sober_time_minutes\(\s*sober_time_alcohol,/);
 });
 
 test('firmware measurement loop polls cancel while sensors are active', () => {
@@ -434,6 +482,83 @@ test('device event assembler reset drops stale chunks from reused firmware frame
   assembler.reset();
   assert.equal(assembler.accept(newFrames[1]), null);
   assert.equal(assembler.accept(newFrames[0]), newPayload);
+});
+
+test('firmware drops partial phone commands across disconnected clients', () => {
+  assert.match(
+    firmwareTransportSource,
+    /pub fn reset\(&mut self\) \{\s*self\.entries\.clear\(\);\s*\}/
+  );
+  assert.match(
+    firmwareGattSource,
+    /if state\.connections\.is_empty\(\) \{\s*state\.phone_transport\.reset\(\);\s*\}/
+  );
+  assert.match(
+    firmwareBleAnalysisSource,
+    /context\.and_then\(elimination_rate_mg_l_per_hour_x1000\)/
+  );
+  assert.match(
+    firmwareBleAnalysisSource,
+    /if elimination_rate_mg_l_per_hour_x1000\(context\)\.is_some\(\)/
+  );
+});
+
+test('firmware caps notify payloads to the shared BLE JSON limit', () => {
+  assert.match(
+    firmwareGattSource,
+    /\.unwrap_or\(super::MAX_BLE_JSON_PAYLOAD_BYTES\)\s*\.min\(super::MAX_BLE_JSON_PAYLOAD_BYTES\)/
+  );
+});
+
+test('device event assembler rejects conflicting duplicate chunks', () => {
+  const assembler = new DeviceEventFrameAssembler();
+  const first = JSON.stringify({
+    frame: 'device_event_chunk',
+    id: 'conflict',
+    index: 0,
+    count: 2,
+    data: '{',
+  });
+  const conflicting = JSON.stringify({
+    frame: 'device_event_chunk',
+    id: 'conflict',
+    index: 0,
+    count: 2,
+    data: '[',
+  });
+
+  assert.equal(assembler.accept(first), null);
+  assert.throws(() => assembler.accept(conflicting), /chunk data changed/);
+  assert.ok(firmwareTransportSource.includes('TransportError::ChunkDataChanged'));
+});
+
+test('device event assembler bounds incomplete frame sessions', () => {
+  const assembler = new DeviceEventFrameAssembler();
+
+  for (let index = 0; index <= maxPendingDeviceEventFrames; index += 1) {
+    assert.equal(
+      assembler.accept(
+        JSON.stringify({
+          frame: 'device_event_chunk',
+          id: `pending-${index}`,
+          index: 0,
+          count: 2,
+          data: `${index}`,
+        })
+      ),
+      null
+    );
+  }
+
+  const evictedTail = JSON.stringify({
+    frame: 'device_event_chunk',
+    id: 'pending-0',
+    index: 1,
+    count: 2,
+    data: 'tail',
+  });
+
+  assert.equal(assembler.accept(evictedTail), null);
 });
 
 test('app BLE client clears assembler state and ignores stale monitor callbacks', () => {

@@ -13,6 +13,7 @@ pub use model::{
     MeasurementProgress, MeasurementResult, MeasurementStarted, MeasurementStep, PhoneCommand,
     PhoneContext, Pulse, Risk, Source, StatusKind,
 };
+pub(crate) use session::SessionContext;
 #[allow(unused_imports)]
 pub use transport::{
     DeviceEventTransport, PhoneCommandTransport, TransportError, DEVICE_EVENT_CHARACTERISTIC_UUID,

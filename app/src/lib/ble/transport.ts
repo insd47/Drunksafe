@@ -7,6 +7,7 @@ const defaultChunkDataBytes = 64;
 const chunkFrameOverheadReserveBytes = 96;
 export const maxBleTransportChunks = 64;
 export const minimumChunkedBlePayloadBytes = 120;
+export const maxPendingDeviceEventFrames = 4;
 let nextFrameSequence = 0;
 
 type ChunkFrame = {
@@ -71,13 +72,16 @@ export class DeviceEventFrameAssembler {
       return payload;
     }
 
-    const entry = this.entries.get(value.id) ?? {
-      count: value.count,
-      chunks: new Array<string | undefined>(value.count).fill(undefined),
-    };
+    const entry = this.entries.get(value.id) ?? this.createEntry(value);
 
     if (entry.count !== value.count) {
       throw new Error('BLE chunk count changed during reassembly');
+    }
+
+    const current = entry.chunks[value.index];
+
+    if (current !== undefined && current !== value.data) {
+      throw new Error('BLE chunk data changed during reassembly');
     }
 
     entry.chunks[value.index] = value.data;
@@ -89,6 +93,18 @@ export class DeviceEventFrameAssembler {
 
     this.entries.delete(value.id);
     return entry.chunks.join('');
+  }
+
+  private createEntry(frame: ChunkFrame) {
+    if (this.entries.size >= maxPendingDeviceEventFrames) {
+      const oldest = this.entries.keys().next().value;
+      if (oldest !== undefined) this.entries.delete(oldest);
+    }
+
+    return {
+      count: frame.count,
+      chunks: new Array<string | undefined>(frame.count).fill(undefined),
+    };
   }
 }
 

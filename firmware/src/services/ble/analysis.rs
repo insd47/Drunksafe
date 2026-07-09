@@ -26,6 +26,7 @@ pub fn measurement_result(
     let bac_milli_percent = brac_to_bac_milli_percent(corrected_alcohol);
     let bac_upper_milli_percent =
         brac_to_bac_milli_percent(upper_alcohol).max(raw_bac_milli_percent);
+    let sober_time_alcohol = upper_alcohol.max(alcohol_mg_l_x1000);
     let risk = risk_from_upper_bac(bac_upper_milli_percent);
     let confidence_percent = confidence_percent(context, pulse_bpm);
 
@@ -45,7 +46,7 @@ pub fn measurement_result(
         bac_milli_percent: Some(bac_milli_percent),
         bac_upper_milli_percent: Some(bac_upper_milli_percent),
         sober_time_minutes: estimate_sober_time_minutes(
-            upper_alcohol,
+            sober_time_alcohol,
             bac_upper_milli_percent,
             context,
         ),
@@ -99,13 +100,8 @@ fn estimate_sober_time_minutes(
         return Some(0);
     }
 
-    if let Some(rate) = context.and_then(|context| context.elimination_mg_l_per_hour_x1000) {
-        if (MIN_CONTEXT_ELIMINATION_MG_L_PER_HOUR_X1000
-            ..=MAX_CONTEXT_ELIMINATION_MG_L_PER_HOUR_X1000)
-            .contains(&rate)
-        {
-            return Some(minutes_for_rate(upper_alcohol_mg_l_x1000, rate));
-        }
+    if let Some(rate) = context.and_then(elimination_rate_mg_l_per_hour_x1000) {
+        return Some(minutes_for_rate(upper_alcohol_mg_l_x1000, rate));
     }
 
     Some(minutes_for_rate(
@@ -146,7 +142,7 @@ fn confidence_percent(context: Option<&PhoneContext>, pulse_bpm: Option<u16>) ->
             confidence = confidence.saturating_add(5);
         }
 
-        if context.elimination_mg_l_per_hour_x1000.is_some() {
+        if elimination_rate_mg_l_per_hour_x1000(context).is_some() {
             confidence = confidence.saturating_add(10);
         }
 
@@ -168,6 +164,13 @@ fn confidence_percent(context: Option<&PhoneContext>, pulse_bpm: Option<u16>) ->
     }
 
     confidence.min(90)
+}
+
+fn elimination_rate_mg_l_per_hour_x1000(context: &PhoneContext) -> Option<u16> {
+    context.elimination_mg_l_per_hour_x1000.filter(|rate| {
+        (MIN_CONTEXT_ELIMINATION_MG_L_PER_HOUR_X1000..=MAX_CONTEXT_ELIMINATION_MG_L_PER_HOUR_X1000)
+            .contains(rate)
+    })
 }
 
 fn pulse_confidence_percent(context: Option<&PhoneContext>, pulse_bpm: u16) -> u8 {

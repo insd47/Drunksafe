@@ -1,7 +1,8 @@
 use error::Result;
 use esp_idf_svc::hal::task::block_on;
 use services::ble::{
-    self, BleService, ErrorCode, MeasurementKind, MeasurementStep, Source, StatusKind,
+    self, BleService, ErrorCode, MeasurementKind, MeasurementStep, SessionContext, Source,
+    StatusKind,
 };
 use services::measure::{MeasureRun, MeasureService};
 use services::screen::{ScreenService, View};
@@ -33,10 +34,11 @@ fn main() -> Result<()> {
     notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
 
     loop {
+        let phone_start = ble.poll_start();
         let start = if trigger.pressed() {
             Some((Source::BoardButton, MeasurementKind::Measurement))
         } else {
-            ble.poll_start().map(|kind| (Source::Phone, kind))
+            phone_start.map(|kind| (Source::Phone, kind))
         };
 
         if let Some((source, kind)) = start {
@@ -52,17 +54,27 @@ fn main() -> Result<()> {
                 ble::measurement_started(session_id.clone(), source, kind),
             );
 
-            let context = ble.wait_for_context(&session_id);
-
-            if let Some(error_code) = context.error_code() {
-                notify_ble(
-                    &ble,
-                    ble::device_error(Some(session_id.clone()), error_code),
-                );
-                notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
-                screen.show(View::Failed);
-                continue;
-            }
+            let context = match ble.wait_for_context(&session_id) {
+                SessionContext::Received(context) => context,
+                SessionContext::Cancelled => {
+                    notify_ble(
+                        &ble,
+                        ble::device_error(Some(session_id.clone()), ErrorCode::Cancelled),
+                    );
+                    notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
+                    screen.show(View::Home);
+                    continue;
+                }
+                SessionContext::TimedOut => {
+                    notify_ble(
+                        &ble,
+                        ble::device_error(Some(session_id.clone()), ErrorCode::ContextTimeout),
+                    );
+                    notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
+                    screen.show(View::Failed);
+                    continue;
+                }
+            };
 
             notify_progress(&ble, &session_id, MeasurementStep::Preparing);
             notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor);
@@ -83,7 +95,7 @@ fn main() -> Result<()> {
                             session_id.clone(),
                             kind,
                             measurement,
-                            context.as_ref(),
+                            Some(&context),
                         ),
                     );
                     notify_ble(

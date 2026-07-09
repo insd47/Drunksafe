@@ -24,6 +24,8 @@ pub enum TransportError {
     Json(#[from] serde_json::Error),
     #[error("BLE chunk count changed during reassembly")]
     ChunkCountChanged,
+    #[error("BLE chunk data changed during reassembly")]
+    ChunkDataChanged,
     #[error("BLE transport frame exceeds configured payload size")]
     FrameTooLarge,
 }
@@ -59,6 +61,10 @@ impl PhoneCommandTransport {
         Self::default()
     }
 
+    pub fn reset(&mut self) {
+        self.entries.clear();
+    }
+
     pub fn accept(&mut self, value: &[u8]) -> Result<Option<PhoneCommand>, TransportError> {
         let payload = std::str::from_utf8(value)?;
 
@@ -92,6 +98,12 @@ impl PhoneCommandTransport {
 
         if entry.count != frame.count {
             return Err(TransportError::ChunkCountChanged);
+        }
+
+        if let Some(current) = &entry.chunks[frame.index] {
+            if current != &frame.data {
+                return Err(TransportError::ChunkDataChanged);
+            }
         }
 
         entry.chunks[frame.index] = Some(frame.data);

@@ -1,4 +1,4 @@
-import { DrunksafeBleClient, type DrunksafeBleDevice } from '@/lib/ble/client';
+import type { DrunksafeBleClient, DrunksafeBleDevice } from '@/lib/ble/client';
 import {
   notifySubscriptionReadyTimeoutMs,
   notifySubscriptionTimeoutMessage,
@@ -6,22 +6,31 @@ import {
 import type { DeviceEvent, PhoneCommand } from '@/lib/ble/model';
 
 export default class BleConnection {
-  private client: DrunksafeBleClient | null = null;
+  private client: BleClient | null = null;
+  private generation = 0;
+  private deviceConnected = false;
   private stateSubscription: Removable | null = null;
   private eventSubscription: Removable | null = null;
   private pendingDevice: DrunksafeBleDevice | null = null;
   private notifyReadyTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private readonly callbacks: ConnectionCallbacks) {}
+  constructor(
+    private readonly createClient: BleClientFactory,
+    private readonly callbacks: ConnectionCallbacks
+  ) {}
 
-  get available() {
+  get initialized() {
     return this.client !== null;
+  }
+
+  get connected() {
+    return this.deviceConnected;
   }
 
   initialize() {
     if (this.client) return;
 
-    this.client = new DrunksafeBleClient();
+    this.client = this.createClient();
     this.client
       .state()
       .then((state) => this.callbacks.onState(String(state)))
@@ -47,29 +56,49 @@ export default class BleConnection {
   async connect(deviceId: string, onPending: (device: DrunksafeBleDevice) => void) {
     if (!this.client) throw new Error('Drunksafe BLE is not initialized');
 
+    const generation = ++this.generation;
     this.clearNotifyReadyWait();
-    const device = await this.client.connect(deviceId);
-
     this.clearEventMonitor();
-    this.pendingDevice = device;
-    onPending(device);
-    this.eventSubscription = this.client.monitorEvents(
-      (event) => void this.callbacks.onEvent(event),
-      this.callbacks.onError
-    );
-    this.scheduleNotifyReadyTimeout(device.id);
+    this.deviceConnected = false;
 
-    return device;
+    try {
+      const device = await this.client.connect(deviceId);
+
+      if (generation !== this.generation) {
+        throw new BleConnectionCancelledError();
+      }
+
+      this.deviceConnected = true;
+      this.pendingDevice = device;
+      onPending(device);
+      this.eventSubscription = this.client.monitorEvents(
+        (event) => void this.callbacks.onEvent(event),
+        this.callbacks.onError
+      );
+      this.scheduleNotifyReadyTimeout(device.id);
+
+      return device;
+    } catch (error) {
+      this.deviceConnected = false;
+      await this.client.disconnect().catch(() => {});
+      throw generation === this.generation ? error : new BleConnectionCancelledError();
+    }
   }
 
   async disconnect() {
+    this.generation += 1;
     this.clearNotifyReadyWait();
     this.clearEventMonitor();
+    this.deviceConnected = false;
+    await this.client?.stopScan().catch(() => {});
     await this.client?.disconnect();
   }
 
   async send(command: PhoneCommand) {
-    if (!this.client) throw new Error('Drunksafe BLE device is not connected');
+    if (!this.client || !this.deviceConnected) {
+      throw new Error('Drunksafe BLE device is not connected');
+    }
+
     await this.client.send(command);
   }
 
@@ -91,6 +120,7 @@ export default class BleConnection {
   }
 
   async destroy() {
+    this.generation += 1;
     this.clearNotifyReadyWait();
     this.clearEventMonitor();
     this.stateSubscription?.remove();
@@ -98,6 +128,7 @@ export default class BleConnection {
 
     if (this.client) await this.client.destroy().catch(() => {});
     this.client = null;
+    this.deviceConnected = false;
   }
 
   private scheduleNotifyReadyTimeout(deviceId: string) {
@@ -125,4 +156,26 @@ interface ConnectionCallbacks {
 
 interface Removable {
   remove: () => void;
+}
+
+export type BleClient = Pick<
+  DrunksafeBleClient,
+  | 'state'
+  | 'onStateChange'
+  | 'startScan'
+  | 'stopScan'
+  | 'connect'
+  | 'disconnect'
+  | 'monitorEvents'
+  | 'send'
+  | 'destroy'
+>;
+
+export type BleClientFactory = () => BleClient;
+
+export class BleConnectionCancelledError extends Error {
+  constructor() {
+    super('BLE connection was cancelled');
+    this.name = 'BleConnectionCancelledError';
+  }
 }

@@ -22,13 +22,17 @@ export default function ConnectScreen() {
   const summary = useConnectionSummary();
   const contextReady = summary.baselineReady || summary.profileReady;
   const startBlocker = measurementStartBlocker({
-    connected: Boolean(ble.connectedDevice),
+    connected: Boolean(ble.connectedDevice && ble.connectionPhase === 'connected'),
     activeMeasurement: hasActiveMeasurement(ble),
     contextReady,
     mockMode: ble.mockMode,
   });
   const scanDisabled =
-    ble.mockMode || ble.connectionPhase === 'connecting' || !canRequestBleScan(ble.bluetoothState);
+    ble.mockMode ||
+    Boolean(ble.connectedDevice) ||
+    ble.connectionPhase === 'connecting' ||
+    hasActiveMeasurement(ble) ||
+    !canRequestBleScan(ble.bluetoothState);
 
   useEffect(() => {
     initializeBle();
@@ -47,7 +51,7 @@ export default function ConnectScreen() {
     if (startBlocker) return;
 
     void ble.startMeasurement();
-    router.push(`/measure/${ble.activeSessionId ?? 'live'}`);
+    router.push('/measure/live');
   };
 
   return (

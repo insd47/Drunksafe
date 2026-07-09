@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use embassy_time::{Duration as EmbassyDuration, Timer};
 
-use super::{BleService, ErrorCode, MeasurementKind, PhoneCommand, PhoneContext};
+use super::{BleService, MeasurementKind, PhoneCommand, PhoneContext};
 
 const CONTEXT_WAIT: Duration = Duration::from_secs(5);
 const COMMAND_POLL: Duration = Duration::from_millis(20);
@@ -12,23 +12,6 @@ pub(crate) enum SessionContext {
     Received(PhoneContext),
     Cancelled,
     TimedOut,
-}
-
-impl SessionContext {
-    pub fn as_ref(&self) -> Option<&PhoneContext> {
-        match self {
-            Self::Received(context) => Some(context),
-            Self::Cancelled | Self::TimedOut => None,
-        }
-    }
-
-    pub const fn error_code(&self) -> Option<ErrorCode> {
-        match self {
-            Self::Received(_) => None,
-            Self::Cancelled => Some(ErrorCode::Cancelled),
-            Self::TimedOut => Some(ErrorCode::ContextTimeout),
-        }
-    }
 }
 
 impl BleService {

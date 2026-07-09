@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { isProfileComplete } from '@/lib/personalization/profile-context';
-import { latestMeasurement, readHistory, type MeasurementRecord } from '@/lib/storage/history';
-import { emptyBaseline, emptyProfile, readBaseline, readProfile } from '@/lib/storage/profile';
+import { readHistory, type MeasurementRecord } from '@/lib/storage/history';
+import { readBaseline, readProfile } from '@/lib/storage/profile';
 
 const emptySummary: ConnectionSummary = {
   baselineReady: false,
@@ -20,28 +20,22 @@ export default function useConnectionSummary() {
     useCallback(() => {
       let active = true;
 
-      Promise.all([readProfile(), readBaseline(), readHistory(), latestMeasurement()])
-        .then(([profile, baseline, history, latest]) => {
+      Promise.all([readProfile(), readBaseline(), readHistory()])
+        .then(([profile, baseline, history]) => {
           if (!active) return;
 
           setSummary({
             baselineReady: baseline.sample_count > 0,
             profileReady: isProfileComplete(profile),
             recentCount: history.filter((record) => record.kind === 'measurement').length,
-            latest,
+            latest: history.find((record) => record.kind === 'measurement') ?? null,
             failed: false,
           });
         })
         .catch(() => {
           if (!active) return;
 
-          setSummary({
-            baselineReady: emptyBaseline.sample_count > 0,
-            profileReady: Boolean(emptyProfile.sex),
-            recentCount: 0,
-            latest: null,
-            failed: true,
-          });
+          setSummary({ ...emptySummary, failed: true });
         });
 
       return () => {

@@ -5,9 +5,14 @@ import ActionButton from '@/components/action-button';
 import ActionLink from '@/components/action-link';
 import Screen from '@/components/screen';
 import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
-import { resolveMeasureRoute, shouldShowResultPreview } from '@/lib/ble/measure-route';
+import {
+  resolveMeasureKind,
+  resolveMeasureRoute,
+  shouldShowResultPreview,
+} from '@/lib/ble/measure-route';
 import { useBleSession } from '@/lib/ble/session';
 import { measurementStartBlocker } from '@/lib/ble/start-readiness';
+import { recordFromResult } from '@/lib/storage/history';
 import ProgressSection from '@/screens/measure/_views/progress';
 import SessionSection from '@/screens/measure/_views/session';
 import useContextReadiness from '@/screens/measure/use-context-readiness';
@@ -17,7 +22,6 @@ export default function MeasureScreen() {
   const ble = useBleSession();
   const initializeBle = ble.initialize;
   const context = useContextReadiness();
-  const baseline = sessionId === 'baseline';
   const route = resolveMeasureRoute({
     routeSessionId: sessionId,
     activeMeasurementKind: ble.activeMeasurementKind,
@@ -26,14 +30,14 @@ export default function MeasureScreen() {
     result: ble.result,
   });
   const active = hasActiveMeasurement(ble);
-  const nextKind =
-    ble.measurementPhase === 'error'
-      ? ble.activeMeasurementKind
-      : baseline
-        ? 'baseline'
-        : 'measurement';
+  const nextKind = resolveMeasureKind({
+    routeSessionId: sessionId,
+    activeSessionId: ble.activeSessionId,
+    activeMeasurementKind: ble.activeMeasurementKind,
+  });
+  const baseline = nextKind === 'baseline';
   const blocker = measurementStartBlocker({
-    connected: Boolean(ble.connectedDevice),
+    connected: Boolean(ble.connectedDevice && ble.connectionPhase === 'connected'),
     activeMeasurement: active,
     contextReady: nextKind === 'baseline' || context.ready,
     mockMode: ble.mockMode,
@@ -43,7 +47,7 @@ export default function MeasureScreen() {
     (ble.measurementPhase === 'idle' || ble.measurementPhase === 'error');
   const canCancel = Boolean(ble.connectedDevice && ble.activeSessionId && active);
   const resultHref = route.result
-    ? `/results/${route.result.session_id}`
+    ? `/results/${recordFromResult(route.result).id}`
     : baseline
       ? '/results/baseline-demo'
       : '/results/demo-result';

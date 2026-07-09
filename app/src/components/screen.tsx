@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { ScrollView, View } from 'react-native';
 
-export function Screen({ children }: Props) {
+export default function Screen({ children }: Props) {
   return (
     <View className="flex-1 bg-white">
       <ScrollView className="flex-1" contentInsetAdjustmentBehavior="automatic">

@@ -18,11 +18,29 @@ import {
 } from '@/lib/ble/verification-log';
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const sessionSource = readFileSync(join(appDir, 'src', 'lib', 'ble', 'session.ts'), 'utf8');
-const connectScreenSource = readFileSync(
-  join(appDir, 'src', 'screens', 'connect', 'index.tsx'),
+const sessionStoreSource = readFileSync(
+  join(appDir, 'src', 'lib', 'ble', 'session', 'store.ts'),
   'utf8'
 );
+const connectionSource = readFileSync(
+  join(appDir, 'src', 'lib', 'ble', 'session', 'connection.ts'),
+  'utf8'
+);
+const sessionSource = [
+  join(appDir, 'src', 'lib', 'ble', 'session.ts'),
+  join(appDir, 'src', 'lib', 'ble', 'session', 'state.ts'),
+  join(appDir, 'src', 'lib', 'ble', 'session', 'store.ts'),
+  join(appDir, 'src', 'lib', 'ble', 'session', 'event-handler.ts'),
+  join(appDir, 'src', 'lib', 'ble', 'session', 'verification.ts'),
+]
+  .map((path) => readFileSync(path, 'utf8'))
+  .join('\n');
+const connectScreenSource = [
+  join(appDir, 'src', 'screens', 'connect', 'index.tsx'),
+  join(appDir, 'src', 'screens', 'connect', '_views', 'evidence.tsx'),
+]
+  .map((path) => readFileSync(path, 'utf8'))
+  .join('\n');
 
 test('verification log keeps the newest bounded timeline with stable keys', () => {
   let entries = [];
@@ -348,15 +366,20 @@ test('BLE session and connect screen expose the verification timeline', () => {
 });
 
 test('real BLE commands are logged only after the write succeeds', () => {
-  const sendCommandSource = sessionSource.match(
+  const sendCommandSource = sessionStoreSource.match(
     /private async sendCommand\(command: PhoneCommand\) \{[\s\S]*?\n  \}/
+  )?.[0];
+  const connectionSendSource = connectionSource.match(
+    /async send\(command: PhoneCommand\) \{[\s\S]*?\n  \}/
   )?.[0];
 
   assert.ok(sendCommandSource);
-  assert.match(sendCommandSource, /await this\.client\.send\(command\);/);
+  assert.ok(connectionSendSource);
+  assert.match(connectionSendSource, /await this\.client\.send\(command\);/);
+  assert.match(sendCommandSource, /await this\.connection\.send\(command\);/);
   assert.match(sendCommandSource, /this\.logCommand\(command\);/);
   assert.ok(
-    sendCommandSource.indexOf('await this.client.send(command);') <
+    sendCommandSource.indexOf('await this.connection.send(command);') <
       sendCommandSource.indexOf('this.logCommand(command);')
   );
 });

@@ -1,4 +1,4 @@
-import { ResultScreen } from '@/screens/result';
+import ResultScreen from '@/screens/result';
 
 export default function ResultRoute() {
   return <ResultScreen />;

@@ -6,7 +6,7 @@ import {
 } from '@/lib/ble/android-permissions';
 
 export async function ensureDrunksafeBlePermissions() {
-  if (Platform.OS !== 'android') {
+  if (process.env.EXPO_OS !== 'android') {
     return;
   }
 

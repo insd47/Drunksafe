@@ -1,6 +1,7 @@
 mod analysis;
 mod gatt;
 mod model;
+mod session;
 #[allow(dead_code)]
 mod transport;
 
@@ -47,12 +48,12 @@ pub fn measurement_started(
 }
 
 #[allow(dead_code)]
-pub fn measurement_progress(session_id: String, step: MeasurementStep, percent: u8) -> DeviceEvent {
+pub fn measurement_progress(session_id: String, step: MeasurementStep) -> DeviceEvent {
     DeviceEvent::MeasurementProgress(MeasurementProgress {
         v: model::PROTOCOL_VERSION,
         session_id,
         step,
-        percent: percent.min(100),
+        percent: progress_percent(step),
     })
 }
 
@@ -74,4 +75,20 @@ pub fn device_error(session_id: Option<String>, code: ErrorCode) -> DeviceEvent 
         session_id,
         code,
     })
+}
+
+pub fn error_code(error: &crate::error::Error) -> ErrorCode {
+    match error {
+        crate::error::Error::AlcoholDevice(_) => ErrorCode::AlcoholSensor,
+        crate::error::Error::PulseDevice(_) => ErrorCode::PulseSensor,
+        crate::error::Error::Timeout(_) => ErrorCode::MeasurementTimeout,
+        crate::error::Error::Esp(_) => ErrorCode::Protocol,
+    }
+}
+
+fn progress_percent(step: MeasurementStep) -> u8 {
+    MEASUREMENT_PROGRESS_PLAN
+        .iter()
+        .find_map(|(candidate, percent)| (*candidate == step).then_some(*percent))
+        .unwrap_or_default()
 }

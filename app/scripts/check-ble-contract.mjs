@@ -31,6 +31,10 @@ const firmwareBleModSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'ble', 'mod.rs'),
   'utf8'
 );
+const firmwareBleSessionSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'ble', 'session.rs'),
+  'utf8'
+);
 const firmwareMainSource = readFileSync(join(repoDir, 'firmware', 'src', 'main.rs'), 'utf8');
 const firmwareMeasureModSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'measure', 'mod.rs'),
@@ -145,7 +149,7 @@ test('firmware measurement progress plan covers every app-visible step in order'
 test('firmware runtime keeps context wait and final result messages ordered', () => {
   const order = [
     'ble::measurement_started(session_id.clone(), source, kind)',
-    'let context = wait_for_context(&ble, &session_id)',
+    'let context = ble.wait_for_context(&session_id)',
     'notify_progress(&ble, &session_id, MeasurementStep::Preparing)',
     'notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor)',
     'notify_progress(&ble, &session_id, MeasurementStep::WaitingBreath)',
@@ -165,7 +169,7 @@ test('firmware runtime keeps context wait and final result messages ordered', ()
 test('firmware measurement loop polls cancel while sensors are active', () => {
   const runUntilCancelledIndex = indexOfRequired(
     firmwareMainSource,
-    'measure.run_until_cancelled(wait_for_measurement_cancel(&ble, &session_id))'
+    'measure.run_until_cancelled(ble.wait_for_cancel(&session_id))'
   );
   const cancelledBranchIndex = indexOfRequiredAfter(
     firmwareMainSource,
@@ -194,17 +198,17 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   }
 
   const cancelFutureIndex = indexOfRequired(
-    firmwareMainSource,
-    'async fn wait_for_measurement_cancel'
+    firmwareBleSessionSource,
+    'pub(crate) async fn wait_for_cancel'
   );
   const cancelDrainIndex = indexOfRequiredAfter(
-    firmwareMainSource,
-    'measurement_cancel_requested(ble, session_id)',
+    firmwareBleSessionSource,
+    'self.cancel_requested(session_id)',
     cancelFutureIndex
   );
   const cancelSleepIndex = indexOfRequiredAfter(
-    firmwareMainSource,
-    'Timer::after(MEASUREMENT_CANCEL_POLL).await',
+    firmwareBleSessionSource,
+    'Timer::after(CANCEL_POLL).await',
     cancelDrainIndex
   );
   assert.ok(cancelFutureIndex < cancelDrainIndex);

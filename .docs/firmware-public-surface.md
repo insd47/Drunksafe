@@ -9,7 +9,8 @@
 
 - `main() -> crate::error::Result<()>`
   - logger와 보드 디바이스를 초기화하고 runtime loop를 시작한다.
-  - 현재 runtime loop는 측정 버튼을 감지해 pulse/alcohol 측정을 실행하고, OLED에 측정 중/결과/오류 화면을 표시한다.
+  - 보드 버튼과 앱의 BLE 시작 명령을 함께 감지한다.
+  - 세션 순번, context 대기, 측정, 결과 전송 순서를 직접 소유하고 OLED 상태를 갱신한다.
 
 ## Devices
 
@@ -22,6 +23,7 @@
   - `alcohol`: ZE29용 `AlcoholDevice`.
   - `pulse`: 아날로그 PPG용 `PulseDevice`.
   - `display`: SH1106 OLED용 `DisplayDevice`.
+  - `modem`: BLE GATT server가 소유할 ESP32 modem handle.
 
 현재 배선은 다음과 같다.
 
@@ -80,7 +82,7 @@
   - I2C0/GPIO21/GPIO22로 SH1106 128x64 OLED를 초기화한다.
 - `display.clear() -> core::result::Result<(), EspError>`
   - 128x64 frame buffer를 비우고 OLED로 전송한다.
-- `features::screen::show(display, view)`
+- `services::screen::ScreenService::show(view)`
   - `Home`, `Measuring`, `Failed`, `Result` 화면을 표시하고 실패 시 warning log를 남긴다.
 
 ## BLE
@@ -91,6 +93,13 @@
   - 보드 또는 앱에서 시작된 측정 세션 이벤트 DTO를 만든다.
 
 BLE model은 app과 firmware 사이의 JSON payload 계약이다.
+
+- `BleService::poll_start()`
+  - idle loop에서 앱의 측정 시작 명령을 꺼낸다.
+- `BleService::wait_for_context(session_id)`
+  - 활성 세션의 context 또는 cancel을 기다리고 timeout을 구분한다.
+- `BleService::wait_for_cancel(session_id)`
+  - 센서 측정 future와 함께 실행할 cancel future를 제공한다.
 
 - `DeviceEvent`
   - `Status`: 장치 상태.

@@ -119,7 +119,8 @@ fn minutes_for_rate(amount: u16, rate_per_hour: u16) -> u16 {
         return u16::MAX;
     }
 
-    ((u32::from(amount) * 60 + u32::from(rate_per_hour) - 1) / u32::from(rate_per_hour))
+    (u32::from(amount) * 60)
+        .div_ceil(u32::from(rate_per_hour))
         .min(u32::from(u16::MAX)) as u16
 }
 

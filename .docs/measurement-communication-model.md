@@ -109,7 +109,7 @@ SOLID 관점:
 
 공개 액션:
 
-- `ble::measurement_started(session_id, source, kind)`: 보드 또는 앱에서 시작된 측정 세션 이벤트 DTO를 만든다.
+- `ble::event::started(session_id, source, kind)`: 보드 또는 앱에서 시작된 측정 세션 이벤트 DTO를 만든다.
 
 GATT transport 계약:
 

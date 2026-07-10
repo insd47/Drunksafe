@@ -28,19 +28,23 @@ const firmwareTransportSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'ble', 'transport.rs'),
   'utf8'
 );
-const firmwareGattSource = readFileSync(
-  join(repoDir, 'firmware', 'src', 'services', 'ble', 'gatt.rs'),
-  'utf8'
-);
+const firmwareGattSource = ['server.rs', 'connections.rs', 'connection.rs']
+  .map((file) =>
+    readFileSync(join(repoDir, 'firmware', 'src', 'services', 'ble', 'gatt', file), 'utf8')
+  )
+  .join('\n');
 const firmwareBleModSource = readFileSync(
-  join(repoDir, 'firmware', 'src', 'services', 'ble', 'mod.rs'),
+  join(repoDir, 'firmware', 'src', 'services', 'ble', 'event.rs'),
   'utf8'
 );
 const firmwareBleSessionSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'ble', 'session.rs'),
   'utf8'
 );
-const firmwareMainSource = readFileSync(join(repoDir, 'firmware', 'src', 'main.rs'), 'utf8');
+const firmwareMainSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'application.rs'),
+  'utf8'
+);
 const firmwareMeasureModSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'measure', 'mod.rs'),
   'utf8'
@@ -53,10 +57,11 @@ const firmwareMeasureRunSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'measure', 'run.rs'),
   'utf8'
 );
-const firmwareBleAnalysisSource = readFileSync(
-  join(repoDir, 'firmware', 'src', 'services', 'ble', 'analysis.rs'),
-  'utf8'
-);
+const firmwareBleAnalysisSource = ['mod.rs', 'alcohol.rs', 'confidence.rs', 'sober.rs']
+  .map((file) =>
+    readFileSync(join(repoDir, 'firmware', 'src', 'services', 'ble', 'analysis', file), 'utf8')
+  )
+  .join('\n');
 const firmwareScreenRenderSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'screen', 'render.rs'),
   'utf8'
@@ -137,7 +142,7 @@ test('firmware serde enum names match the contract fixture', () => {
 });
 
 test('firmware measurement progress plan covers every app-visible step in order', () => {
-  const plan = readRustProgressPlan(firmwareBleModSource, 'MEASUREMENT_PROGRESS_PLAN');
+  const plan = readRustProgressPlan(firmwareBleModSource, 'PROGRESS');
 
   assert.deepEqual(
     plan.map((item) => item.step),
@@ -153,17 +158,17 @@ test('firmware measurement progress plan covers every app-visible step in order'
 
 test('firmware runtime keeps context wait and final result messages ordered', () => {
   const order = [
-    'ble::measurement_started(session_id.clone(), source, kind)',
-    'let context = match ble.wait_for_context(&session_id)',
-    'notify_progress(&ble, &session_id, MeasurementStep::Preparing)',
-    'notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor)',
-    'notify_progress(&ble, &session_id, MeasurementStep::WaitingBreath)',
-    'notify_progress(&ble, &session_id, MeasurementStep::SamplingBreath)',
-    'notify_progress(&ble, &session_id, MeasurementStep::SamplingPulse)',
-    'notify_progress(&ble, &session_id, MeasurementStep::Analyzing)',
-    'notify_progress(&ble, &session_id, MeasurementStep::Done)',
-    'ble::measurement_result(',
-    'ble::device_status(StatusKind::ResultReady, Some(session_id))',
+    'event::started(session_id.clone(), source, kind)',
+    'let context = match session::context(&self.ble, &session_id)',
+    'MeasurementStep::Preparing',
+    'MeasurementStep::WarmingSensor',
+    'MeasurementStep::WaitingBreath',
+    'MeasurementStep::SamplingBreath',
+    'MeasurementStep::SamplingPulse',
+    'MeasurementStep::Analyzing',
+    'MeasurementStep::Done',
+    'analysis::result(',
+    'StatusKind::ResultReady',
   ].map((pattern) => indexOfRequired(firmwareMainSource, pattern));
 
   for (let index = 1; index < order.length; index += 1) {
@@ -172,32 +177,28 @@ test('firmware runtime keeps context wait and final result messages ordered', ()
 });
 
 test('firmware drains phone starts before giving the board button priority', () => {
-  const phoneStartIndex = indexOfRequired(firmwareMainSource, 'let phone_start = ble.poll_start()');
+  const phoneStartIndex = indexOfRequired(firmwareMainSource, 'let phone = session::start(&self.ble)');
   const boardStartIndex = indexOfRequiredAfter(
     firmwareMainSource,
-    'if trigger.pressed()',
+    'if self.trigger.pressed()',
     phoneStartIndex
   );
 
   assert.ok(phoneStartIndex < boardStartIndex);
-  assert.ok(firmwareMainSource.includes('phone_start.map(|kind| (Source::Phone, kind))'));
+  assert.ok(firmwareMainSource.includes('phone.map(|kind| (Source::Phone, kind))'));
 });
 
 test('firmware treats context cancellation as a normal return to home', () => {
-  const cancelledIndex = indexOfRequired(firmwareMainSource, 'SessionContext::Cancelled =>');
+  const cancelledIndex = indexOfRequired(firmwareMainSource, 'code == ErrorCode::Cancelled');
   const cancelledHomeIndex = indexOfRequiredAfter(
     firmwareMainSource,
-    'screen.show(View::Home)',
+    'View::Home',
     cancelledIndex
   );
-  const timeoutIndex = indexOfRequiredAfter(
-    firmwareMainSource,
-    'SessionContext::TimedOut =>',
-    cancelledHomeIndex
-  );
+  const timeoutIndex = indexOfRequiredAfter(firmwareMainSource, 'else {', cancelledHomeIndex);
   const timeoutFailureIndex = indexOfRequiredAfter(
     firmwareMainSource,
-    'screen.show(View::Failed)',
+    'View::Failed',
     timeoutIndex
   );
 
@@ -209,15 +210,15 @@ test('firmware treats context cancellation as a normal return to home', () => {
 test('firmware sober-time input never falls below the raw alcohol reading', () => {
   assert.match(
     firmwareBleAnalysisSource,
-    /let sober_time_alcohol = upper_alcohol\.max\(alcohol_mg_l_x1000\);/
+    /sober::time\(upper\.max\(raw\), upper_bac, context\)/
   );
-  assert.match(firmwareBleAnalysisSource, /estimate_sober_time_minutes\(\s*sober_time_alcohol,/);
+  assert.match(firmwareBleAnalysisSource, /pub fn time\(alcohol: u16, bac: u16,/);
 });
 
 test('firmware measurement loop polls cancel while sensors are active', () => {
   const runUntilCancelledIndex = indexOfRequired(
     firmwareMainSource,
-    'measure.run_until_cancelled(ble.wait_for_cancel(&session_id))'
+    '.run_until_cancelled(session::cancel(&self.ble, &session_id))'
   );
   const cancelledBranchIndex = indexOfRequiredAfter(
     firmwareMainSource,
@@ -226,12 +227,12 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   );
   const cancelledErrorIndex = indexOfRequiredAfter(
     firmwareMainSource,
-    'ble::device_error(Some(session_id.clone()), ErrorCode::Cancelled)',
+    'event::error(Some(session_id.clone()), ErrorCode::Cancelled)',
     cancelledBranchIndex
   );
   const idleStatusIndex = indexOfRequiredAfter(
     firmwareMainSource,
-    'ble::device_status(StatusKind::Idle, None)',
+    'event::status(StatusKind::Idle, None)',
     cancelledErrorIndex
   );
   const mainOrder = [
@@ -247,11 +248,11 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
 
   const cancelFutureIndex = indexOfRequired(
     firmwareBleSessionSource,
-    'pub(crate) async fn wait_for_cancel'
+    'pub async fn cancel'
   );
   const cancelDrainIndex = indexOfRequiredAfter(
     firmwareBleSessionSource,
-    'self.cancel_requested(session_id)',
+    'if requested(ble, session)',
     cancelFutureIndex
   );
   const cancelSleepIndex = indexOfRequiredAfter(
@@ -352,7 +353,7 @@ test('firmware alcohol result can complete when pulse is unavailable', () => {
   assert.ok(firmwareMeasureModSource.includes('continuing with alcohol result'));
   assert.ok(firmwareMeasureModSource.includes('Ok(Measurement::new(alcohol, pulse))'));
   assert.equal(firmwareMeasureModSource.includes('Measurement::new(alcohol?, pulse?)'), false);
-  assert.ok(firmwareBleAnalysisSource.includes('pulse: pulse_bpm.map'));
+  assert.ok(firmwareBleAnalysisSource.includes('pulse: pulse.map'));
   assert.ok(firmwareScreenRenderSource.includes('format_args!("BPM --")'));
 });
 
@@ -487,22 +488,22 @@ test('firmware drops partial phone commands across disconnected clients', () => 
   );
   assert.match(
     firmwareGattSource,
-    /if state\.connections\.is_empty\(\) \{\s*state\.phone_transport\.reset\(\);\s*\}/
+    /if self\.connections\.remove\(peer\) \{\s*self\.phone\.lock\(\)\.unwrap\(\)\.reset\(\);\s*\}/
   );
   assert.match(
     firmwareBleAnalysisSource,
-    /context\.and_then\(elimination_rate_mg_l_per_hour_x1000\)/
+    /context\.and_then\(rate\)/
   );
   assert.match(
     firmwareBleAnalysisSource,
-    /if elimination_rate_mg_l_per_hour_x1000\(context\)\.is_some\(\)/
+    /if sober::rate\(context\)\.is_some\(\)/
   );
 });
 
 test('firmware caps notify payloads to the shared BLE JSON limit', () => {
   assert.match(
     firmwareGattSource,
-    /\.unwrap_or\(super::MAX_BLE_JSON_PAYLOAD_BYTES\)\s*\.min\(super::MAX_BLE_JSON_PAYLOAD_BYTES\)/
+    /\.unwrap_or\(MAX_BLE_JSON_PAYLOAD_BYTES\)\s*\.min\(MAX_BLE_JSON_PAYLOAD_BYTES\)/
   );
 });
 

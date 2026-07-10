@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
 
-use super::{DeviceEvent, PhoneCommand};
+use super::model::{DeviceEvent, PhoneCommand};
 
 pub const SERVICE_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12201;
 pub const DEVICE_EVENT_CHARACTERISTIC_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12202;
@@ -135,11 +135,7 @@ impl DeviceEventTransport {
         Self { next_frame_id: 0 }
     }
 
-    pub fn frames(&mut self, event: &DeviceEvent) -> Result<Vec<String>, TransportError> {
-        self.frames_with_max_payload_bytes(event, MAX_BLE_JSON_PAYLOAD_BYTES)
-    }
-
-    pub fn frames_with_max_payload_bytes(
+    pub fn frames(
         &mut self,
         event: &DeviceEvent,
         max_payload_bytes: usize,

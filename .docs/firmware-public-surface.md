@@ -5,10 +5,11 @@
 
 ## Runtime
 
-위치: `firmware/src/main.rs`
+위치: `firmware/src/main.rs`, `firmware/src/application.rs`
 
 - `main() -> crate::error::Result<()>`
-  - logger와 보드 디바이스를 초기화하고 runtime loop를 시작한다.
+  - logger와 보드 디바이스를 초기화하고 `Application`을 시작한다.
+- `Application::run()`
   - 보드 버튼과 앱의 BLE 시작 명령을 함께 감지한다.
   - 세션 순번, context 대기, 측정, 결과 전송 순서를 직접 소유하고 OLED 상태를 갱신한다.
 
@@ -54,9 +55,11 @@
   - ZE29 `0x86` read test results 명령으로 현재 알코올 측정값을 읽는다.
 - `device.status() -> alcohol device Result<Status>`
   - ZE29 `0x85` query module status 명령으로 모듈 상태 코드를 읽는다.
-- `device.work(wake) -> alcohol device Result<()>`
-  - ZE29 `0x87` switch module working status 명령으로 센서 모듈의 wake 상태를 전환한다.
-  - 현재 firmware에서는 `true`를 `0x01`, `false`를 `0x00`으로 캡슐화한다.
+- `device.start() -> alcohol device Result<()>`
+  - 이전 요청에서 늦게 도착한 UART 응답을 버리고 ZE29 `0x87` 명령으로 측정을 시작한다.
+- `device.stop() -> alcohol device Result<()>`
+  - 취소된 요청의 잔여 UART 응답을 버린 뒤 ZE29을 수동 측정 대기 상태로 되돌린다.
+  - 첫 종료 명령이 실패한 경우에만 UART를 다시 정리하고 한 번 재시도한다.
 
 ## Pulse
 
@@ -89,17 +92,19 @@
 
 위치: `../firmware/src/services/ble/`
 
-- `ble::measurement_started(session_id, source, kind) -> DeviceEvent`
+- `ble::event::started(session_id, source, kind) -> DeviceEvent`
   - 보드 또는 앱에서 시작된 측정 세션 이벤트 DTO를 만든다.
 
 BLE model은 app과 firmware 사이의 JSON payload 계약이다.
 
-- `BleService::poll_start()`
+- `ble::session::start(&ble)`
   - idle loop에서 앱의 측정 시작 명령을 꺼낸다.
-- `BleService::wait_for_context(session_id)`
+- `ble::session::context(&ble, session_id)`
   - 활성 세션의 context 또는 cancel을 기다리고 timeout을 구분한다.
-- `BleService::wait_for_cancel(session_id)`
+- `ble::session::cancel(&ble, session_id)`
   - 센서 측정 future와 함께 실행할 cancel future를 제공한다.
+- `BleService::send(event)`
+  - GATT notify 실패를 BLE service 경계에서 기록한다.
 
 - `DeviceEvent`
   - `Status`: 장치 상태.

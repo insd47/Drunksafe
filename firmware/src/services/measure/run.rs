@@ -5,7 +5,7 @@ use embassy_time::{Duration, Instant, Timer};
 
 const PULSE_SAMPLE: Duration = Duration::from_millis(10);
 const ALCOHOL_POLL: Duration = Duration::from_millis(200);
-const TIMEOUT: Duration = Duration::from_secs(16);
+const TIMEOUT: Duration = Duration::from_secs(30);
 
 pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
     device.reset();

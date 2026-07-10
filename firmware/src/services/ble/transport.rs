@@ -1,16 +1,13 @@
+use super::model::{DeviceEvent, PhoneCommand};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
-
-use super::model::{DeviceEvent, PhoneCommand};
 
 pub const SERVICE_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12201;
 pub const DEVICE_EVENT_CHARACTERISTIC_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12202;
 pub const PHONE_COMMAND_CHARACTERISTIC_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12203;
 pub const DEVICE_NAME: &str = "Drunksafe";
-
 pub const MAX_BLE_JSON_PAYLOAD_BYTES: usize = 180;
-
 const DEFAULT_CHUNK_DATA_BYTES: usize = 64;
 const CHUNK_FRAME_OVERHEAD_RESERVE_BYTES: usize = 96;
 const MAX_CHUNKS: usize = 64;

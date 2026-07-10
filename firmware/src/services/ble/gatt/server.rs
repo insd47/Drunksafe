@@ -1,12 +1,3 @@
-use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
-
-use esp_idf_svc::bt::ble::gap::BleGapEvent;
-use esp_idf_svc::bt::ble::gatt::server::{ConnectionId, GattsEvent};
-use esp_idf_svc::bt::ble::gatt::{GattInterface, Handle};
-use esp_idf_svc::bt::{BdAddr, Ble, BtDriver};
-use esp_idf_svc::sys::{EspError, ESP_FAIL};
-
 use super::attributes::Attributes;
 use super::connections::Connections;
 use super::gap::Gap;
@@ -14,6 +5,13 @@ use super::status;
 use crate::services::ble::event;
 use crate::services::ble::model::{DeviceEvent, PhoneCommand, StatusKind};
 use crate::services::ble::transport::{DeviceEventTransport, PhoneCommandTransport};
+use esp_idf_svc::bt::ble::gap::BleGapEvent;
+use esp_idf_svc::bt::ble::gatt::server::{ConnectionId, GattsEvent};
+use esp_idf_svc::bt::ble::gatt::{GattInterface, Handle};
+use esp_idf_svc::bt::{BdAddr, Ble, BtDriver};
+use esp_idf_svc::sys::{EspError, ESP_FAIL};
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 
 const APP_ID: u16 = 0;
 const NOTIFY_ENABLED: u16 = 0x0001;

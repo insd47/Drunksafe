@@ -1,9 +1,7 @@
-use std::time::{Duration, Instant};
-
-use embassy_time::{Duration as EmbassyDuration, Timer};
-
 use super::model::{ErrorCode, MeasurementKind, PhoneCommand, PhoneContext};
 use super::service::BleService;
+use embassy_time::{Duration as EmbassyDuration, Timer};
+use std::time::{Duration, Instant};
 
 const CONTEXT_WAIT: Duration = Duration::from_secs(5);
 const COMMAND_POLL: Duration = Duration::from_millis(20);

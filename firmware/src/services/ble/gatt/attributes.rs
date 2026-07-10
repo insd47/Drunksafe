@@ -1,5 +1,6 @@
-use std::sync::{Arc, Mutex};
-
+use crate::services::ble::transport::{
+    DEVICE_EVENT_CHARACTERISTIC_UUID, PHONE_COMMAND_CHARACTERISTIC_UUID, SERVICE_UUID,
+};
 use enumset::enum_set;
 use esp_idf_svc::bt::ble::gatt::server::{ConnectionId, EspGatts, GattsEvent};
 use esp_idf_svc::bt::ble::gatt::{
@@ -8,10 +9,7 @@ use esp_idf_svc::bt::ble::gatt::{
 };
 use esp_idf_svc::bt::{Ble, BtDriver, BtUuid};
 use esp_idf_svc::sys::{EspError, ESP_FAIL};
-
-use crate::services::ble::transport::{
-    DEVICE_EVENT_CHARACTERISTIC_UUID, PHONE_COMMAND_CHARACTERISTIC_UUID, SERVICE_UUID,
-};
+use std::sync::{Arc, Mutex};
 
 const MAX_VALUE_LEN: usize = 200;
 const CLIENT_CONFIGURATION_UUID: u16 = 0x2902;

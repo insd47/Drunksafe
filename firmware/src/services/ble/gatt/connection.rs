@@ -1,7 +1,6 @@
+use crate::services::ble::transport::MAX_BLE_JSON_PAYLOAD_BYTES;
 use esp_idf_svc::bt::ble::gatt::server::ConnectionId;
 use esp_idf_svc::bt::BdAddr;
-
-use crate::services::ble::transport::MAX_BLE_JSON_PAYLOAD_BYTES;
 
 pub struct Connection {
     id: ConnectionId,

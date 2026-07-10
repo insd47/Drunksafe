@@ -1,9 +1,7 @@
-use std::sync::Mutex;
-
+use super::connection::Connection;
 use esp_idf_svc::bt::ble::gatt::server::ConnectionId;
 use esp_idf_svc::bt::BdAddr;
-
-use super::connection::Connection;
+use std::sync::Mutex;
 
 pub struct Connections {
     values: Mutex<Vec<Connection>>,

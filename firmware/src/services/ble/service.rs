@@ -1,13 +1,11 @@
-use std::sync::mpsc::{self, Receiver};
-use std::sync::Arc;
-
+use super::gatt::Server;
+use super::model::{DeviceEvent, PhoneCommand};
 use esp_idf_svc::bt::{Ble, BtDriver};
 use esp_idf_svc::hal::modem::Modem;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use esp_idf_svc::sys::EspError;
-
-use super::gatt::Server;
-use super::model::{DeviceEvent, PhoneCommand};
+use std::sync::mpsc::{self, Receiver};
+use std::sync::Arc;
 
 pub struct BleService {
     _driver: Arc<BtDriver<'static, Ble>>,

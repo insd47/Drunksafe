@@ -1,11 +1,9 @@
-use std::sync::Arc;
-
+use super::status;
+use crate::services::ble::transport::{DEVICE_NAME, SERVICE_UUID};
 use esp_idf_svc::bt::ble::gap::{AdvConfiguration, BleGapEvent, EspBleGap};
 use esp_idf_svc::bt::{Ble, BtDriver, BtUuid};
 use esp_idf_svc::sys::EspError;
-
-use super::status;
-use crate::services::ble::transport::{DEVICE_NAME, SERVICE_UUID};
+use std::sync::Arc;
 
 pub struct Gap {
     driver: Arc<EspBleGap<'static, Ble, Arc<BtDriver<'static, Ble>>>>,

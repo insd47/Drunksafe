@@ -85,8 +85,11 @@
   - I2C0/GPIO21/GPIO22로 SH1106 128x64 OLED를 초기화한다.
 - `display.clear() -> core::result::Result<(), EspError>`
   - 128x64 frame buffer를 비우고 OLED로 전송한다.
+- `display.draw(content) -> core::result::Result<(), EspError>`
+  - 표준 `embedded-graphics::DrawTarget`인 `DisplayFrame`에 화면을 그린 뒤 OLED로 전송한다.
 - `services::screen::ScreenService::show(view)`
-  - `Home`, `Measuring`, `Failed`, `Result` 화면을 표시하고 실패 시 warning log를 남긴다.
+  - `Home`, `Context`, `Measuring`, `Analyzing`, `Failed`, `Result` 화면을 표시하고 실패 시 warning log를 남긴다.
+  - U8g2 Gulim Korean2 폰트로 한국어를 표시하고, 아이콘과 구분선은 `embedded-graphics` primitive로 그린다.
 
 ## BLE
 

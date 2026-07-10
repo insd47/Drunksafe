@@ -1,3 +1,9 @@
+use core::convert::Infallible;
+
+use embedded_graphics::geometry::{OriginDimensions, Size};
+use embedded_graphics::pixelcolor::BinaryColor;
+use embedded_graphics::prelude::{DrawTarget, Pixel, Point};
+
 pub const WIDTH: usize = 128;
 pub const HEIGHT: usize = 64;
 pub const PAGES: usize = HEIGHT / 8;
@@ -13,19 +19,54 @@ impl Frame {
         }
     }
 
-    pub fn clear(&mut self) {
+    pub fn reset(&mut self) {
         self.bytes.fill(0);
     }
 
-    pub fn page_slice(&self, page: usize, start: usize, end: usize) -> &[u8] {
+    pub fn page(&self, page: usize, start: usize, end: usize) -> &[u8] {
         &self.bytes[page * WIDTH + start..page * WIDTH + end]
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize) {
+    fn set(&mut self, point: Point, color: BinaryColor) {
+        let Ok(x) = usize::try_from(point.x) else {
+            return;
+        };
+        let Ok(y) = usize::try_from(point.y) else {
+            return;
+        };
+
         if x >= WIDTH || y >= HEIGHT {
             return;
         }
 
-        self.bytes[(y / 8) * WIDTH + x] |= 1 << (y % 8);
+        let byte = &mut self.bytes[(y / 8) * WIDTH + x];
+        let bit = 1 << (y % 8);
+
+        match color {
+            BinaryColor::On => *byte |= bit,
+            BinaryColor::Off => *byte &= !bit,
+        }
+    }
+}
+
+impl DrawTarget for Frame {
+    type Color = BinaryColor;
+    type Error = Infallible;
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
+    where
+        I: IntoIterator<Item = Pixel<Self::Color>>,
+    {
+        for Pixel(point, color) in pixels {
+            self.set(point, color);
+        }
+
+        Ok(())
+    }
+}
+
+impl OriginDimensions for Frame {
+    fn size(&self) -> Size {
+        Size::new(WIDTH as u32, HEIGHT as u32)
     }
 }

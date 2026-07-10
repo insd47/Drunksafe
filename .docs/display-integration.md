@@ -26,11 +26,13 @@ The Rust firmware maps this into:
 The current supported screen views are:
 
 - Home
+- Waiting for app context
 - Measuring
+- Analyzing
 - Result summary
 - Failed
 
-Korean U8g2 font rendering is not ported yet. The first Rust integration uses an ASCII 5x7 font so it can build without adding a display/font dependency.
+The frame buffer implements the standard `embedded-graphics` `DrawTarget` contract. Screen text uses the U8g2 Gulim 11 Korean2 font with unknown glyphs treated as errors, while status icons and separators use `embedded-graphics` primitives. This replaces the previous byte-based ASCII 5x7 renderer and allows UTF-8 Korean copy without coupling text layout to the SH1106 transport.
 
 ## Pin Mapping
 

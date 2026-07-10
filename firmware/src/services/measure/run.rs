@@ -1,5 +1,4 @@
-use crate::devices::alcohol::Status;
-use crate::devices::{AlcoholDevice, PulseDevice};
+use crate::devices::{AlcoholDevice, AlcoholStatus, PulseDevice};
 use crate::error::{Result, TimeoutKind};
 use embassy_time::{Duration, Instant, Timer};
 
@@ -42,7 +41,7 @@ async fn alcohol_result(device: &mut AlcoholDevice<'_>) -> Result<u16> {
     let started = Instant::now();
 
     loop {
-        if device.status().await? == Status::ReadResult {
+        if device.status().await? == AlcoholStatus::ReadResult {
             return Ok(device.test().await?);
         }
 

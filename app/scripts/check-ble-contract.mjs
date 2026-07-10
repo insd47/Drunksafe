@@ -66,6 +66,14 @@ const firmwareScreenRenderSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'screen', 'render.rs'),
   'utf8'
 );
+const firmwareScreenTextSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'services', 'screen', 'text.rs'),
+  'utf8'
+);
+const firmwareDisplayFrameSource = readFileSync(
+  join(repoDir, 'firmware', 'src', 'devices', 'display', 'frame.rs'),
+  'utf8'
+);
 const firmwareAlcoholSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'devices', 'alcohol', 'mod.rs'),
   'utf8'
@@ -354,7 +362,24 @@ test('firmware alcohol result can complete when pulse is unavailable', () => {
   assert.ok(firmwareMeasureModSource.includes('Ok(Measurement::new(alcohol, pulse))'));
   assert.equal(firmwareMeasureModSource.includes('Measurement::new(alcohol?, pulse?)'), false);
   assert.ok(firmwareBleAnalysisSource.includes('pulse: pulse.map'));
-  assert.ok(firmwareScreenRenderSource.includes('format_args!("BPM --")'));
+  assert.ok(firmwareScreenRenderSource.includes('text::right(frame, 56, "-- BPM")'));
+});
+
+test('firmware display supports Korean text and standard graphics primitives', () => {
+  assert.ok(firmwareDisplayFrameSource.includes('impl DrawTarget for Frame'));
+  assert.ok(firmwareScreenTextSource.includes('u8g2_font_gulim11_t_korean2'));
+  assert.ok(firmwareScreenTextSource.includes('with_ignore_unknown_chars(false)'));
+
+  for (const phrase of [
+    '측정 준비',
+    '정보 확인 중',
+    '측정 중',
+    '분석 중',
+    '측정 실패',
+    '측정 결과',
+  ]) {
+    assert.ok(firmwareScreenRenderSource.includes(`"${phrase}"`));
+  }
 });
 
 test('device event fixtures parse through the app validator', () => {

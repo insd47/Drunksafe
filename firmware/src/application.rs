@@ -65,6 +65,7 @@ impl Application {
         ));
         self.ble
             .send(event::started(session_id.clone(), source, kind));
+        self.screen.show(View::Context);
 
         let context = match session::context(&self.ble, &session_id) {
             Ok(context) => context,
@@ -98,6 +99,7 @@ impl Application {
 
         match result {
             Ok(MeasureRun::Completed(measurement)) => {
+                self.screen.show(View::Analyzing);
                 self.ble.send(event::progress(
                     session_id.clone(),
                     MeasurementStep::Analyzing,

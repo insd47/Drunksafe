@@ -8,9 +8,9 @@ pub enum Error {
     #[error(transparent)]
     Esp(#[from] esp_idf_svc::sys::EspError),
     #[error(transparent)]
-    AlcoholDevice(#[from] devices::alcohol::Error),
+    AlcoholDevice(#[from] devices::AlcoholError),
     #[error(transparent)]
-    PulseDevice(#[from] devices::pulse::Error),
+    PulseDevice(#[from] devices::PulseError),
     #[error("{0} timed out")]
     Timeout(TimeoutKind),
 }

@@ -10,8 +10,8 @@ import {
   riskTone,
 } from '@/lib/format/measurement';
 import { baselineResultDescription } from '@/lib/personalization/baseline-acceptance';
-import { recordLoadLabels } from '@/screens/result/labels';
-import type { ResultViewModel } from '@/screens/result/use-result';
+import { recordLoadLabels } from '@/features/result/labels';
+import type { ResultViewModel } from '@/features/result/use-result';
 
 export default function ResultSummary({ result }: Props) {
   const { record, kind, loadState } = result;

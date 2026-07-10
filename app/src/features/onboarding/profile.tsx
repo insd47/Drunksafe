@@ -3,7 +3,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import Section from '@/components/section';
 import StatusRow from '@/components/status-row';
 import type { Sex } from '@/lib/storage/profile';
-import type { ProfileForm, SaveState } from '@/screens/onboarding/use-profile-form';
+import type { ProfileForm, SaveState } from '@/features/onboarding/use-profile-form';
 
 export default function ProfileSection({ form, saveState, complete, onChange }: Props) {
   return (

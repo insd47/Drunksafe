@@ -2,7 +2,7 @@ import Section from '@/components/section';
 import StatusRow from '@/components/status-row';
 import { formatAlcohol, formatBpm } from '@/lib/format/measurement';
 import type { UserBaseline } from '@/lib/storage/profile';
-import { formatUpdatedAt } from '@/screens/onboarding/format';
+import { formatUpdatedAt } from '@/features/onboarding/format';
 
 export default function BaselineSection({ baseline }: Props) {
   return (

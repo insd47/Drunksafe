@@ -7,7 +7,7 @@ import {
   formatRisk,
   riskTone,
 } from '@/lib/format/measurement';
-import type { ConnectionSummary } from '@/screens/connect/use-summary';
+import type { ConnectionSummary } from '@/features/connect/use-summary';
 
 export function PersonalizationSection({ summary }: Props) {
   return (

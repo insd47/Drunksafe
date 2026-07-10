@@ -8,7 +8,7 @@ import {
   type MeasurementKind,
   type MeasurementRecord,
 } from '@/lib/storage/history';
-import createDemoResult from '@/screens/result/demo';
+import createDemoResult from '@/features/result/demo';
 
 const emptyLookup: SavedLookup = { id: null, record: null, state: 'idle' };
 

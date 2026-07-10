@@ -26,10 +26,7 @@ const eventHandlerSource = readFileSync(
   join(appDir, 'src', 'lib', 'ble', 'session', 'event-handler.ts'),
   'utf8'
 );
-const connectScreenSource = readFileSync(
-  join(appDir, 'src', 'screens', 'connect', 'index.tsx'),
-  'utf8'
-);
+const connectScreenSource = readFileSync(join(appDir, 'src', 'app', 'index.tsx'), 'utf8');
 const firmwareGattSource = readFileSync(
   join(repoDir, 'firmware', 'src', 'services', 'ble', 'gatt', 'server.rs'),
   'utf8'

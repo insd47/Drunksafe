@@ -1,4 +1,4 @@
-import type { RecordLoadState } from '@/screens/result/use-result';
+import type { RecordLoadState } from '@/features/result/use-result';
 
 export const recordLoadLabels: Record<RecordLoadState, string> = {
   idle: '대기',

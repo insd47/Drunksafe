@@ -36,8 +36,8 @@ const sessionSource = [
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');
 const connectScreenSource = [
-  join(appDir, 'src', 'screens', 'connect', 'index.tsx'),
-  join(appDir, 'src', 'screens', 'connect', '_views', 'evidence.tsx'),
+  join(appDir, 'src', 'app', 'index.tsx'),
+  join(appDir, 'src', 'features', 'connect', 'evidence.tsx'),
 ]
   .map((path) => readFileSync(path, 'utf8'))
   .join('\n');

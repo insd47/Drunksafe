@@ -1,8 +1,8 @@
 import Section from '@/components/section';
 import StatusRow from '@/components/status-row';
 import { formatBpm } from '@/lib/format/measurement';
-import { recordLoadLabels } from '@/screens/result/labels';
-import type { RecordLoadState, ResultOrigin, ResultViewModel } from '@/screens/result/use-result';
+import { recordLoadLabels } from '@/features/result/labels';
+import type { RecordLoadState, ResultOrigin, ResultViewModel } from '@/features/result/use-result';
 
 export default function ResultSupport({ result }: Props) {
   const { record, origin, loadState, saved } = result;

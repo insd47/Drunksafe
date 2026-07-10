@@ -12,8 +12,8 @@ import {
   connectionTone,
   measurementLabel,
   measurementTone,
-} from '@/screens/connect/labels';
-import type { ConnectionSummary } from '@/screens/connect/use-summary';
+} from '@/features/connect/labels';
+import type { ConnectionSummary } from '@/features/connect/use-summary';
 
 export default function ConnectionSection({ ble, summary, contextReady, startBlocker }: Props) {
   return (

@@ -14,7 +14,7 @@ import {
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const onboardingProfileSource = readFileSync(
-  join(appDir, 'src', 'screens', 'onboarding', 'use-profile-form.ts'),
+  join(appDir, 'src', 'features', 'onboarding', 'use-profile-form.ts'),
   'utf8'
 );
 

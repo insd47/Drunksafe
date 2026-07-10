@@ -8,7 +8,7 @@ import {
   type BleVerificationEvidenceSummary,
   type BleVerificationLogEntry,
 } from '@/lib/ble/verification-log';
-import type { StatusTone } from '@/screens/connect/labels';
+import type { StatusTone } from '@/features/connect/labels';
 
 export default function EvidenceSections({ ble }: Props) {
   if (ble.verificationLog.length === 0) return null;

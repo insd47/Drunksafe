@@ -12,10 +12,7 @@ import {
 } from '@/lib/ble/measure-route';
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const connectScreenSource = readFileSync(
-  join(appDir, 'src', 'screens', 'connect', 'index.tsx'),
-  'utf8'
-);
+const connectScreenSource = readFileSync(join(appDir, 'src', 'app', 'index.tsx'), 'utf8');
 
 test('baseline route follows the active baseline BLE session id', () => {
   const result = measurementResult('baseline-mock-123', 'baseline');

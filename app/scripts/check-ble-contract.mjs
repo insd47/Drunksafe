@@ -269,7 +269,7 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   const cancelSelectIndex = indexOfRequired(firmwareMeasureModSource, 'Either::Second(()) => {');
   const alcoholStopIndex = indexOfRequiredAfter(
     firmwareMeasureModSource,
-    'self.alcohol.stop_work().await?',
+    'self.alcohol.stop().await?',
     cancelSelectIndex
   );
   const cancelledReturnIndex = indexOfRequiredAfter(
@@ -284,7 +284,7 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   const alcoholRunIndex = indexOfRequired(firmwareMeasureRunSource, 'pub async fn alcohol');
   const alcoholWakeIndex = indexOfRequiredAfter(
     firmwareMeasureRunSource,
-    'device.work(true).await?',
+    'device.start().await?',
     alcoholRunIndex
   );
   const alcoholResultIndex = indexOfRequiredAfter(
@@ -294,7 +294,7 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   );
   const alcoholStopAfterRunIndex = indexOfRequiredAfter(
     firmwareMeasureRunSource,
-    'device.stop_work().await',
+    'device.stop().await',
     alcoholResultIndex
   );
   const alcoholReturnIndex = indexOfRequiredAfter(
@@ -315,35 +315,31 @@ test('firmware measurement loop polls cancel while sensors are active', () => {
   assert.ok(
     firmwareMeasureRunSource.includes('failed to stop alcohol sensor work mode after measurement')
   );
-  assert.ok(firmwareAlcoholSource.includes('pub async fn stop_work'));
-  const preDrainIndex = indexOfRequired(
-    firmwareAlcoholSource,
-    'self.channel.drain_pending().await?'
-  );
+  assert.ok(firmwareAlcoholSource.includes('pub async fn start'));
+  assert.ok(firmwareAlcoholSource.includes('pub async fn stop'));
+  const preClearIndex = indexOfRequired(firmwareAlcoholSource, 'self.channel.clear().await?');
   const firstStopIndex = indexOfRequiredAfter(
     firmwareAlcoholSource,
-    'let first = self.work(false).await',
-    preDrainIndex
+    'let Err(first) = self.work(false).await else',
+    preClearIndex
   );
-  const secondStopIndex = indexOfRequiredAfter(
+  const retryClearIndex = indexOfRequiredAfter(
     firmwareAlcoholSource,
-    'let second = self.work(false).await',
+    'self.channel.clear().await?',
     firstStopIndex
   );
-  const postDrainIndex = indexOfRequiredAfter(
+  const retryStopIndex = indexOfRequiredAfter(
     firmwareAlcoholSource,
-    'self.channel.drain_pending().await?',
-    secondStopIndex
+    'self.work(false).await.map_err(|_| first)',
+    retryClearIndex
   );
-  assert.ok(preDrainIndex < firstStopIndex);
-  assert.ok(firstStopIndex < secondStopIndex);
-  assert.ok(secondStopIndex < postDrainIndex);
-  assert.ok(firmwareAlcoholSource.includes('let first = self.work(false).await'));
-  assert.ok(firmwareAlcoholSource.includes('let second = self.work(false).await'));
-  assert.ok(firmwareAlcoholChannelSource.includes('const DRAIN_QUIET_TIMEOUT'));
-  assert.ok(firmwareAlcoholChannelSource.includes('const MAX_DRAIN_BYTES: usize = FRAME_LEN * 4'));
-  assert.ok(firmwareAlcoholChannelSource.includes('while drained < MAX_DRAIN_BYTES'));
-  assert.ok(firmwareAlcoholChannelSource.includes('pub async fn drain_pending'));
+  assert.ok(preClearIndex < firstStopIndex);
+  assert.ok(firstStopIndex < retryClearIndex);
+  assert.ok(retryClearIndex < retryStopIndex);
+  assert.ok(firmwareAlcoholChannelSource.includes('const CLEAR_TIMEOUT'));
+  assert.ok(firmwareAlcoholChannelSource.includes('const MAX_CLEAR_BYTES: usize = FRAME_LEN * 4'));
+  assert.ok(firmwareAlcoholChannelSource.includes('while cleared < MAX_CLEAR_BYTES'));
+  assert.ok(firmwareAlcoholChannelSource.includes('pub async fn clear'));
 });
 
 test('firmware alcohol result can complete when pulse is unavailable', () => {

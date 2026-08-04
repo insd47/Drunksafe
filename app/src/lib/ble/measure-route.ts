@@ -46,3 +46,21 @@ export function shouldShowResultPreview({
 }) {
   return !hasResult && !hasActiveMeasurement;
 }
+
+export function resolveMeasureKind({
+  routeSessionId,
+  activeSessionId,
+  activeMeasurementKind,
+}: {
+  routeSessionId: string;
+  activeSessionId: string | null;
+  activeMeasurementKind: MeasurementKind;
+}): MeasurementKind {
+  if (routeSessionId === 'baseline') return 'baseline';
+
+  if (routeSessionId !== 'live' && routeSessionId === activeSessionId) {
+    return activeMeasurementKind;
+  }
+
+  return 'measurement';
+}

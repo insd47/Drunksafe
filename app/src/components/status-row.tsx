@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { cn } from '@/lib/utils/cn';
 
-export function StatusRow({ label, value, description, tone = 'neutral' }: Props) {
+export default function StatusRow({ label, value, description, tone = 'neutral' }: Props) {
   return (
     <View className="flex-row items-center justify-between gap-4 py-3">
       <View className="min-w-0 flex-1 gap-1">

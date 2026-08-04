@@ -36,26 +36,28 @@ impl<'d> AlcoholDevice<'d> {
         Ok(Status::from(res.payload()[0]))
     }
 
-    pub async fn work(&mut self, wake: bool) -> Result<()> {
-        let value = wake as u8;
+    pub async fn start(&mut self) -> Result<()> {
+        self.channel.clear().await?;
+        self.work(true).await
+    }
+
+    pub async fn stop(&mut self) -> Result<()> {
+        self.channel.clear().await?;
+
+        let Err(first) = self.work(false).await else {
+            return Ok(());
+        };
+
+        self.channel.clear().await?;
+        self.work(false).await.map_err(|_| first)
+    }
+
+    async fn work(&mut self, enabled: bool) -> Result<()> {
+        let value = enabled as u8;
         self.channel
             .request(Command::Work, [value, 0, 0, 0, 0])
             .await?;
 
         Ok(())
-    }
-
-    pub async fn stop_work(&mut self) -> Result<()> {
-        self.channel.drain_pending().await?;
-
-        let first = self.work(false).await;
-        let second = self.work(false).await;
-
-        self.channel.drain_pending().await?;
-
-        match (first, second) {
-            (_, Ok(())) => Ok(()),
-            (Err(error), Err(_)) | (Ok(()), Err(error)) => Err(error),
-        }
     }
 }

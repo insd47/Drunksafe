@@ -1,8 +1,10 @@
-use crate::devices::display::DisplayDevice;
+use crate::devices::DisplayDevice;
 use crate::error::Result;
 pub use view::View;
 
+mod icon;
 mod render;
+mod text;
 mod view;
 
 pub struct ScreenService<'d> {
@@ -23,7 +25,9 @@ impl<'d> ScreenService<'d> {
     fn try_show(&mut self, view: View) -> Result<()> {
         match view {
             View::Home => render::home(&mut self.display),
+            View::Context => render::context(&mut self.display),
             View::Measuring => render::measuring(&mut self.display),
+            View::Analyzing => render::analyzing(&mut self.display),
             View::Failed => render::failed(&mut self.display),
             View::Result(measurement) => render::result(&mut self.display, measurement),
         }

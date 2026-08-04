@@ -1,5 +1,4 @@
-use crate::devices::alcohol::Status;
-use crate::devices::{AlcoholDevice, PulseDevice};
+use crate::devices::{AlcoholDevice, AlcoholStatus, PulseDevice};
 use crate::error::{Result, TimeoutKind};
 use embassy_time::{Duration, Instant, Timer};
 
@@ -28,10 +27,10 @@ pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
 }
 
 pub async fn alcohol(device: &mut AlcoholDevice<'_>) -> Result<u16> {
-    device.work(true).await?;
+    device.start().await?;
     let result = alcohol_result(device).await;
 
-    if let Err(error) = device.stop_work().await {
+    if let Err(error) = device.stop().await {
         log::warn!("failed to stop alcohol sensor work mode after measurement: {error}");
     }
 
@@ -42,7 +41,7 @@ async fn alcohol_result(device: &mut AlcoholDevice<'_>) -> Result<u16> {
     let started = Instant::now();
 
     loop {
-        if device.status().await? == Status::ReadResult {
+        if device.status().await? == AlcoholStatus::ReadResult {
             return Ok(device.test().await?);
         }
 

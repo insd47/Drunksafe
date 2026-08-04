@@ -1,16 +1,13 @@
+use super::model::{DeviceEvent, PhoneCommand};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
-
-use super::{DeviceEvent, PhoneCommand};
 
 pub const SERVICE_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12201;
 pub const DEVICE_EVENT_CHARACTERISTIC_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12202;
 pub const PHONE_COMMAND_CHARACTERISTIC_UUID: u128 = 0x6f5f3f7a3b0d4df79d17151b71e12203;
 pub const DEVICE_NAME: &str = "Drunksafe";
-
 pub const MAX_BLE_JSON_PAYLOAD_BYTES: usize = 180;
-
 const DEFAULT_CHUNK_DATA_BYTES: usize = 64;
 const CHUNK_FRAME_OVERHEAD_RESERVE_BYTES: usize = 96;
 const MAX_CHUNKS: usize = 64;
@@ -24,6 +21,8 @@ pub enum TransportError {
     Json(#[from] serde_json::Error),
     #[error("BLE chunk count changed during reassembly")]
     ChunkCountChanged,
+    #[error("BLE chunk data changed during reassembly")]
+    ChunkDataChanged,
     #[error("BLE transport frame exceeds configured payload size")]
     FrameTooLarge,
 }
@@ -57,6 +56,10 @@ pub struct PhoneCommandTransport {
 impl PhoneCommandTransport {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn reset(&mut self) {
+        self.entries.clear();
     }
 
     pub fn accept(&mut self, value: &[u8]) -> Result<Option<PhoneCommand>, TransportError> {
@@ -94,6 +97,12 @@ impl PhoneCommandTransport {
             return Err(TransportError::ChunkCountChanged);
         }
 
+        if let Some(current) = &entry.chunks[frame.index] {
+            if current != &frame.data {
+                return Err(TransportError::ChunkDataChanged);
+            }
+        }
+
         entry.chunks[frame.index] = Some(frame.data);
 
         if entry.chunks.iter().any(Option::is_none) {
@@ -123,11 +132,7 @@ impl DeviceEventTransport {
         Self { next_frame_id: 0 }
     }
 
-    pub fn frames(&mut self, event: &DeviceEvent) -> Result<Vec<String>, TransportError> {
-        self.frames_with_max_payload_bytes(event, MAX_BLE_JSON_PAYLOAD_BYTES)
-    }
-
-    pub fn frames_with_max_payload_bytes(
+    pub fn frames(
         &mut self,
         event: &DeviceEvent,
         max_payload_bytes: usize,

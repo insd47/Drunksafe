@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { protocolVersion } from '@/lib/ble/model';
-import { resolveMeasureRoute, shouldShowResultPreview } from '@/lib/ble/measure-route';
+import {
+  resolveMeasureKind,
+  resolveMeasureRoute,
+  shouldShowResultPreview,
+} from '@/lib/ble/measure-route';
+
+const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
+const connectScreenSource = readFileSync(join(appDir, 'src', 'app', 'index.tsx'), 'utf8');
 
 test('baseline route follows the active baseline BLE session id', () => {
   const result = measurementResult('baseline-mock-123', 'baseline');
@@ -70,6 +80,41 @@ test('result preview is hidden while a real measurement is active', () => {
     }),
     false
   );
+});
+
+test('explicit baseline route wins over a previous measurement error kind', () => {
+  assert.equal(
+    resolveMeasureKind({
+      routeSessionId: 'baseline',
+      activeSessionId: 'fw-previous',
+      activeMeasurementKind: 'measurement',
+    }),
+    'baseline'
+  );
+});
+
+test('live route starts fresh while an exact active route preserves its kind', () => {
+  assert.equal(
+    resolveMeasureKind({
+      routeSessionId: 'live',
+      activeSessionId: 'fw-baseline',
+      activeMeasurementKind: 'baseline',
+    }),
+    'measurement'
+  );
+  assert.equal(
+    resolveMeasureKind({
+      routeSessionId: 'fw-baseline',
+      activeSessionId: 'fw-baseline',
+      activeMeasurementKind: 'baseline',
+    }),
+    'baseline'
+  );
+});
+
+test('new phone measurements always navigate to the live session route', () => {
+  assert.match(connectScreenSource, /router\.push\('\/measure\/live'\)/);
+  assert.doesNotMatch(connectScreenSource, /router\.push\(`\/measure\/\$\{ble\.activeSessionId/);
 });
 
 function measurementResult(sessionId, kind = 'measurement') {

@@ -1,6 +1,10 @@
 # ESP32 DevKitC V4 uses the classic ESP32 chip.
 CONFIG_IDF_TARGET="esp32"
 
+# The MVP ships as a single image without OTA slots. Reserve enough flash for BLE and Korean UI assets.
+CONFIG_ESPTOOLPY_FLASHSIZE_2MB=y
+CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
+
 # Rust often needs more main task stack than the ESP-IDF C default.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096

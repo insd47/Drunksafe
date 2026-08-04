@@ -1,15 +1,15 @@
 use crate::error::Result;
-pub use alcohol::AlcoholDevice;
-pub use display::DisplayDevice;
+pub use alcohol::{AlcoholDevice, Error as AlcoholError, Status as AlcoholStatus};
+pub use display::{DisplayDevice, Frame as DisplayFrame};
 use esp_idf_svc::hal::modem::Modem;
 use esp_idf_svc::hal::peripherals::Peripherals;
-pub use pulse::PulseDevice;
+pub use pulse::{Analysis as PulseAnalysis, Error as PulseError, PulseDevice};
 pub use trigger::TriggerDevice;
 
-pub mod alcohol;
-pub mod display;
-pub mod pulse;
-pub mod trigger;
+mod alcohol;
+mod display;
+mod pulse;
+mod trigger;
 
 pub fn init() -> Result<Devices> {
     let peripherals = Peripherals::take()?;
@@ -25,7 +25,6 @@ pub fn init() -> Result<Devices> {
 }
 
 pub struct Devices {
-    #[allow(dead_code)]
     pub alcohol: AlcoholDevice<'static>,
     pub display: DisplayDevice<'static>,
     pub modem: Modem<'static>,

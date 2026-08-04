@@ -8,8 +8,8 @@ use esp_idf_svc::hal::uart::{config, AsyncUartDriver, Uart, UartDriver};
 use esp_idf_svc::hal::units::Hertz;
 
 const READ_TIMEOUT: Duration = Duration::from_millis(100);
-const DRAIN_QUIET_TIMEOUT: Duration = Duration::from_millis(120);
-const MAX_DRAIN_BYTES: usize = FRAME_LEN * 4;
+const CLEAR_TIMEOUT: Duration = Duration::from_millis(120);
+const MAX_CLEAR_BYTES: usize = FRAME_LEN * 4;
 
 pub struct Channel<'d> {
     driver: AsyncUartDriver<'d, UartDriver<'d>>,
@@ -39,22 +39,22 @@ impl<'d> Channel<'d> {
         self.read(command).await
     }
 
-    pub async fn drain_pending(&mut self) -> Result<()> {
+    pub async fn clear(&mut self) -> Result<()> {
         let mut bytes = [0; FRAME_LEN];
-        let mut drained = 0;
+        let mut cleared = 0;
 
-        while drained < MAX_DRAIN_BYTES {
-            match with_timeout(DRAIN_QUIET_TIMEOUT, self.driver.read(&mut bytes)).await {
+        while cleared < MAX_CLEAR_BYTES {
+            match with_timeout(CLEAR_TIMEOUT, self.driver.read(&mut bytes)).await {
                 Ok(Ok(0)) | Err(_) => return Ok(()),
                 Ok(Ok(read)) => {
-                    drained += read;
-                    log::trace!("[ALCOHOL] drained pending bytes: {:?}", &bytes[..read]);
+                    cleared += read;
+                    log::trace!("[ALCOHOL] discarded stale bytes: {:?}", &bytes[..read]);
                 }
                 Ok(Err(error)) => return Err(error.into()),
             }
         }
 
-        log::warn!("[ALCOHOL] stopped draining pending UART bytes after {drained} bytes");
+        log::warn!("[ALCOHOL] stopped clearing UART after {cleared} bytes");
         Ok(())
     }
 

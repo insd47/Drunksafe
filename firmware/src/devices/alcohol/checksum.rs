@@ -1,6 +1,6 @@
 use super::error::Result;
 use super::protocol::FRAME_LEN;
-use crate::devices::alcohol::Error;
+use super::Error;
 
 pub fn generate(bytes: &[u8; FRAME_LEN]) -> u8 {
     bytes[1..8]

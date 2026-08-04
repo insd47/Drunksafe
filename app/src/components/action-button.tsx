@@ -2,7 +2,12 @@ import { Pressable, Text } from 'react-native';
 
 import { cn } from '@/lib/utils/cn';
 
-export function ActionButton({ label, variant = 'primary', disabled = false, onPress }: Props) {
+export default function ActionButton({
+  label,
+  variant = 'primary',
+  disabled = false,
+  onPress,
+}: Props) {
   return (
     <Pressable
       accessibilityLabel={label}

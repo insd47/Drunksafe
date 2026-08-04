@@ -13,8 +13,8 @@ import {
 } from '@/lib/personalization/baseline-acceptance';
 
 const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const onboardingSource = readFileSync(
-  join(appDir, 'src', 'screens', 'onboarding', 'index.tsx'),
+const onboardingProfileSource = readFileSync(
+  join(appDir, 'src', 'features', 'onboarding', 'use-profile-form.ts'),
   'utf8'
 );
 
@@ -80,9 +80,12 @@ test('baseline result copy distinguishes history save from baseline acceptance',
 });
 
 test('onboarding refreshes saved baseline evidence when the screen focuses', () => {
-  assert.match(onboardingSource, /useFocusEffect/);
-  assert.match(onboardingSource, /Promise\.all\(\[readProfile\(\), readBaseline\(\)\]\)/);
-  assert.ok(onboardingSource.indexOf('useFocusEffect') < onboardingSource.indexOf('setBaseline'));
+  assert.match(onboardingProfileSource, /useFocusEffect/);
+  assert.match(onboardingProfileSource, /Promise\.all\(\[readProfile\(\), readBaseline\(\)\]\)/);
+  assert.ok(
+    onboardingProfileSource.indexOf('useFocusEffect') <
+      onboardingProfileSource.indexOf('setBaseline')
+  );
 });
 
 function result({ risk, alcohol }) {

@@ -14,7 +14,7 @@ Firmware 공개 표면은 [../.docs/firmware-public-surface.md](../.docs/firmwar
 Screen 브랜치의 OLED 통합 내역과 핀 충돌은 [../.docs/display-integration.md](../.docs/display-integration.md)에 정리되어 있다.
 MVP 실기기 검증 체크리스트는 [../.docs/mvp-verification.md](../.docs/mvp-verification.md)에 정리되어 있다.
 
-Firmware modules keep their public surface narrow. `main.rs` initializes logging, devices, and the runtime loop directly. Board pin mapping and hardware handles live under `devices/`; measurement/screen/BLE policy lives under `features/`.
+Firmware modules keep their public surface narrow. `main.rs` initializes logging, devices, and the runtime loop directly. Board pin mapping and hardware handles live under `devices/`; measurement, screen, and BLE policy lives under `services/`.
 
 ## Prerequisites
 

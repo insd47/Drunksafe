@@ -36,11 +36,6 @@ export async function readHistoryEntries(limit: number): Promise<HistoryEntry[]>
     }));
 }
 
-export async function latestMeasurement() {
-  const history = await readHistory();
-  return history.find((record) => record.kind === 'measurement') ?? null;
-}
-
 export async function readMeasurementById(id: string) {
   const history = await readHistory();
   return history.find((record) => record.id === id || record.session_id === id) ?? null;

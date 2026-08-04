@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "packageManager": "pnpm@10.24.0",
   "scripts": {
-    "test": "pnpm test:ble-contract && pnpm test:ble-readiness && pnpm test:ble-permissions && pnpm test:profile-context && pnpm test:baseline-acceptance && pnpm test:start-readiness && pnpm test:measure-route && pnpm test:measurement-phase && pnpm test:history-insights && pnpm test:history-storage && pnpm test:ble-session-patches && pnpm test:ble-verification-log && pnpm test:measurement-format && pnpm test:mvp-evidence-template && pnpm test:mvp-run-record && pnpm test:mvp-hardware-preflight",
+    "test": "pnpm test:ble-contract && pnpm test:ble-readiness && pnpm test:ble-session-runtime && pnpm test:ble-permissions && pnpm test:profile-context && pnpm test:baseline-acceptance && pnpm test:start-readiness && pnpm test:measure-route && pnpm test:measurement-phase && pnpm test:history-insights && pnpm test:history-storage && pnpm test:ble-session-patches && pnpm test:ble-verification-log && pnpm test:measurement-format && pnpm test:mvp-evidence-template && pnpm test:mvp-run-record && pnpm test:mvp-hardware-preflight",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "test:ble-contract": "tsx --tsconfig tsconfig.json scripts/check-ble-contract.mjs",
     "test:ble-readiness": "tsx --tsconfig tsconfig.json scripts/check-ble-readiness.mjs",
+    "test:ble-session-runtime": "tsx --tsconfig tsconfig.json scripts/check-ble-session-runtime.mjs",
     "test:ble-permissions": "tsx --tsconfig tsconfig.json scripts/check-ble-permissions.mjs",
     "test:baseline-acceptance": "tsx --tsconfig tsconfig.json scripts/check-baseline-acceptance.mjs",
     "test:start-readiness": "tsx --tsconfig tsconfig.json scripts/check-start-readiness.mjs",

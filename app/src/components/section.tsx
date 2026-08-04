@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 
 import { cn } from '@/lib/utils/cn';
 
-export function Section({ title, eyebrow, action, children, className }: Props) {
+export default function Section({ title, eyebrow, action, children, className }: Props) {
   return (
     <View className={cn('gap-3', className)}>
       <View className="flex-row items-end justify-between gap-3">

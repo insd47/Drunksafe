@@ -740,11 +740,11 @@ class BleSessionStore {
 
   private scheduleNotifyReadyTimeout(deviceId: string) {
     this.clearNotifyReadyTimer();
-    this.notifyReadyTimer = setTimeout(() => {
+    /*this.notifyReadyTimer = setTimeout(() => {
       if (this.pendingConnectedDevice?.id === deviceId) {
         this.fail(new Error(notifySubscriptionTimeoutMessage));
       }
-    }, notifySubscriptionReadyTimeoutMs);
+    }, notifySubscriptionReadyTimeoutMs);*/
   }
 
   private consumePendingConnectedDevice() {

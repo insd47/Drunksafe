@@ -216,6 +216,18 @@ impl GattServer {
             } => {
                 self.check_gatt_status(status)?;
                 self.register_descriptor(service_handle, attr_handle, descr_uuid)?;
+                //self.gatts.start_service(service_handle)?;
+                self.gatts.add_characteristic(
+                  service_handle,
+                  &GattCharacteristic {
+                    uuid: BtUuid::uuid128(PHONE_COMMAND_CHARACTERISTIC_UUID),
+                    permissions: enum_set!(Permission::Write),
+                    properties: enum_set!(Property::Write),
+                    max_len: MAX_CHARACTERISTIC_VALUE_LEN,
+                    auto_rsp: AutoResponse::ByApp,
+                  },
+                  &[],
+                )?;
             }
             GattsEvent::Mtu { conn_id, mtu } => {
                 self.register_mtu(conn_id, mtu);
@@ -279,14 +291,14 @@ impl GattServer {
             include_name: true,
             include_txpower: true,
             flag: 2,
-            service_uuid: Some(BtUuid::uuid128(SERVICE_UUID)),
+            service_uuid: None, //uuid까지 전송하면 ble 통신 바이트 초과
             ..Default::default()
         })
     }
 
     fn start_service(&self, service_handle: Handle) -> Result<(), EspError> {
         self.state.lock().unwrap().service_handle = Some(service_handle);
-        self.gatts.start_service(service_handle)?;
+        //self.gatts.start_service(service_handle)?;//
         self.add_characteristics(service_handle)
     }
 
@@ -302,19 +314,6 @@ impl GattServer {
             },
             &[],
         )?;
-
-        self.gatts.add_characteristic(
-            service_handle,
-            &GattCharacteristic {
-                uuid: BtUuid::uuid128(PHONE_COMMAND_CHARACTERISTIC_UUID),
-                permissions: enum_set!(Permission::Write),
-                properties: enum_set!(Property::Write),
-                max_len: MAX_CHARACTERISTIC_VALUE_LEN,
-                auto_rsp: AutoResponse::ByApp,
-            },
-            &[],
-        )?;
-
         Ok(())
     }
 
@@ -348,6 +347,8 @@ impl GattServer {
                     permissions: enum_set!(Permission::Read | Permission::Write),
                 },
             )?;
+        } else if char_uuid == BtUuid::uuid128(PHONE_COMMAND_CHARACTERISTIC_UUID) {
+            self.gatts.start_service(service_handle)?;
         }
 
         Ok(())
@@ -396,7 +397,8 @@ impl GattServer {
             }
         }
 
-        self.set_adv_conf()
+        self.gap.stop_advertising()?;
+        Ok(())
     }
 
     fn remove_connection(&self, addr: BdAddr) -> Result<(), EspError> {

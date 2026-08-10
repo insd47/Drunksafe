@@ -4,6 +4,7 @@ use crate::services::measure::Measurement;
 pub enum View {
     Home,
     Measuring,
+    MeasuringPulse { signal_percent: u8 },
     Failed,
     Result(Measurement),
 }

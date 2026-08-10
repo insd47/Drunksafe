@@ -102,15 +102,33 @@ fn main() -> Result<()> {
             }
 
             notify_progress(&ble, &session_id, MeasurementStep::Preparing);
-            notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor);
-            notify_progress(&ble, &session_id, MeasurementStep::WaitingBreath);
-            notify_progress(&ble, &session_id, MeasurementStep::SamplingBreath);
-            notify_progress(&ble, &session_id, MeasurementStep::SamplingPulse);
-
             screen.show(View::Measuring);
-            let result = block_on(
-                measure.run_until_cancelled(wait_for_measurement_cancel(&ble, &session_id)),
-            );
+
+            let result = block_on(measure.run_until_cancelled(
+                wait_for_measurement_cancel(&ble, &session_id),
+                |status| {
+                    use crate::devices::alcohol::Status;
+                    match status {
+                        Status::Idle | Status::Preheating => {
+                            notify_progress(&ble, &session_id, MeasurementStep::WarmingSensor);
+                        }
+                        Status::WaitBlow => {
+                            notify_progress(&ble, &session_id, MeasurementStep::WaitingBreath);
+                        }
+                        Status::Blowing => {
+                            notify_progress(&ble, &session_id, MeasurementStep::SamplingBreath);
+                        }
+                        Status::Calculating | Status::ReadResult => {
+                            notify_progress(&ble, &session_id, MeasurementStep::SamplingPulse);
+                        }
+                        _ => {}
+                    }
+                },
+                |signal_percent| {
+                    notify_progress(&ble, &session_id, MeasurementStep::SamplingPulse);
+                    screen.show(View::MeasuringPulse { signal_percent });
+                },
+            ));
 
             match result {
                 Ok(MeasureRun::Completed(measurement)) => {

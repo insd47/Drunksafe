@@ -37,7 +37,7 @@ impl<'d> AlcoholDevice<'d> {
     }
 
     pub async fn work(&mut self, wake: bool) -> Result<()> {
-        let value = wake as u8;
+        let value = if wake { 0x32 } else { 0x00 };
         self.channel
             .request(Command::Work, [value, 0, 0, 0, 0])
             .await?;

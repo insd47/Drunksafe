@@ -24,6 +24,9 @@ impl<'d> ScreenService<'d> {
         match view {
             View::Home => render::home(&mut self.display),
             View::Measuring => render::measuring(&mut self.display),
+            View::MeasuringPulse { signal_percent } => {
+                render::measuring_pulse(&mut self.display, signal_percent)
+            }
             View::Failed => render::failed(&mut self.display),
             View::Result(measurement) => render::result(&mut self.display, measurement),
         }

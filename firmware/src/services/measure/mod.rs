@@ -26,13 +26,15 @@ impl<'d> MeasureService<'d> {
         Self { pulse, alcohol }
     }
 
-    pub async fn run(&mut self) -> Result<Measurement> {
-        let pulse = &mut self.pulse;
-        let alcohol = &mut self.alcohol;
-        let (pulse, alcohol) = join(run::pulse(pulse), run::alcohol(alcohol)).await;
-        let alcohol = alcohol?;
-        let pulse = match pulse {
-            Ok(pulse) => Some(pulse),
+    pub async fn run<F, P>(&mut self, on_alcohol_status: F, on_pulse_signal: P) -> Result<Measurement>
+    where
+        F: FnMut(crate::devices::alcohol::Status),
+        P: FnMut(u8),
+    {
+        let alcohol_res = run::alcohol(&mut self.alcohol, on_alcohol_status).await?;
+        
+        let pulse_res = match run::pulse(&mut self.pulse, on_pulse_signal).await {
+            Ok(bpm) => Some(bpm),
             Err(error) => {
                 log::warn!(
                     "pulse measurement unavailable, continuing with alcohol result: {error}"
@@ -41,14 +43,20 @@ impl<'d> MeasureService<'d> {
             }
         };
 
-        Ok(Measurement::new(alcohol, pulse))
+        Ok(Measurement::new(alcohol_res, pulse_res))
     }
 
-    pub async fn run_until_cancelled(
+    pub async fn run_until_cancelled<F, P>(
         &mut self,
         cancel: impl Future<Output = ()>,
-    ) -> Result<MeasureRun> {
-        match select(self.run(), cancel).await {
+        on_alcohol_status: F,
+        on_pulse_signal: P,
+    ) -> Result<MeasureRun>
+    where
+        F: FnMut(crate::devices::alcohol::Status),
+        P: FnMut(u8),
+    {
+        match select(self.run(on_alcohol_status, on_pulse_signal), cancel).await {
             Either::First(result) => result.map(MeasureRun::Completed),
             Either::Second(()) => {
                 self.alcohol.stop_work().await?;

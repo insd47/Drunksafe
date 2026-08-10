@@ -12,8 +12,25 @@ pub fn home(display: &mut DisplayDevice<'_>) -> Result<()> {
 
 pub fn measuring(display: &mut DisplayDevice<'_>) -> Result<()> {
     display.draw(|canvas| {
-        canvas.centered(16, format_args!("MEASURING"));
-        canvas.centered(36, format_args!("PLEASE WAIT"));
+        canvas.centered(16, format_args!("ALCOHOL SENSOR"));
+        canvas.centered(36, format_args!("MEASURING..."));
+    })?;
+    Ok(())
+}
+
+pub fn measuring_pulse(display: &mut DisplayDevice<'_>, signal_percent: u8) -> Result<()> {
+    display.draw(|canvas| {
+        canvas.centered(14, format_args!("PULSE SENSOR"));
+        canvas.centered(32, format_args!("SIGNAL: {}%", signal_percent));
+        
+        let bar = match signal_percent {
+            0..=20 => "[.         ]",
+            21..=40 => "[...       ]",
+            41..=60 => "[.....     ]",
+            61..=80 => "[.......   ]",
+            _ => "[..........]",
+        };
+        canvas.centered(50, format_args!("{bar}"));
     })?;
     Ok(())
 }

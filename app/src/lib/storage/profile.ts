@@ -1,11 +1,11 @@
 import { protocolVersion } from '@/lib/ble/model';
 import type { PhoneContext } from '@/lib/ble/model';
-import { estimateProfileEliminationMgLPerHourX1000 } from '@/lib/personalization/profile-context';
 import { readHistoryEntries } from '@/lib/storage/history';
 import { readJson, writeJson } from '@/lib/storage/json';
 
 const profileKey = 'drunksafe.profile.v1';
 const baselineKey = 'drunksafe.baseline.v1';
+const conservativeBacEliminationMilliPercentPerHour = 13;
 
 export type Sex = 'male' | 'female';
 
@@ -72,6 +72,14 @@ export async function buildPhoneContext(
   const profile = await readProfile();
   const baseline = await readBaseline();
   const recent = await readHistoryEntries(clampHistoryLimit(historyLimit));
+  const profileComplete =
+    profile.age_years !== null &&
+    profile.height_cm !== null &&
+    profile.weight_kg !== null &&
+    profile.sex !== null;
+  const profileEliminationMgLPerHourX1000 = profileComplete
+    ? Math.ceil((conservativeBacEliminationMilliPercentPerHour * 100) / 21)
+    : null;
 
   return {
     v: protocolVersion,
@@ -81,8 +89,7 @@ export async function buildPhoneContext(
     sober_alcohol_mg_l_x1000: baseline.sober_alcohol_mg_l_x1000,
     sober_alcohol_mad_mg_l_x1000: baseline.sober_alcohol_mad_mg_l_x1000,
     elimination_mg_l_per_hour_x1000:
-      baseline.elimination_mg_l_per_hour_x1000 ??
-      estimateProfileEliminationMgLPerHourX1000(profile),
+      baseline.elimination_mg_l_per_hour_x1000 ?? profileEliminationMgLPerHourX1000,
     resting_bpm: baseline.resting_bpm,
   };
 }

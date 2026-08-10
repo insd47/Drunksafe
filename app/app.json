@@ -26,7 +26,10 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-status-bar"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",

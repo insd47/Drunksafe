@@ -1,0 +1,139 @@
+import { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+
+import { ActionButton } from '@/components/action-button';
+import { Banner } from '@/components/banner';
+import { Screen } from '@/components/screen';
+import { canRequestBleScan } from '@/lib/ble/connection-readiness';
+import { useBleSession } from '@/lib/ble/session';
+
+const searchTimeoutMs = 8000;
+
+/** 진입하면 바로 검색하고, 목록의 기기를 누르면 연결한 뒤 스스로 닫힌다. */
+export default function ConnectRoute() {
+  const router = useRouter();
+  const ble = useBleSession();
+  const initialize = ble.initialize;
+  const startScan = ble.startScan;
+  const stopScan = ble.stopScan;
+  const connectedDevice = ble.connectedDevice;
+  const scannable = canRequestBleScan(ble.bluetoothState);
+  const scanning = ble.connectionPhase === 'scanning';
+  const connecting = ble.connectionPhase === 'connecting';
+  const failed = ble.connectionPhase === 'error';
+  const [searchExpired, setSearchExpired] = useState(false);
+  const notFound = scanning && searchExpired && ble.devices.length === 0;
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  useEffect(() => {
+    if (!scannable) {
+      return;
+    }
+
+    void startScan();
+
+    return () => {
+      void stopScan();
+    };
+  }, [scannable, startScan, stopScan]);
+
+  useEffect(() => {
+    if (!scanning) {
+      return;
+    }
+
+    const timer = setTimeout(() => setSearchExpired(true), searchTimeoutMs);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [scanning]);
+
+  useEffect(() => {
+    if (!connectedDevice) {
+      return;
+    }
+
+    router.back();
+  }, [connectedDevice, router]);
+
+  function research() {
+    setSearchExpired(false);
+    void startScan();
+  }
+
+  return (
+    <Screen>
+      <Text className="text-sm leading-6 text-gray-600">
+        기기 전원을 켜고 휴대폰 가까이 두세요.
+      </Text>
+
+      {!scannable ? (
+        <Banner
+          description="Bluetooth를 켠 뒤 다시 시도하세요."
+          title="Bluetooth를 사용할 수 없습니다"
+          tone="danger"
+        />
+      ) : null}
+
+      {failed ? (
+        <Banner
+          description="기기 전원과 거리를 확인하세요."
+          title="연결하지 못했습니다"
+          tone="danger"
+        />
+      ) : null}
+
+      {scanning && !notFound ? (
+        <View className="flex-row items-center gap-3 border border-gray-200 p-4">
+          <ActivityIndicator color="#030712" size="small" />
+          <Text className="text-sm text-gray-600">주변 기기를 찾는 중입니다…</Text>
+        </View>
+      ) : null}
+
+      {notFound ? (
+        <View className="gap-1 border border-gray-200 p-4">
+          <Text className="text-sm font-semibold text-gray-950">기기를 찾지 못했습니다</Text>
+          <Text className="text-xs leading-5 text-gray-500">
+            기기 전원이 켜져 있는지 확인하고 다시 검색하세요.
+          </Text>
+        </View>
+      ) : null}
+
+      <View className="border-y border-gray-200">
+        {ble.devices.map((device) => (
+          <Pressable
+            accessibilityLabel={`${device.name} 연결`}
+            accessibilityRole="button"
+            className="flex-row items-center justify-between gap-4 py-4"
+            disabled={connecting}
+            key={device.id}
+            onPress={() => {
+              void ble.connect(device.id);
+            }}>
+            <Text className="min-w-0 flex-1 text-sm font-medium text-gray-950">{device.name}</Text>
+            {connecting ? (
+              <ActivityIndicator color="#9ca3af" size="small" />
+            ) : (
+              <Text className="text-sm text-gray-400">연결</Text>
+            )}
+          </Pressable>
+        ))}
+      </View>
+
+      {notFound || failed ? <ActionButton label="다시 검색" onPress={research} /> : null}
+
+      <ActionButton
+        label="닫기"
+        onPress={() => {
+          router.back();
+        }}
+        variant="secondary"
+      />
+    </Screen>
+  );
+}

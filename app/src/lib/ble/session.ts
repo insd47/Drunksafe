@@ -5,8 +5,8 @@ import {
   canRequestBleScan,
   connectedDeviceAfterNotifySubscriptionReady,
   notifySubscriptionPendingMessage,
-  notifySubscriptionReadyTimeoutMs,
   notifySubscriptionTimeoutMessage,
+  scheduleNotifySubscriptionTimeout,
 } from '@/lib/ble/connection-readiness';
 import type {
   DeviceEvent,
@@ -107,12 +107,18 @@ const initialSnapshot: BleSessionSnapshot = {
   mockMode: false,
 };
 
+const reconnectBackoffMs = [500, 1500] as const;
+
 class BleSessionStore {
   private client: DrunksafeBleClient | null = null;
   private stateSubscription: Removable | null = null;
   private eventSubscription: Removable | null = null;
+  private disconnectSubscription: Removable | null = null;
+  private disconnectMonitorGeneration = 0;
   private pendingConnectedDevice: DrunksafeBleDevice | null = null;
   private notifyReadyTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempt = 0;
   private readonly mockTimers = new Set<ReturnType<typeof setTimeout>>();
   private readonly cancelledSessionIds = new Set<string>();
   private readonly listeners = new Set<() => void>();
@@ -150,6 +156,7 @@ class BleSessionStore {
       return;
     }
 
+    this.clearReconnectWait();
     this.clearNotifyReadyWait();
     this.set({
       connectionPhase: 'scanning',
@@ -189,6 +196,7 @@ class BleSessionStore {
       return;
     }
 
+    this.clearReconnectWait();
     this.clearNotifyReadyWait();
     this.set({
       connectionPhase: 'connecting',
@@ -196,34 +204,22 @@ class BleSessionStore {
     });
 
     try {
-      const device = await this.client.connect(deviceId);
-      this.clearEventMonitor();
-      this.pendingConnectedDevice = device;
-      this.set({
-        connectionPhase: 'connecting',
-        connectedDevice: null,
-        deviceStatus: null,
-        message: notifySubscriptionPendingMessage,
-      });
-      this.eventSubscription = this.client.monitorEvents(
-        (event) => {
-          void this.handleEvent(event);
-        },
-        (error) => this.fail(error)
-      );
-      this.scheduleNotifyReadyTimeout(device.id);
-
-      await this.sendCommand({ cmd: 'time', unix_time_ms: Date.now() });
+      await this.establishConnection(deviceId);
     } catch (error) {
       this.fail(error);
     }
   };
 
   connectMockDevice = async () => {
+    this.clearReconnectWait();
     this.clearNotifyReadyWait();
     this.clearMockTimers();
-    this.eventSubscription?.remove();
-    this.eventSubscription = null;
+    this.clearDisconnectMonitor();
+    this.clearEventMonitor();
+
+    if (this.client && !this.snapshot.mockMode) {
+      await this.client.disconnect().catch(() => {});
+    }
 
     this.set({
       connectionPhase: 'connected',
@@ -243,6 +239,7 @@ class BleSessionStore {
   };
 
   disconnect = async () => {
+    this.clearReconnectWait();
     this.clearNotifyReadyWait();
     const activeMeasurement = this.isActiveMeasurement();
     const sessionPatch = disconnectOrInterruptSessionPatch({
@@ -268,8 +265,8 @@ class BleSessionStore {
       return;
     }
 
-    this.eventSubscription?.remove();
-    this.eventSubscription = null;
+    this.clearDisconnectMonitor();
+    this.clearEventMonitor();
     await this.client.disconnect();
     this.set({
       connectionPhase: this.canUseBluetooth() ? 'idle' : this.snapshot.connectionPhase,
@@ -368,10 +365,11 @@ class BleSessionStore {
   };
 
   destroy = async () => {
+    this.clearReconnectWait();
     this.clearNotifyReadyWait();
     this.clearMockTimers();
-    this.eventSubscription?.remove();
-    this.eventSubscription = null;
+    this.clearDisconnectMonitor();
+    this.clearEventMonitor();
     this.stateSubscription?.remove();
     this.stateSubscription = null;
 
@@ -382,6 +380,104 @@ class BleSessionStore {
 
     this.set(initialSnapshot);
   };
+
+  private async establishConnection(deviceId: string) {
+    if (!this.client) {
+      throw new Error('Drunksafe BLE client is not initialized');
+    }
+
+    const device = await this.client.connect(deviceId);
+    this.clearEventMonitor();
+    this.clearDisconnectMonitor();
+    this.pendingConnectedDevice = device;
+    this.set({
+      connectionPhase: 'connecting',
+      connectedDevice: null,
+      deviceStatus: null,
+      message: notifySubscriptionPendingMessage,
+    });
+
+    const monitorGeneration = this.disconnectMonitorGeneration;
+    this.disconnectSubscription = this.client.onDisconnected((error) => {
+      if (monitorGeneration !== this.disconnectMonitorGeneration) {
+        return;
+      }
+
+      void this.handleDeviceDisconnected(device.id, error);
+    });
+    this.eventSubscription = this.client.monitorEvents(
+      (event) => {
+        void this.handleEvent(event);
+      },
+      (error) => this.fail(error)
+    );
+    this.scheduleNotifyReadyTimeout(device.id);
+
+    await this.sendCommand({ cmd: 'time', unix_time_ms: Date.now() });
+  }
+
+  private async handleDeviceDisconnected(deviceId: string, error: Error | null) {
+    this.clearReconnectWait();
+    this.clearNotifyReadyWait();
+    this.clearDisconnectMonitor();
+    this.clearEventMonitor();
+
+    const message = error?.message ?? 'Drunksafe 장치 연결이 예기치 않게 해제되었습니다.';
+    const activeMeasurement = this.isActiveMeasurement();
+    const sessionPatch = disconnectOrInterruptSessionPatch({
+      activeMeasurement,
+      result: this.snapshot.result,
+      resultSaved: this.snapshot.resultSaved,
+      interruptedMessage: message,
+    });
+
+    this.set({
+      connectionPhase: 'connecting',
+      connectedDevice: null,
+      deviceStatus: null,
+      ...sessionPatch,
+      message: activeMeasurement ? message : '장치 연결이 끊겨 재연결을 준비하고 있습니다.',
+    });
+
+    await this.client?.disconnect().catch(() => {});
+    this.scheduleReconnect(deviceId, error);
+  }
+
+  private scheduleReconnect(deviceId: string, lastError: Error | null) {
+    if (this.reconnectTimer) {
+      return;
+    }
+
+    const delayMs = reconnectBackoffMs[this.reconnectAttempt];
+
+    if (delayMs === undefined || !this.client || !this.canUseBluetooth()) {
+      this.fail(lastError ?? new Error('Drunksafe 장치 자동 재연결에 실패했습니다.'));
+      return;
+    }
+
+    this.reconnectAttempt += 1;
+    this.set({
+      connectionPhase: 'connecting',
+      message: `장치 자동 재연결을 시도합니다. (${this.reconnectAttempt}/${reconnectBackoffMs.length})`,
+    });
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.reconnect(deviceId, lastError);
+    }, delayMs);
+  }
+
+  private async reconnect(deviceId: string, lastError: Error | null) {
+    try {
+      await this.establishConnection(deviceId);
+      this.reconnectAttempt = 0;
+    } catch (error) {
+      this.clearNotifyReadyWait();
+      this.clearDisconnectMonitor();
+      this.clearEventMonitor();
+      await this.client?.disconnect().catch(() => {});
+      this.scheduleReconnect(deviceId, error instanceof Error ? error : lastError);
+    }
+  }
 
   private async handleEvent(event: DeviceEvent) {
     this.logEvent(event);
@@ -576,14 +672,18 @@ class BleSessionStore {
     const patch: Partial<BleSessionSnapshot> = { bluetoothState: state };
 
     if (state === 'Unsupported') {
+      this.clearReconnectWait();
       this.clearNotifyReadyWait();
+      this.clearDisconnectMonitor();
       this.clearEventMonitor();
       patch.connectionPhase = 'unsupported';
       patch.connectedDevice = null;
       patch.deviceStatus = null;
       patch.message = '이 환경에서는 BLE를 사용할 수 없습니다.';
     } else if (state !== 'PoweredOn') {
+      this.clearReconnectWait();
       this.clearNotifyReadyWait();
+      this.clearDisconnectMonitor();
       this.clearEventMonitor();
       const message = 'Bluetooth를 켜야 장치를 찾을 수 있습니다.';
 
@@ -621,6 +721,10 @@ class BleSessionStore {
   }
 
   private logCommand(command: PhoneCommand) {
+    if (!__DEV__) {
+      return;
+    }
+
     const atUnixMs = Date.now();
     const input = bleCommandLogEntry(command);
 
@@ -639,6 +743,10 @@ class BleSessionStore {
   }
 
   private logEvent(event: DeviceEvent) {
+    if (!__DEV__) {
+      return;
+    }
+
     const atUnixMs = Date.now();
     const input = bleEventLogEntry(event);
 
@@ -657,6 +765,10 @@ class BleSessionStore {
   }
 
   private logState(label: string, detail: string, sessionId: string | null = null) {
+    if (!__DEV__) {
+      return;
+    }
+
     const atUnixMs = Date.now();
     const input: BleVerificationLogInput = {
       ...bleStateLogEntry(label, detail, sessionId),
@@ -683,8 +795,12 @@ class BleSessionStore {
     const measurementFailed = this.isActiveMeasurement();
     const sessionPatch = measurementFailed ? interruptedMeasurementPatch(message) : { message };
 
+    this.clearReconnectWait();
     this.clearNotifyReadyWait();
+    this.clearMockTimers();
+    this.clearDisconnectMonitor();
     this.clearEventMonitor();
+    void this.client?.disconnect().catch(() => {});
     this.set({
       connectionPhase: unsupported ? 'unsupported' : 'error',
       connectedDevice: null,
@@ -740,11 +856,13 @@ class BleSessionStore {
 
   private scheduleNotifyReadyTimeout(deviceId: string) {
     this.clearNotifyReadyTimer();
-    /*this.notifyReadyTimer = setTimeout(() => {
-      if (this.pendingConnectedDevice?.id === deviceId) {
+    this.notifyReadyTimer = scheduleNotifySubscriptionTimeout({
+      deviceId,
+      pendingDeviceId: () => this.pendingConnectedDevice?.id ?? null,
+      onTimeout: () => {
         this.fail(new Error(notifySubscriptionTimeoutMessage));
-      }
-    }, notifySubscriptionReadyTimeoutMs);*/
+      },
+    });
   }
 
   private consumePendingConnectedDevice() {
@@ -767,6 +885,15 @@ class BleSessionStore {
     }
   }
 
+  private clearReconnectWait() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    this.reconnectAttempt = 0;
+  }
+
   private set(patch: Partial<BleSessionSnapshot>) {
     this.snapshot = { ...this.snapshot, ...patch };
     this.listeners.forEach((listener) => listener());
@@ -775,6 +902,12 @@ class BleSessionStore {
   private clearEventMonitor() {
     this.eventSubscription?.remove();
     this.eventSubscription = null;
+  }
+
+  private clearDisconnectMonitor() {
+    this.disconnectMonitorGeneration += 1;
+    this.disconnectSubscription?.remove();
+    this.disconnectSubscription = null;
   }
 }
 

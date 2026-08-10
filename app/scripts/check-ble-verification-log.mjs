@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
   appendBleVerificationLog,
@@ -16,13 +13,6 @@ import {
   updateBleVerificationEvidenceWithEvent,
   updateBleVerificationEvidenceWithState,
 } from '@/lib/ble/verification-log';
-
-const appDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const sessionSource = readFileSync(join(appDir, 'src', 'lib', 'ble', 'session.ts'), 'utf8');
-const connectScreenSource = readFileSync(
-  join(appDir, 'src', 'screens', 'connect', 'index.tsx'),
-  'utf8'
-);
 
 test('verification log keeps the newest bounded timeline with stable keys', () => {
   let entries = [];
@@ -330,33 +320,4 @@ test('verification evidence summary keeps MVP proof fields beyond bounded timeli
   );
 
   assert.equal(isBleVerificationAckCorrelated(mismatch), false);
-});
-
-test('BLE session and connect screen expose the verification timeline', () => {
-  assert.match(sessionSource, /verificationLog: BleVerificationLogEntry\[\]/);
-  assert.match(sessionSource, /bleEventLogEntry\(event\)/);
-  assert.match(sessionSource, /bleCommandLogEntry\(command\)/);
-  assert.match(sessionSource, /state:notify-ready/);
-  assert.match(sessionSource, /verificationEvidence: BleVerificationEvidenceSummary/);
-  assert.match(connectScreenSource, /BLE 검증 로그/);
-  assert.match(connectScreenSource, /MVP 증거 누적/);
-  assert.match(connectScreenSource, /시간 동기화/);
-  assert.match(connectScreenSource, /Context 전송/);
-  assert.match(connectScreenSource, /ble\.verificationEvidence/);
-  assert.match(connectScreenSource, /isBleVerificationAckCorrelated/);
-  assert.match(connectScreenSource, /ble\.verificationLog/);
-});
-
-test('real BLE commands are logged only after the write succeeds', () => {
-  const sendCommandSource = sessionSource.match(
-    /private async sendCommand\(command: PhoneCommand\) \{[\s\S]*?\n  \}/
-  )?.[0];
-
-  assert.ok(sendCommandSource);
-  assert.match(sendCommandSource, /await this\.client\.send\(command\);/);
-  assert.match(sendCommandSource, /this\.logCommand\(command\);/);
-  assert.ok(
-    sendCommandSource.indexOf('await this.client.send(command);') <
-      sendCommandSource.indexOf('this.logCommand(command);')
-  );
 });

@@ -5,8 +5,8 @@ use enumset::enum_set;
 use esp_idf_svc::bt::ble::gap::{AdvConfiguration, BleGapEvent, EspBleGap};
 use esp_idf_svc::bt::ble::gatt::server::{ConnectionId, EspGatts, GattsEvent, TransferId};
 use esp_idf_svc::bt::ble::gatt::{
-    AutoResponse, GattCharacteristic, GattDescriptor, GattId, GattInterface, GattResponse,
-    GattServiceId, GattStatus, Handle, Permission, Property,
+    set_local_mtu, AutoResponse, GattCharacteristic, GattDescriptor, GattId, GattInterface,
+    GattResponse, GattServiceId, GattStatus, Handle, Permission, Property,
 };
 use esp_idf_svc::bt::{BdAddr, Ble, BtDriver, BtStatus, BtUuid};
 use esp_idf_svc::hal::modem::Modem;
@@ -20,10 +20,12 @@ use super::{
 };
 
 const APP_ID: u16 = 0;
+const LOCAL_MTU: u16 = 185;
 const MAX_CHARACTERISTIC_VALUE_LEN: usize = 200;
 const CLIENT_CHARACTERISTIC_CONFIGURATION_UUID: u16 = 0x2902;
 const NOTIFY_ENABLED: u16 = 0x0001;
 const INDICATE_ENABLED: u16 = 0x0002;
+const ADVERTISING_MAX_ATTEMPTS: u8 = 3;
 
 type Driver = BtDriver<'static, Ble>;
 type Gap = Arc<EspBleGap<'static, Ble, Arc<Driver>>>;
@@ -39,6 +41,8 @@ impl BleService {
     pub fn new(modem: Modem<'static>) -> Result<Self, EspError> {
         let nvs = EspDefaultNvsPartition::take()?;
         let bt = Arc::new(BtDriver::new(modem, Some(nvs))?);
+        set_local_mtu(LOCAL_MTU)?;
+        info!("BLE local MTU set to {LOCAL_MTU}");
         let gap = Arc::new(EspBleGap::new(bt.clone())?);
         let gatts = Arc::new(EspGatts::new(bt.clone())?);
         let (command_tx, commands) = mpsc::channel();
@@ -93,6 +97,7 @@ struct State {
     phone_transport: PhoneCommandTransport,
     event_transport: DeviceEventTransport,
     last_status: Option<DeviceEvent>,
+    advertising_attempts: u8,
 }
 
 #[derive(Clone)]
@@ -133,14 +138,13 @@ impl GattServer {
             let connections = state
                 .connections
                 .iter()
-                .filter(|conn| conn.subscribed)
-                .map(|conn| {
-                    let max_payload_bytes = conn
-                        .mtu
-                        .map(|mtu| mtu.saturating_sub(3) as usize)
-                        .unwrap_or(super::MAX_BLE_JSON_PAYLOAD_BYTES);
+                .filter_map(|conn| {
+                    if !conn.subscribed {
+                        return None;
+                    }
 
-                    (conn.conn_id, max_payload_bytes)
+                    let mtu = conn.mtu?;
+                    Some((conn.conn_id, mtu.saturating_sub(3) as usize))
                 })
                 .collect::<Vec<_>>();
 
@@ -172,10 +176,28 @@ impl GattServer {
     fn on_gap_event(&self, event: BleGapEvent) -> Result<(), EspError> {
         debug!("BLE GAP event: {event:?}");
 
-        if let BleGapEvent::AdvertisingConfigured(status) = event {
-            self.check_bt_status(status)?;
-            self.gap.start_advertising()?;
-            info!("BLE advertising started");
+        match event {
+            BleGapEvent::AdvertisingConfigured(status) => {
+                if !matches!(status, BtStatus::Success) {
+                    warn!("BLE advertising configuration failed: {status:?}");
+                    return self.configure_advertising();
+                }
+
+                if let Err(error) = self.gap.start_advertising() {
+                    warn!("BLE advertising start request failed: {error:?}");
+                    return self.configure_advertising();
+                }
+            }
+            BleGapEvent::AdvertisingStarted(status) => {
+                if !matches!(status, BtStatus::Success) {
+                    warn!("BLE advertising start failed: {status:?}");
+                    return self.configure_advertising();
+                }
+
+                self.state.lock().unwrap().advertising_attempts = 0;
+                info!("BLE advertising started");
+            }
+            _ => {}
         }
 
         Ok(())
@@ -197,7 +219,7 @@ impl GattServer {
                 ..
             } => {
                 self.check_gatt_status(status)?;
-                self.start_service(service_handle)?;
+                self.configure_service(service_handle)?;
             }
             GattsEvent::CharacteristicAdded {
                 status,
@@ -216,21 +238,32 @@ impl GattServer {
             } => {
                 self.check_gatt_status(status)?;
                 self.register_descriptor(service_handle, attr_handle, descr_uuid)?;
-                //self.gatts.start_service(service_handle)?;
                 self.gatts.add_characteristic(
-                  service_handle,
-                  &GattCharacteristic {
-                    uuid: BtUuid::uuid128(PHONE_COMMAND_CHARACTERISTIC_UUID),
-                    permissions: enum_set!(Permission::Write),
-                    properties: enum_set!(Property::Write),
-                    max_len: MAX_CHARACTERISTIC_VALUE_LEN,
-                    auto_rsp: AutoResponse::ByApp,
-                  },
-                  &[],
+                    service_handle,
+                    &GattCharacteristic {
+                        uuid: BtUuid::uuid128(PHONE_COMMAND_CHARACTERISTIC_UUID),
+                        permissions: enum_set!(Permission::Write),
+                        properties: enum_set!(Property::Write),
+                        max_len: MAX_CHARACTERISTIC_VALUE_LEN,
+                        auto_rsp: AutoResponse::ByApp,
+                    },
+                    &[],
                 )?;
             }
+            GattsEvent::ServiceStarted {
+                status,
+                service_handle,
+            } => {
+                self.check_gatt_status(status)?;
+
+                if self.state.lock().unwrap().service_handle == Some(service_handle) {
+                    self.begin_advertising()?;
+                }
+            }
             GattsEvent::Mtu { conn_id, mtu } => {
-                self.register_mtu(conn_id, mtu);
+                if let Some(status) = self.register_mtu(conn_id, mtu) {
+                    self.notify(&status)?;
+                }
             }
             GattsEvent::PeerConnected { conn_id, addr, .. } => {
                 self.add_connection(conn_id, addr)?;
@@ -270,7 +303,6 @@ impl GattServer {
         self.state.lock().unwrap().gatt_if = Some(gatt_if);
 
         self.gap.set_device_name(DEVICE_NAME)?;
-        self.set_adv_conf()?;
         self.gatts.create_service(
             gatt_if,
             &GattServiceId {
@@ -286,20 +318,50 @@ impl GattServer {
         Ok(())
     }
 
-    fn set_adv_conf(&self) -> Result<(), EspError> {
-        self.gap.set_adv_conf(&AdvConfiguration {
-            include_name: true,
-            include_txpower: true,
-            flag: 2,
-            service_uuid: None, //uuid까지 전송하면 ble 통신 바이트 초과
-            ..Default::default()
-        })
+    fn configure_service(&self, service_handle: Handle) -> Result<(), EspError> {
+        self.state.lock().unwrap().service_handle = Some(service_handle);
+        self.add_characteristics(service_handle)
     }
 
-    fn start_service(&self, service_handle: Handle) -> Result<(), EspError> {
-        self.state.lock().unwrap().service_handle = Some(service_handle);
-        //self.gatts.start_service(service_handle)?;//
-        self.add_characteristics(service_handle)
+    fn begin_advertising(&self) -> Result<(), EspError> {
+        self.state.lock().unwrap().advertising_attempts = 0;
+        self.configure_advertising()
+    }
+
+    fn configure_advertising(&self) -> Result<(), EspError> {
+        loop {
+            let attempt = {
+                let mut state = self.state.lock().unwrap();
+
+                if state.advertising_attempts >= ADVERTISING_MAX_ATTEMPTS {
+                    warn!(
+                        "BLE advertising stopped after {ADVERTISING_MAX_ATTEMPTS} failed attempts"
+                    );
+                    return Err(EspError::from_infallible::<ESP_FAIL>());
+                }
+
+                state.advertising_attempts += 1;
+                state.advertising_attempts
+            };
+
+            let configuration = AdvConfiguration {
+                include_name: true,
+                include_txpower: true,
+                flag: 2,
+                service_uuid: None,
+                ..Default::default()
+            };
+
+            match self.gap.set_adv_conf(&configuration) {
+                Ok(()) => {
+                    debug!("BLE advertising configuration requested, attempt={attempt}");
+                    return Ok(());
+                }
+                Err(error) => {
+                    warn!("BLE advertising configuration request failed, attempt={attempt}: {error:?}");
+                }
+            }
+        }
     }
 
     fn add_characteristics(&self, service_handle: Handle) -> Result<(), EspError> {
@@ -371,15 +433,29 @@ impl GattServer {
         Ok(())
     }
 
-    fn register_mtu(&self, conn_id: ConnectionId, mtu: u16) {
+    fn register_mtu(&self, conn_id: ConnectionId, mtu: u16) -> Option<DeviceEvent> {
         let mut state = self.state.lock().unwrap();
 
-        if let Some(conn) = state
+        let subscribed = state
             .connections
             .iter_mut()
             .find(|conn| conn.conn_id == conn_id)
-        {
-            conn.mtu = Some(mtu);
+            .map(|conn| {
+                conn.mtu = Some(mtu);
+                conn.subscribed
+            })?;
+
+        info!("BLE negotiated MTU={mtu}, conn_id={conn_id}");
+
+        if subscribed {
+            Some(
+                state
+                    .last_status
+                    .clone()
+                    .unwrap_or_else(|| super::device_status(super::StatusKind::Connected, None)),
+            )
+        } else {
+            None
         }
     }
 
@@ -414,7 +490,7 @@ impl GattServer {
             }
         }
 
-        self.set_adv_conf()
+        self.begin_advertising()
     }
 
     fn handle_write(
@@ -434,7 +510,7 @@ impl GattServer {
                 if offset == 0 && value.len() == 2 {
                     let value = u16::from_le_bytes([value[0], value[1]]);
                     let subscribed = value == NOTIFY_ENABLED || value == INDICATE_ENABLED;
-                    let mut connection_updated = false;
+                    let mut replay_ready = false;
 
                     if let Some(conn) = state
                         .connections
@@ -442,11 +518,11 @@ impl GattServer {
                         .find(|conn| conn.conn_id == conn_id)
                     {
                         conn.subscribed = subscribed;
-                        connection_updated = true;
+                        replay_ready = subscribed && conn.mtu.is_some();
                         info!("BLE client subscribed={}", conn.subscribed);
                     }
 
-                    if connection_updated && subscribed {
+                    if replay_ready {
                         subscribe_status = Some(state.last_status.clone().unwrap_or_else(|| {
                             super::device_status(super::StatusKind::Connected, None)
                         }));
@@ -525,15 +601,6 @@ impl GattServer {
     fn check_esp_status(&self, status: Result<(), EspError>) {
         if let Err(error) = status {
             warn!("BLE callback failed: {error:?}");
-        }
-    }
-
-    fn check_bt_status(&self, status: BtStatus) -> Result<(), EspError> {
-        if matches!(status, BtStatus::Success) {
-            Ok(())
-        } else {
-            warn!("BLE status is not success: {status:?}");
-            Err(EspError::from_infallible::<ESP_FAIL>())
         }
     }
 

@@ -2,21 +2,24 @@ import '../global.css';
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 export default function RootLayout() {
-    return (
-        <SafeAreaProvider>
-          <SafeAreaView style={{ flex: 1 }}>
-            <Stack screenOptions={{ headerShown: true }}>
-              <Stack.Screen name="index" options={{ title: 'Drunksafe' }} />
-              <Stack.Screen name="onboarding" options={{ title: '온보딩' }} />
-              <Stack.Screen name="measure/[sessionId]" options={{ title: '측정' }} />
-              <Stack.Screen name="results/[id]" options={{ title: '결과' }} />
-              <Stack.Screen name="history" options={{ title: '히스토리' }} />
-            </Stack>
-            <StatusBar style="auto" />
-          </SafeAreaView>
-        </SafeAreaProvider>
-    );
+  return (
+    <SafeAreaProvider>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="connect" options={{ presentation: 'modal', title: '기기 연결' }} />
+        <Stack.Screen
+          name="measure"
+          options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen name="results/[id]" options={{ title: '측정 결과' }} />
+        <Stack.Protected guard={__DEV__}>
+          <Stack.Screen name="dev" options={{ title: '개발자 도구' }} />
+        </Stack.Protected>
+      </Stack>
+      <StatusBar style="auto" />
+    </SafeAreaProvider>
+  );
 }

@@ -41,6 +41,10 @@ export class DrunksafeBleClient {
     return Promise.resolve();
   }
 
+  onDisconnected(_listener: (error: Error | null) => void) {
+    return { remove() {} };
+  }
+
   monitorEvents(_onEvent: (event: DeviceEvent) => void, _onError?: (error: Error) => void) {
     return { remove() {} };
   }

@@ -43,6 +43,7 @@ export class DrunksafeBleClient {
   private readonly manager: BleManager;
   private readonly eventAssembler = new DeviceEventFrameAssembler();
   private maxWritePayloadBytes = maxBleJsonPayloadBytes;
+  private device: Device | null = null;
   private deviceId: string | null = null;
   private eventSubscription: Subscription | null = null;
   private eventMonitorGeneration = 0;
@@ -99,12 +100,25 @@ export class DrunksafeBleClient {
       const discovered = await device.discoverAllServicesAndCharacteristics();
       await this.assertDrunksafeCharacteristics(discovered.id);
 
+      this.device = discovered;
       this.deviceId = discovered.id;
       return toDrunksafeDevice(discovered);
     } catch (error) {
+      this.device = null;
+      this.deviceId = null;
       await this.manager.cancelDeviceConnection(device.id).catch(() => {});
       throw error;
     }
+  }
+
+  onDisconnected(listener: (error: Error | null) => void) {
+    if (!this.device) {
+      throw new Error('Drunksafe BLE device is not connected');
+    }
+
+    return this.device.onDisconnected((error) => {
+      listener(error ? toError(error) : null);
+    });
   }
 
   async disconnect() {
@@ -112,10 +126,12 @@ export class DrunksafeBleClient {
     await this.cancelTransactions();
 
     if (!this.deviceId) {
+      this.device = null;
       return;
     }
 
     const deviceId = this.deviceId;
+    this.device = null;
     this.deviceId = null;
 
     if (await this.manager.isDeviceConnected(deviceId)) {
@@ -181,6 +197,7 @@ export class DrunksafeBleClient {
     await this.stopScan().catch(() => {});
     this.clearEventMonitor();
     await this.cancelTransactions();
+    this.device = null;
     this.deviceId = null;
 
     return this.manager.destroy();

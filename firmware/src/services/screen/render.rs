@@ -28,7 +28,7 @@ pub fn failed(display: &mut DisplayDevice<'_>) -> Result<()> {
 
 pub fn result(display: &mut DisplayDevice<'_>, measurement: Measurement) -> Result<()> {
     let alcohol = measurement.alcohol_mg_l_x1000();
-    let bpm = measurement.pulse_bpm();
+    let bpm = measurement.pulse().map(|pulse| pulse.bpm());
 
     display.draw(|canvas| {
         canvas.centered(

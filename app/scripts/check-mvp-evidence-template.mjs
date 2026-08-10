@@ -32,7 +32,7 @@ test('MVP evidence run template covers every required evidence field', () => {
   assert.match(markdown, /ESP32 flash 완료/);
   assert.match(markdown, /measurement_started\.kind=baseline/);
   assert.match(markdown, /measurement_started\.source=board_button/);
-  assert.match(markdown, /Context timeout/);
+  assert.match(markdown, /raw-only 측정이 즉시 시작/);
   assert.match(markdown, /Notify subscription race/);
   assert.match(markdown, /ZE29 work mode 잔류/);
   assert.match(markdown, /ESP32 후보 serial port/);

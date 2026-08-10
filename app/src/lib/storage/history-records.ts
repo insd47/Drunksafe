@@ -1,4 +1,9 @@
-import type { MeasurementKind, MeasurementResult, Risk } from '@/lib/ble/model';
+import type { MeasurementKind, MeasurementResult } from '@/lib/ble/model';
+import {
+  analyzeMeasurement,
+  type MeasurementAnalysisState,
+  type Risk,
+} from '@/lib/personalization/analysis';
 
 export const measurementHistoryLimit = 50;
 
@@ -21,25 +26,28 @@ export type MeasurementRecord = {
 
 export function recordFromResult(
   result: MeasurementResult,
-  kind: MeasurementKind = result.kind
+  state: MeasurementAnalysisState,
+  measuredAtUnixMs = Date.now()
 ): MeasurementRecord {
-  const measuredAt = result.measured_at_unix_ms ?? Date.now();
+  const analysis = analyzeMeasurement(result, state);
 
   return {
-    id: `${kind}:${result.session_id}:${measuredAt}`,
-    kind,
+    id: `${result.kind}:${result.session_id}:${measuredAtUnixMs}`,
+    kind: result.kind,
     session_id: result.session_id,
-    measured_at_unix_ms: measuredAt,
-    alcohol_mg_l_x1000: result.alcohol.mg_l_x1000,
-    bac_milli_percent: result.bac_milli_percent,
-    bac_upper_milli_percent: result.bac_upper_milli_percent,
-    sober_time_minutes: result.sober_time_minutes,
-    risk: result.risk,
-    confidence_percent: result.confidence_percent,
+    measured_at_unix_ms: measuredAtUnixMs,
+    alcohol_mg_l_x1000: result.alcohol_mg_l_x1000,
+    bac_milli_percent: analysis.bac_milli_percent,
+    bac_upper_milli_percent: analysis.bac_upper_milli_percent,
+    sober_time_minutes: analysis.sober_time_minutes,
+    risk: analysis.risk,
+    confidence_percent: analysis.confidence_percent,
     pulse_bpm: result.pulse?.bpm ?? null,
     pulse_stable: result.pulse?.stable ?? null,
   };
 }
+
+export type { Risk } from '@/lib/personalization/analysis';
 
 export function insertMeasurementRecord(history: MeasurementRecord[], record: MeasurementRecord) {
   if (history.some((item) => isSameMeasurement(item, record))) {

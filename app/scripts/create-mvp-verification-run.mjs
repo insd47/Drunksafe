@@ -31,7 +31,7 @@ export const requiredEvidenceFields = [
 const highRiskEvidence = [
   [
     'Notify subscription race',
-    '첫 status notify 전 start 차단, 연결 후 start가 context timeout 없이 시작됨',
+    '첫 status notify 전 start 차단, 연결 후 raw-only 측정이 즉시 시작됨',
   ],
   [
     '측정 중 cancel 지연',
@@ -135,7 +135,6 @@ ${requiredEvidenceFields.map((field) => `| ${field} |  |`).join('\n')}
 - [ ] BLE 권한 허용
 - [ ] \`Drunksafe 스캔\` 결과에 실제 장치 표시
 - [ ] 연결 후 상태가 \`연결됨\`
-- [ ] Context 상태가 \`준비됨\`
 
 증거:
 
@@ -147,7 +146,7 @@ ${requiredEvidenceFields.map((field) => `| ${field} |  |`).join('\n')}
 ### 3. Baseline 측정
 
 - [ ] \`measurement_started.kind=baseline\`
-- [ ] progress 7단계 순서 확인
+- [ ] 지연 후 raw \`measurement_result\` 수신 확인
 - [ ] baseline 결과 화면 확인
 - [ ] 낮은 safe baseline만 sober baseline에 반영
 - [ ] baseline 결과가 일반 측정 히스토리 집계에 섞이지 않음
@@ -164,7 +163,7 @@ ${requiredEvidenceFields.map((field) => `| ${field} |  |`).join('\n')}
 
 - [ ] \`measurement_started.kind=measurement\`
 - [ ] \`measurement_result.kind=measurement\`
-- [ ] \`measurement_result.measured_at_unix_ms\` 채워짐
+- [ ] 저장 record의 \`measured_at_unix_ms\`가 앱 result 수신 시각으로 채워짐
 - [ ] 결과 저장 상태가 \`저장됨\`
 - [ ] 히스토리 최신 기록이 결과 화면과 일치
 - [ ] 반복 위험 샘플에서 129/109/지역 센터 개선 안내가 표시됨
@@ -183,21 +182,21 @@ ${requiredEvidenceFields.map((field) => `| ${field} |  |`).join('\n')}
 
 - [ ] GPIO0 trigger 버튼으로 측정 시작
 - [ ] \`measurement_started.source=board_button\`
-- [ ] 같은 session id의 progress/result 표시
+- [ ] 같은 session id의 started/result 표시
 - [ ] 일반 측정 히스토리에 저장
 
 증거:
 
 - Board-button session id:
-- Progress 화면 캡처:
+- 측정 화면 캡처:
 - Result 또는 history 화면 캡처:
 
 ### 6. 실패 케이스
 
 | 완료 | 케이스 | 기대 결과 | 증거 |
 | --- | --- | --- | --- |
-| [ ] | Context timeout | 앱 연결 없이 보드 버튼 측정 시 \`context_timeout\` 또는 OLED 실패 화면 |  |
-| [ ] | Cancel | 측정 취소 후 \`cancelled\` 메시지, stale progress/result 제거 |  |
+| [ ] | 앱 미연결 보드 측정 | 폰 왕복 없이 측정하고 OLED에 결과 표시 |  |
+| [ ] | Cancel | 측정 취소 후 \`cancelled\` 메시지, stale result 제거 |  |
 | [ ] | 연결 해제 | Bluetooth off 또는 disconnect 후 다음 측정을 막지 않음 |  |
 | [ ] | 센서 timeout | ZE29 또는 PPG 입력 없이 \`measurement_timeout\` 또는 센서 오류 표시 |  |
 

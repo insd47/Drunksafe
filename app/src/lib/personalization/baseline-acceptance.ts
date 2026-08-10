@@ -1,11 +1,11 @@
-import type { MeasurementResult } from '@/lib/ble/model';
+import type { MeasurementRecord } from '@/lib/storage/history';
 
 export const maxSoberBaselineAlcoholMgLX1000 = 50;
 
-export function shouldUpdateSoberBaseline(result: MeasurementResult) {
+export function shouldUpdateSoberBaseline(result: MeasurementRecord) {
   return shouldAcceptSoberBaselineSample({
     risk: result.risk,
-    alcohol_mg_l_x1000: result.alcohol.mg_l_x1000,
+    alcohol_mg_l_x1000: result.alcohol_mg_l_x1000,
   });
 }
 
@@ -13,7 +13,7 @@ export function shouldAcceptSoberBaselineSample({
   risk,
   alcohol_mg_l_x1000,
 }: {
-  risk: MeasurementResult['risk'];
+  risk: MeasurementRecord['risk'];
   alcohol_mg_l_x1000: number;
 }) {
   return risk === 'safe' && alcohol_mg_l_x1000 <= maxSoberBaselineAlcoholMgLX1000;
@@ -23,7 +23,7 @@ export function baselineResultDescription({
   risk,
   alcohol_mg_l_x1000,
 }: {
-  risk: MeasurementResult['risk'];
+  risk: MeasurementRecord['risk'];
   alcohol_mg_l_x1000: number;
 }) {
   return shouldAcceptSoberBaselineSample({ risk, alcohol_mg_l_x1000 })

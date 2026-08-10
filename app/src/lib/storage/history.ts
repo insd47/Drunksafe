@@ -1,4 +1,4 @@
-import type { HistoryEntry, Risk } from '@/lib/ble/model';
+import type { Risk } from '@/lib/personalization/analysis';
 import {
   insertMeasurementRecord,
   measurementHistoryLimit,
@@ -10,7 +10,7 @@ import { readJson, writeJson } from '@/lib/storage/json';
 const historyKey = 'drunksafe.history.v1';
 
 export { insertMeasurementRecord, recordFromResult };
-export type { MeasurementKind, MeasurementRecord } from '@/lib/storage/history-records';
+export type { MeasurementKind, MeasurementRecord, Risk } from '@/lib/storage/history-records';
 
 export async function readHistory() {
   return readJson<MeasurementRecord[]>(
@@ -19,21 +19,6 @@ export async function readHistory() {
     isMeasurementHistory,
     sanitizeMeasurementHistory
   );
-}
-
-export async function readHistoryEntries(limit: number): Promise<HistoryEntry[]> {
-  const history = await readHistory();
-
-  return history
-    .filter((record) => record.kind === 'measurement')
-    .slice(0, clampReadLimit(limit))
-    .map((record) => ({
-      measured_at_unix_ms: record.measured_at_unix_ms,
-      alcohol_mg_l_x1000: record.alcohol_mg_l_x1000,
-      bac_milli_percent: record.bac_milli_percent,
-      risk: record.risk,
-      confidence_percent: record.confidence_percent,
-    }));
 }
 
 export async function latestMeasurement() {
@@ -122,12 +107,4 @@ function isNullableU16(value: unknown): value is number | null {
 
 function isNullableFiniteNumber(value: unknown): value is number | null {
   return value === null || (typeof value === 'number' && Number.isFinite(value));
-}
-
-function clampReadLimit(limit: number) {
-  if (!Number.isInteger(limit)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(limit, measurementHistoryLimit));
 }

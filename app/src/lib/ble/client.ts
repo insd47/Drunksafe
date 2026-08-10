@@ -257,7 +257,7 @@ export class DrunksafeBleClient {
       mtuDevice = await this.manager.requestMTUForDevice(device.id, preferredMtu);
     } catch {
       if (process.env.EXPO_OS === 'android') {
-        throw new Error('BLE MTU 협상에 실패해 측정 context를 안정적으로 전송할 수 없습니다.');
+        throw new Error('BLE MTU 협상에 실패해 payload를 안정적으로 전송할 수 없습니다.');
       }
 
       this.maxWritePayloadBytes = maxBleJsonPayloadBytes;
@@ -268,7 +268,7 @@ export class DrunksafeBleClient {
 
     if (writePayloadBytes < minimumChunkedBlePayloadBytes) {
       throw new Error(
-        `BLE MTU가 너무 작아 측정 context를 전송할 수 없습니다. 최소 ${minimumChunkedBlePayloadBytes} byte payload가 필요합니다.`
+        `BLE MTU가 너무 작아 chunk payload를 전송할 수 없습니다. 최소 ${minimumChunkedBlePayloadBytes} byte payload가 필요합니다.`
       );
     }
 

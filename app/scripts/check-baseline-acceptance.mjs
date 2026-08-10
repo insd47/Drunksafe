@@ -72,22 +72,17 @@ test('baseline result copy distinguishes history save from baseline acceptance',
 
 function result({ risk, alcohol }) {
   return {
-    v: 7,
+    id: `baseline:${risk}:${alcohol}`,
     session_id: `baseline-${risk}-${alcohol}`,
     kind: 'baseline',
     measured_at_unix_ms: 1798848000000,
-    alcohol: {
-      mg_l_x1000: alcohol,
-    },
-    pulse: {
-      bpm: 72,
-      stable: true,
-      confidence_percent: 88,
-    },
+    alcohol_mg_l_x1000: alcohol,
     bac_milli_percent: Math.round(alcohol * 0.21),
     bac_upper_milli_percent: Math.round(alcohol * 0.21),
     sober_time_minutes: 0,
     risk,
     confidence_percent: 88,
+    pulse_bpm: 72,
+    pulse_stable: true,
   };
 }

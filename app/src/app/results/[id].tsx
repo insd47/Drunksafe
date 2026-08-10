@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { useEffect, useState, type PropsWithChildren } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
@@ -8,7 +8,6 @@ import { LegalNotice } from '@/components/legal-notice';
 import { Screen } from '@/components/screen';
 import { StatusRow } from '@/components/status-row';
 import { cn } from '@/lib/utils/cn';
-import type { Risk } from '@/lib/ble/model';
 import { useBleSession } from '@/lib/ble/session';
 import {
   formatAlcohol,
@@ -18,11 +17,7 @@ import {
   formatMeasuredAt,
   formatMinutes,
 } from '@/lib/format/measurement';
-import {
-  readMeasurementById,
-  recordFromResult,
-  type MeasurementRecord,
-} from '@/lib/storage/history';
+import { readMeasurementById, type MeasurementRecord, type Risk } from '@/lib/storage/history';
 
 /** 판정을 먼저 보여주고 근거는 접어 둔다. */
 export default function ResultRoute() {
@@ -31,11 +26,7 @@ export default function ResultRoute() {
   const ble = useBleSession();
   const liveResult = ble.result?.session_id === id ? ble.result : null;
   const [lookup, setLookup] = useState<SavedLookup>({ id: null, record: null });
-  const liveRecord = useMemo(
-    () => (liveResult ? recordFromResult(liveResult) : null),
-    [liveResult]
-  );
-  const record = liveRecord ?? (lookup.id === id ? lookup.record : null);
+  const record = liveResult ?? (lookup.id === id ? lookup.record : null);
   const loading = !record && lookup.id !== id;
 
   useEffect(() => {

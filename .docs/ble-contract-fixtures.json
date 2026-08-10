@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 7,
+  "protocolVersion": 8,
   "gatt": {
     "serviceUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12201",
     "deviceEventCharacteristicUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12202",
@@ -10,86 +10,49 @@
     "source": ["board_button", "phone"],
     "measurementKind": ["measurement", "baseline"],
     "statusKind": ["idle", "connected", "measuring", "result_ready", "error"],
-    "measurementStep": [
-      "preparing",
-      "warming_sensor",
-      "waiting_breath",
-      "sampling_breath",
-      "sampling_pulse",
-      "analyzing",
-      "done"
-    ],
-    "risk": ["safe", "caution", "danger"],
-    "errorCode": [
-      "context_timeout",
-      "alcohol_sensor",
-      "measurement_timeout",
-      "cancelled"
-    ]
+    "errorCode": ["alcohol_sensor", "measurement_timeout", "cancelled"]
   },
   "payloadKinds": {
     "deviceEvent": [
       "status",
       "measurement_started",
-      "measurement_progress",
       "measurement_result",
       "device_error"
     ],
-    "phoneCommand": ["start", "context", "cancel", "time", "ack"],
+    "phoneCommand": ["start", "cancel"],
     "transportFrame": ["phone_command_chunk", "device_event_chunk"],
     "transportFrameFields": ["frame", "id", "index", "count", "data"]
   },
   "deviceEvents": [
     {
       "event": "status",
-      "v": 7,
+      "v": 8,
       "status": "connected",
-      "active_session_id": null,
-      "battery_percent": 88,
-      "firmware_version": "0.1.0"
+      "active_session_id": null
     },
     {
       "event": "measurement_started",
-      "v": 7,
+      "v": 8,
       "session_id": "fw-fixture-1",
       "source": "phone",
-      "kind": "measurement",
-      "history_limit": 8,
-      "needs_context": true,
-      "sync_time": true
-    },
-    {
-      "event": "measurement_progress",
-      "v": 7,
-      "session_id": "fw-fixture-1",
-      "step": "sampling_breath",
-      "percent": 50
+      "kind": "measurement"
     },
     {
       "event": "measurement_result",
-      "v": 7,
+      "v": 8,
       "session_id": "fw-fixture-1",
       "kind": "measurement",
-      "measured_at_unix_ms": 1798848000000,
-      "alcohol": {
-        "mg_l_x1000": 165
-      },
+      "alcohol_mg_l_x1000": 165,
       "pulse": {
         "bpm": 96,
-        "stable": true,
-        "confidence_percent": 82
-      },
-      "bac_milli_percent": 35,
-      "bac_upper_milli_percent": 39,
-      "sober_time_minutes": 156,
-      "risk": "danger",
-      "confidence_percent": 82
+        "stable": true
+      }
     },
     {
       "event": "device_error",
-      "v": 7,
+      "v": 8,
       "session_id": "fw-fixture-1",
-      "code": "context_timeout"
+      "code": "measurement_timeout"
     }
   ],
   "phoneCommands": [
@@ -98,42 +61,13 @@
       "kind": "measurement"
     },
     {
-      "cmd": "time",
-      "unix_time_ms": 1798848000000
-    },
-    {
-      "cmd": "context",
-      "v": 7,
-      "session_id": "fw-fixture-1",
-      "phone_time_unix_ms": 1798848000000,
-      "recent": [
-        {
-          "measured_at_unix_ms": 1798844400000,
-          "alcohol_mg_l_x1000": 7,
-          "bac_milli_percent": 1,
-          "risk": "safe",
-          "confidence_percent": 90
-        },
-        {
-          "measured_at_unix_ms": 1798846200000,
-          "alcohol_mg_l_x1000": 118,
-          "bac_milli_percent": 25,
-          "risk": "caution",
-          "confidence_percent": 76
-        }
-      ],
-      "sober_alcohol_mg_l_x1000": 7,
-      "sober_alcohol_mad_mg_l_x1000": 3,
-      "elimination_mg_l_per_hour_x1000": 63,
-      "resting_bpm": 71
-    },
-    {
       "cmd": "cancel",
       "session_id": "fw-fixture-1"
-    },
-    {
-      "cmd": "ack",
-      "session_id": "fw-fixture-1"
     }
-  ]
+  ],
+  "deferred": {
+    "chunkTransport": "실기기 negotiated MTU 확인 후 삭제 여부를 결정한다.",
+    "resultTimestamp": "현재 앱 수신 시각을 측정 시각으로 기록하며, 오프라인 버퍼링 도입 시 기기 시각과 Time 동기로 대체한다.",
+    "storeAndForwardCommands": "store-and-forward 버퍼 도입 시 Time은 시각 동기, Ack는 버퍼 삭제 확인 용도로 재도입한다."
+  }
 }

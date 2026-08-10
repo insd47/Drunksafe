@@ -1,6 +1,7 @@
 use crate::devices::alcohol::Status;
 use crate::devices::{AlcoholDevice, PulseDevice};
 use crate::error::{Result, TimeoutKind};
+use crate::services::measure::PulseMeasurement;
 use embassy_time::{Duration, Instant, Timer};
 
 const PULSE_SAMPLE: Duration = Duration::from_millis(10);
@@ -8,7 +9,7 @@ const ALCOHOL_POLL: Duration = Duration::from_millis(200);
 const PULSE_TIMEOUT: Duration = Duration::from_secs(30);
 const ALCOHOL_RESULT_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
+pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<PulseMeasurement> {
     device.reset();
     let started = Instant::now();
 
@@ -16,8 +17,8 @@ pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
         let elapsed_ms = started.elapsed().as_millis().min(u64::from(u32::MAX)) as u32;
 
         if let Some(analysis) = device.sample(elapsed_ms)? {
-            let pulse_bpm = analysis.bpm.round().clamp(0.0, u16::MAX as f32) as u16;
-            return Ok(pulse_bpm);
+            let bpm = analysis.bpm.round().clamp(0.0, u16::MAX as f32) as u16;
+            return Ok(PulseMeasurement::new(bpm, analysis.stable));
         }
 
         if started.elapsed() >= PULSE_TIMEOUT {

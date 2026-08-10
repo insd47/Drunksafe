@@ -1,15 +1,9 @@
 import type { StatusKind } from '@/lib/ble/model';
 
-export type BleMeasurementPhase =
-  | 'idle'
-  | 'starting'
-  | 'waiting_context'
-  | 'measuring'
-  | 'result'
-  | 'error';
+export type BleMeasurementPhase = 'idle' | 'starting' | 'measuring' | 'result' | 'error';
 
 export function isActiveMeasurementPhase(phase: BleMeasurementPhase) {
-  return phase === 'starting' || phase === 'waiting_context' || phase === 'measuring';
+  return phase === 'starting' || phase === 'measuring';
 }
 
 export function isActiveMeasurementStatus(status: StatusKind | null) {

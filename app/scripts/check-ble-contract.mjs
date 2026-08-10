@@ -45,14 +45,6 @@ test('app validator accepts every BLE enum value from the contract fixture', () 
     assert.equal(parseDeviceEvent(JSON.stringify(measurementResult({ kind }))).kind, kind);
   }
 
-  for (const step of contract.enums.measurementStep) {
-    assert.equal(parseDeviceEvent(JSON.stringify(measurementProgress({ step }))).step, step);
-  }
-
-  for (const risk of contract.enums.risk) {
-    assert.equal(parseDeviceEvent(JSON.stringify(measurementResult({ risk }))).risk, risk);
-  }
-
   for (const code of contract.enums.errorCode) {
     assert.equal(parseDeviceEvent(JSON.stringify(deviceError({ code }))).code, code);
   }
@@ -69,12 +61,10 @@ test('phone command fixtures serialize through the app validator', () => {
   }
 });
 
-test('phone context is chunked into bounded BLE command frames', () => {
-  const contextCommand = contract.phoneCommands.find((command) => command.cmd === 'context');
-  assert.ok(contextCommand);
-
+test('chunk transport keeps oversized valid commands in bounded BLE frames', () => {
+  const command = oversizedCancelCommand();
   const maxPayloadBytes = 120;
-  const frames = serializePhoneCommandFrames(contextCommand, maxPayloadBytes);
+  const frames = serializePhoneCommandFrames(command, maxPayloadBytes);
 
   assert.ok(frames.length > 1);
 
@@ -91,23 +81,21 @@ test('phone context is chunked into bounded BLE command frames', () => {
     return parsed.data;
   });
 
-  assert.deepEqual(JSON.parse(chunks.join('')), contextCommand);
+  assert.deepEqual(JSON.parse(chunks.join('')), command);
 });
 
-test('phone context requires a chunk-capable BLE payload size', () => {
-  const contextCommand = contract.phoneCommands.find((command) => command.cmd === 'context');
-  assert.ok(contextCommand);
-
+test('oversized commands require a chunk-capable BLE payload size', () => {
+  const command = oversizedCancelCommand();
   assert.throws(
-    () => serializePhoneCommandFrames(contextCommand, 20),
+    () => serializePhoneCommandFrames(command, 20),
     /BLE transport chunk count exceeds configured limit/
   );
   assert.throws(
-    () => serializePhoneCommandFrames(contextCommand, 97),
+    () => serializePhoneCommandFrames(command, 97),
     /BLE transport chunk count exceeds configured limit/
   );
 
-  const frames = serializePhoneCommandFrames(contextCommand, minimumChunkedBlePayloadBytes);
+  const frames = serializePhoneCommandFrames(command, minimumChunkedBlePayloadBytes);
 
   assert.ok(frames.length <= maxBleTransportChunks);
 
@@ -137,8 +125,8 @@ test('device event chunk frames reassemble before parsing', () => {
 });
 
 test('device event assembler reset drops stale chunks from reused firmware frame ids', () => {
-  const oldPayload = JSON.stringify(deviceStatus({ firmware_version: 'old' }));
-  const newPayload = JSON.stringify(deviceStatus({ firmware_version: 'new' }));
+  const oldPayload = JSON.stringify(deviceStatus({ active_session_id: 'old' }));
+  const newPayload = JSON.stringify(deviceStatus({ active_session_id: 'new' }));
   const oldFrames = twoDeviceEventChunkFrames(oldPayload, 'fw-1');
   const newFrames = twoDeviceEventChunkFrames(newPayload, 'fw-1');
   const assembler = new DeviceEventFrameAssembler();
@@ -157,14 +145,32 @@ test('BLE base64 codec keeps JSON payload bytes stable at the API boundary', () 
   assert.equal(decodeUtf8Base64(encodeUtf8Base64(payload)), payload);
 });
 
+test('v8 rejects removed progress events and payer-free commands', () => {
+  assert.throws(
+    () =>
+      parseDeviceEvent(
+        JSON.stringify({
+          event: 'measurement_progress',
+          v: contract.protocolVersion,
+          session_id: 'removed',
+          step: 'preparing',
+          percent: 5,
+        })
+      ),
+    /Invalid Drunksafe BLE event payload/
+  );
+  assert.throws(
+    () => toPhoneCommandPayload({ cmd: 'time', unix_time_ms: 1798848000000 }),
+    /Invalid Drunksafe BLE command payload/
+  );
+});
+
 function deviceStatus(overrides = {}) {
   return {
     event: 'status',
     v: contract.protocolVersion,
     status: 'connected',
     active_session_id: null,
-    battery_percent: null,
-    firmware_version: '0.1.0',
     ...overrides,
   };
 }
@@ -176,20 +182,6 @@ function measurementStarted(overrides = {}) {
     session_id: 'enum-fixture',
     source: 'phone',
     kind: 'measurement',
-    history_limit: 8,
-    needs_context: true,
-    sync_time: true,
-    ...overrides,
-  };
-}
-
-function measurementProgress(overrides = {}) {
-  return {
-    event: 'measurement_progress',
-    v: contract.protocolVersion,
-    session_id: 'enum-fixture',
-    step: 'preparing',
-    percent: 1,
     ...overrides,
   };
 }
@@ -200,18 +192,14 @@ function measurementResult(overrides = {}) {
     v: contract.protocolVersion,
     session_id: 'enum-fixture',
     kind: 'measurement',
-    measured_at_unix_ms: null,
-    alcohol: {
-      mg_l_x1000: 0,
-    },
+    alcohol_mg_l_x1000: 0,
     pulse: null,
-    bac_milli_percent: null,
-    bac_upper_milli_percent: null,
-    sober_time_minutes: null,
-    risk: 'safe',
-    confidence_percent: 80,
     ...overrides,
   };
+}
+
+function oversizedCancelCommand() {
+  return { cmd: 'cancel', session_id: 'session'.repeat(100) };
 }
 
 function deviceError(overrides = {}) {

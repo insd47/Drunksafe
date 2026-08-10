@@ -17,14 +17,10 @@ export type BleVerificationLogInput = Omit<BleVerificationLogEntry, 'id' | 'atUn
 
 export type BleVerificationEvidenceSummary = {
   notifyReadyAtUnixMs: number | null;
-  timeSyncAtUnixMs: number | null;
-  contextSessionId: string | null;
-  contextCommandAtUnixMs: number | null;
   baselineSessionId: string | null;
   measurementSessionId: string | null;
   boardButtonSessionId: string | null;
   resultSessionId: string | null;
-  ackSessionId: string | null;
   cancelSessionId: string | null;
   cancelCommandAtUnixMs: number | null;
   cancelErrorSessionId: string | null;
@@ -33,14 +29,10 @@ export type BleVerificationEvidenceSummary = {
 
 export const emptyBleVerificationEvidenceSummary: BleVerificationEvidenceSummary = {
   notifyReadyAtUnixMs: null,
-  timeSyncAtUnixMs: null,
-  contextSessionId: null,
-  contextCommandAtUnixMs: null,
   baselineSessionId: null,
   measurementSessionId: null,
   boardButtonSessionId: null,
   resultSessionId: null,
-  ackSessionId: null,
   cancelSessionId: null,
   cancelCommandAtUnixMs: null,
   cancelErrorSessionId: null,
@@ -74,32 +66,11 @@ export function bleCommandLogEntry(command: PhoneCommand): BleVerificationLogInp
         detail: `kind=${command.kind}`,
         sessionId: null,
       };
-    case 'context':
-      return {
-        kind: 'command',
-        label: 'cmd:context',
-        detail: `recent=${command.recent.length} baseline=${nullableNumber(command.sober_alcohol_mg_l_x1000)}`,
-        sessionId: command.session_id,
-      };
     case 'cancel':
       return {
         kind: 'command',
         label: 'cmd:cancel',
         detail: 'phone requested cancel',
-        sessionId: command.session_id,
-      };
-    case 'time':
-      return {
-        kind: 'command',
-        label: 'cmd:time',
-        detail: `unix=${command.unix_time_ms}`,
-        sessionId: null,
-      };
-    case 'ack':
-      return {
-        kind: 'command',
-        label: 'cmd:ack',
-        detail: 'result acknowledged',
         sessionId: command.session_id,
       };
   }
@@ -118,23 +89,14 @@ export function bleEventLogEntry(event: DeviceEvent): BleVerificationLogInput {
       return {
         kind: 'event',
         label: 'event:started',
-        detail: `kind=${event.kind} source=${event.source} context=${event.needs_context ? 'needed' : 'none'}`,
-        sessionId: event.session_id,
-      };
-    case 'measurement_progress':
-      return {
-        kind: 'event',
-        label: 'event:progress',
-        detail: `${event.step} ${event.percent}%`,
+        detail: `kind=${event.kind} source=${event.source}`,
         sessionId: event.session_id,
       };
     case 'measurement_result':
       return {
         kind: 'event',
         label: 'event:result',
-        detail: `risk=${event.risk} bac=${nullableNumber(event.bac_milli_percent)} upper=${nullableNumber(
-          event.bac_upper_milli_percent
-        )}`,
+        detail: `alcohol=${event.alcohol_mg_l_x1000} pulse=${event.pulse?.bpm ?? '-'}`,
         sessionId: event.session_id,
       };
     case 'device_error':
@@ -166,17 +128,6 @@ export function updateBleVerificationEvidenceWithCommand(
   atUnixMs: number
 ): BleVerificationEvidenceSummary {
   switch (command.cmd) {
-    case 'time':
-      return {
-        ...summary,
-        timeSyncAtUnixMs: atUnixMs,
-      };
-    case 'context':
-      return {
-        ...summary,
-        contextSessionId: command.session_id,
-        contextCommandAtUnixMs: atUnixMs,
-      };
     case 'cancel':
       return {
         ...summary,
@@ -184,11 +135,6 @@ export function updateBleVerificationEvidenceWithCommand(
         cancelCommandAtUnixMs: atUnixMs,
         cancelErrorSessionId: null,
         cancelLatencyMs: null,
-      };
-    case 'ack':
-      return {
-        ...summary,
-        ackSessionId: command.session_id,
       };
     default:
       return summary;
@@ -248,14 +194,6 @@ export function updateBleVerificationEvidenceWithState(
     ...summary,
     notifyReadyAtUnixMs: atUnixMs,
   };
-}
-
-export function isBleVerificationAckCorrelated(summary: BleVerificationEvidenceSummary) {
-  return Boolean(summary.resultSessionId && summary.ackSessionId === summary.resultSessionId);
-}
-
-function nullableNumber(value: number | null) {
-  return value === null ? '-' : String(value);
 }
 
 function nextLogEntryId(entries: BleVerificationLogEntry[], idBase: string) {

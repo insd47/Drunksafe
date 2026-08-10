@@ -6,7 +6,7 @@ use embassy_futures::{
     join::join,
     select::{select, Either},
 };
-pub use measurement::Measurement;
+pub use measurement::{Measurement, PulseMeasurement};
 
 mod measurement;
 mod run;

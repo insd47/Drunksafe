@@ -8,21 +8,12 @@ import {
   notifySubscriptionTimeoutMessage,
   scheduleNotifySubscriptionTimeout,
 } from '@/lib/ble/connection-readiness';
-import type {
-  DeviceEvent,
-  ErrorCode,
-  MeasurementProgress,
-  MeasurementResult,
-  PhoneCommand,
-  StatusKind,
-} from '@/lib/ble/model';
+import type { DeviceEvent, ErrorCode, PhoneCommand, StatusKind } from '@/lib/ble/model';
 import {
-  createMockProgressEvent,
   createMockResultEvent,
   createMockSessionId,
   createMockStartedEvent,
   mockBleDevice,
-  mockProgressPlan,
 } from '@/lib/ble/mock';
 import { hasActiveMeasurement, type BleMeasurementPhase } from '@/lib/ble/measurement-phase';
 import {
@@ -32,12 +23,23 @@ import {
   statusMessageAfterNotify,
   terminalDeviceErrorPatch,
 } from '@/lib/ble/session-patches';
-import { recordFromResult, saveMeasurement, type MeasurementKind } from '@/lib/storage/history';
+import {
+  readHistory,
+  recordFromResult,
+  saveMeasurement,
+  type MeasurementKind,
+  type MeasurementRecord,
+} from '@/lib/storage/history';
 import {
   savedResultMessage,
   shouldUpdateSoberBaseline,
 } from '@/lib/personalization/baseline-acceptance';
-import { buildPhoneContext, readBaseline, writeBaseline } from '@/lib/storage/profile';
+import {
+  conservativeEliminationMgLPerHourX1000,
+  emptyBaseline,
+  readBaseline,
+  writeBaseline,
+} from '@/lib/storage/profile';
 import {
   appendBleVerificationLog,
   bleCommandLogEntry,
@@ -76,12 +78,10 @@ export type BleSessionSnapshot = {
   deviceStatus: StatusKind | null;
   activeMeasurementKind: MeasurementKind;
   activeSessionId: string | null;
-  progress: MeasurementProgress | null;
-  result: MeasurementResult | null;
+  result: MeasurementRecord | null;
   resultSaved: boolean;
   deviceErrorCode: ErrorCode | null;
   message: string | null;
-  contextSentSessionId: string | null;
   verificationLog: BleVerificationLogEntry[];
   verificationEvidence: BleVerificationEvidenceSummary;
   mockMode: boolean;
@@ -96,12 +96,10 @@ const initialSnapshot: BleSessionSnapshot = {
   deviceStatus: null,
   activeMeasurementKind: 'measurement',
   activeSessionId: null,
-  progress: null,
   result: null,
   resultSaved: false,
   deviceErrorCode: null,
   message: null,
-  contextSentSessionId: null,
   verificationLog: [],
   verificationEvidence: emptyBleVerificationEvidenceSummary,
   mockMode: false,
@@ -228,12 +226,10 @@ class BleSessionStore {
       connectedDevice: mockBleDevice,
       deviceStatus: 'connected',
       activeSessionId: null,
-      progress: null,
       result: null,
       resultSaved: false,
       deviceErrorCode: null,
       message: '시뮬레이터 데모 장치가 연결됐습니다.',
-      contextSentSessionId: null,
       mockMode: true,
     });
   };
@@ -292,7 +288,6 @@ class BleSessionStore {
       this.logState('state:cancelled', 'mock device cancelled', sessionId);
       this.set({
         measurementPhase: 'error',
-        progress: null,
         result: null,
         resultSaved: false,
         deviceErrorCode: 'cancelled',
@@ -349,12 +344,10 @@ class BleSessionStore {
       measurementPhase: 'starting',
       activeMeasurementKind: kind,
       activeSessionId: null,
-      progress: null,
       result: null,
       resultSaved: false,
       deviceErrorCode: null,
       message: '측정 시작 명령을 보냈습니다.',
-      contextSentSessionId: null,
     });
 
     try {
@@ -412,8 +405,6 @@ class BleSessionStore {
       (error) => this.fail(error)
     );
     this.scheduleNotifyReadyTimeout(device.id);
-
-    await this.sendCommand({ cmd: 'time', unix_time_ms: Date.now() });
   }
 
   private async handleDeviceDisconnected(deviceId: string, error: Error | null) {
@@ -516,19 +507,7 @@ class BleSessionStore {
         });
         return;
       case 'measurement_started':
-        await this.handleMeasurementStarted(event);
-        return;
-      case 'measurement_progress':
-        if (this.cancelledSessionIds.has(event.session_id)) {
-          return;
-        }
-
-        this.set({
-          measurementPhase: event.step === 'done' ? 'result' : 'measuring',
-          activeSessionId: event.session_id,
-          progress: event,
-          message: stepMessage(event),
-        });
+        this.handleMeasurementStarted(event);
         return;
       case 'measurement_result':
         if (this.cancelledSessionIds.has(event.session_id)) {
@@ -536,7 +515,6 @@ class BleSessionStore {
           this.set({
             measurementPhase: 'error',
             activeSessionId: event.session_id,
-            progress: null,
             result: null,
             resultSaved: false,
             deviceErrorCode: 'cancelled',
@@ -557,80 +535,53 @@ class BleSessionStore {
     }
   }
 
-  private async handleMeasurementStarted(
-    event: Extract<DeviceEvent, { event: 'measurement_started' }>
-  ) {
+  private handleMeasurementStarted(event: Extract<DeviceEvent, { event: 'measurement_started' }>) {
     this.set({
-      measurementPhase: event.needs_context ? 'waiting_context' : 'measuring',
+      measurementPhase: 'measuring',
       activeMeasurementKind: event.kind,
       activeSessionId: event.session_id,
-      progress: null,
       result: null,
       resultSaved: false,
       deviceErrorCode: null,
-      message: event.needs_context ? '측정 context를 준비하는 중입니다.' : '측정이 시작됐습니다.',
+      message: '측정이 시작됐습니다.',
     });
-
-    if (this.snapshot.mockMode) {
-      if (event.needs_context) {
-        await buildPhoneContext(event.session_id, event.history_limit);
-
-        if (this.cancelledSessionIds.has(event.session_id)) {
-          return;
-        }
-
-        this.set({
-          measurementPhase: 'measuring',
-          contextSentSessionId: event.session_id,
-          message: '시뮬레이터 측정 context를 준비했습니다.',
-        });
-      }
-      return;
-    }
-
-    if (!this.client) {
-      return;
-    }
-
-    try {
-      if (event.sync_time) {
-        await this.sendCommand({ cmd: 'time', unix_time_ms: Date.now() });
-      }
-
-      if (event.needs_context) {
-        const context = await buildPhoneContext(event.session_id, event.history_limit);
-
-        if (this.cancelledSessionIds.has(event.session_id)) {
-          return;
-        }
-
-        await this.sendCommand({ cmd: 'context', ...context });
-        this.set({
-          measurementPhase: 'measuring',
-          contextSentSessionId: event.session_id,
-          message: '측정 context를 보냈습니다.',
-        });
-      }
-    } catch (error) {
-      this.fail(error);
-    }
   }
 
   private async handleMeasurementResult(
     event: Extract<DeviceEvent, { event: 'measurement_result' }>
   ) {
+    const measuredAtUnixMs = Date.now();
+    let record = recordFromResult(
+      event,
+      {
+        baseline: emptyBaseline,
+        conservativeEliminationMgLPerHourX1000: conservativeEliminationMgLPerHourX1000(),
+        recentMeasurementCount: 0,
+      },
+      measuredAtUnixMs
+    );
     let resultSaved = true;
     let baselineAccepted: boolean | null = null;
     const kind = event.kind;
 
     try {
-      const { inserted } = await saveMeasurement(recordFromResult(event));
+      const [baseline, history] = await Promise.all([readBaseline(), readHistory()]);
+      record = recordFromResult(
+        event,
+        {
+          baseline,
+          conservativeEliminationMgLPerHourX1000: conservativeEliminationMgLPerHourX1000(),
+          recentMeasurementCount: history.filter((item) => item.kind === 'measurement').length,
+        },
+        measuredAtUnixMs
+      );
+      const { inserted } = await saveMeasurement(record);
 
       if (kind === 'baseline') {
-        baselineAccepted = shouldUpdateSoberBaseline(event);
+        baselineAccepted = shouldUpdateSoberBaseline(record);
 
         if (baselineAccepted && inserted) {
-          await saveBaselineFromResult(event);
+          await saveBaselineFromResult(record);
         }
       }
     } catch {
@@ -641,17 +592,12 @@ class BleSessionStore {
       measurementPhase: 'result',
       activeMeasurementKind: kind,
       activeSessionId: event.session_id,
-      progress: null,
-      result: event,
+      result: record,
       resultSaved,
       message: resultSaved
         ? savedResultMessage({ kind, baselineAccepted })
         : '결과 저장에 실패했습니다.',
     });
-
-    if (this.client && resultSaved) {
-      await this.sendCommand({ cmd: 'ack', session_id: event.session_id }).catch(() => {});
-    }
   }
 
   private addDevice(device: DrunksafeBleDevice) {
@@ -816,7 +762,6 @@ class BleSessionStore {
       measurementPhase: 'starting',
       activeMeasurementKind: kind,
       activeSessionId: sessionId,
-      progress: null,
       result: null,
       resultSaved: false,
       deviceErrorCode: null,
@@ -828,12 +773,6 @@ class BleSessionStore {
     if (this.cancelledSessionIds.has(sessionId) || !this.isActiveMeasurement()) {
       return;
     }
-
-    mockProgressPlan.forEach((progress) => {
-      this.scheduleMockEvent(async () => {
-        await this.handleEvent(createMockProgressEvent(sessionId, progress.step, progress.percent));
-      }, progress.delayMs);
-    });
 
     this.scheduleMockEvent(async () => {
       await this.handleEvent(createMockResultEvent(sessionId, kind));
@@ -934,29 +873,8 @@ export function useBleSession() {
   };
 }
 
-function stepMessage(progress: MeasurementProgress) {
-  if (progress.step === 'waiting_breath') {
-    return '호기 입력을 기다리는 중입니다.';
-  }
-
-  if (progress.step === 'sampling_breath') {
-    return '호기 알코올을 측정하고 있습니다.';
-  }
-
-  if (progress.step === 'sampling_pulse') {
-    return '심박 신호를 확인하고 있습니다.';
-  }
-
-  if (progress.step === 'analyzing') {
-    return '결과를 분석하고 있습니다.';
-  }
-
-  return '측정이 진행 중입니다.';
-}
-
 function errorMessage(code: ErrorCode) {
   const labels: Record<ErrorCode, string> = {
-    context_timeout: '측정 context 전송 시간이 초과됐습니다.',
     alcohol_sensor: '알코올 센서 오류가 감지됐습니다.',
     measurement_timeout: '측정 시간이 초과됐습니다.',
     cancelled: '측정이 취소됐습니다.',
@@ -965,14 +883,14 @@ function errorMessage(code: ErrorCode) {
   return labels[code];
 }
 
-async function saveBaselineFromResult(result: MeasurementResult) {
+async function saveBaselineFromResult(result: MeasurementRecord) {
   const baseline = await readBaseline();
   const previousCount = baseline.sample_count;
   const sampleCount = Math.min(previousCount + 1, 65535);
-  const alcohol = result.alcohol.mg_l_x1000;
+  const alcohol = result.alcohol_mg_l_x1000;
   const previousMean = baseline.sober_alcohol_mg_l_x1000;
   const alcoholDeviation = previousMean === null ? 0 : Math.abs(alcohol - previousMean);
-  const stableBpm = result.pulse?.stable ? clampU16(Math.round(result.pulse.bpm)) : null;
+  const stableBpm = result.pulse_stable ? clampU16(Math.round(result.pulse_bpm ?? 0)) : null;
 
   await writeBaseline({
     ...baseline,
@@ -987,7 +905,7 @@ async function saveBaselineFromResult(result: MeasurementResult) {
         ? baseline.resting_bpm
         : rollingAverage(baseline.resting_bpm, previousCount, stableBpm),
     sample_count: sampleCount,
-    updated_at_unix_ms: result.measured_at_unix_ms ?? Date.now(),
+    updated_at_unix_ms: result.measured_at_unix_ms,
   });
 }
 

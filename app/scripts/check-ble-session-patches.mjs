@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { protocolVersion } from '@/lib/ble/model';
 import {
   activeSessionIdAfterStatusNotify,
   disconnectOrInterruptSessionPatch,
@@ -15,7 +16,7 @@ import {
 test('terminal device error clears stale measurement artifacts', () => {
   const patch = terminalDeviceErrorPatch(
     {
-      v: 7,
+      v: protocolVersion,
       session_id: 'fw-7',
       code: 'alcohol_sensor',
     },
@@ -24,12 +25,10 @@ test('terminal device error clears stale measurement artifacts', () => {
 
   assert.equal(patch.measurementPhase, 'error');
   assert.equal(patch.activeSessionId, 'fw-7');
-  assert.equal(patch.progress, null);
   assert.equal(patch.result, null);
   assert.equal(patch.resultSaved, false);
   assert.equal(patch.deviceStatus, 'error');
   assert.equal(patch.deviceErrorCode, 'alcohol_sensor');
-  assert.equal(patch.contextSentSessionId, null);
 });
 
 test('idle session patch clears visible session artifacts after disconnect', () => {
@@ -37,11 +36,9 @@ test('idle session patch clears visible session artifacts after disconnect', () 
 
   assert.equal(patch.measurementPhase, 'idle');
   assert.equal(patch.activeSessionId, null);
-  assert.equal(patch.progress, null);
   assert.equal(patch.result, null);
   assert.equal(patch.resultSaved, false);
   assert.equal(patch.deviceErrorCode, null);
-  assert.equal(patch.contextSentSessionId, null);
   assert.equal(patch.message, null);
 });
 
@@ -51,11 +48,9 @@ test('disconnect session patch preserves unsaved live results', () => {
 
   assert.equal(patch.measurementPhase, 'result');
   assert.equal(patch.activeSessionId, 'fw-unsaved');
-  assert.equal(patch.progress, null);
   assert.equal(patch.result, result);
   assert.equal(patch.resultSaved, false);
   assert.equal(patch.deviceErrorCode, null);
-  assert.equal(patch.contextSentSessionId, null);
   assert.match(patch.message, /저장에 실패/);
 });
 
@@ -80,22 +75,18 @@ test('disconnect during an active measurement leaves an interruption message', (
   });
 
   assert.equal(patch.measurementPhase, 'error');
-  assert.equal(patch.progress, null);
   assert.equal(patch.result, null);
   assert.equal(patch.resultSaved, false);
-  assert.equal(patch.contextSentSessionId, null);
   assert.match(patch.message, /연결이 해제/);
 });
 
-test('interrupted measurement patch clears stale progress and result artifacts', () => {
+test('interrupted measurement patch clears stale result artifacts', () => {
   const patch = interruptedMeasurementPatch('Bluetooth를 켜야 장치를 찾을 수 있습니다.');
 
   assert.equal(patch.measurementPhase, 'error');
-  assert.equal(patch.progress, null);
   assert.equal(patch.result, null);
   assert.equal(patch.resultSaved, false);
   assert.equal(patch.deviceErrorCode, null);
-  assert.equal(patch.contextSentSessionId, null);
   assert.equal(patch.message, 'Bluetooth를 켜야 장치를 찾을 수 있습니다.');
   assert.equal(Object.hasOwn(patch, 'activeSessionId'), false);
 });
@@ -146,18 +137,17 @@ test('terminal status notify preserves result and error messages', () => {
 
 function measurementResult(sessionId) {
   return {
-    v: 7,
+    id: `measurement:${sessionId}:1798848000000`,
     session_id: sessionId,
     kind: 'measurement',
     measured_at_unix_ms: 1798848000000,
-    alcohol: {
-      mg_l_x1000: 80,
-    },
-    pulse: null,
+    alcohol_mg_l_x1000: 80,
     bac_milli_percent: 17,
     bac_upper_milli_percent: 21,
     sober_time_minutes: 84,
     risk: 'caution',
     confidence_percent: 78,
+    pulse_bpm: null,
+    pulse_stable: null,
   };
 }

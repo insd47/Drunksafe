@@ -24,9 +24,4 @@ const copy: Record<DisplayedErrorCode, DeviceErrorCopy> = {
     title: '센서에 문제가 있습니다',
     action: '기기 전원을 껐다 켠 뒤 다시 시도하세요.',
   },
-  context_timeout: {
-    icon: '📡',
-    title: '기기와 통신이 끊겼습니다',
-    action: '기기를 가까이 두고 다시 시도하세요.',
-  },
 };

@@ -4,7 +4,7 @@ import test from 'node:test';
 import { hasActiveMeasurement, isActiveMeasurementPhase } from '@/lib/ble/measurement-phase';
 
 test('active measurement phases block duplicate start commands', () => {
-  for (const phase of ['starting', 'waiting_context', 'measuring']) {
+  for (const phase of ['starting', 'measuring']) {
     assert.equal(isActiveMeasurementPhase(phase), true);
   }
 

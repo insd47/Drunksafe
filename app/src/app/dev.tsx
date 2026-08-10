@@ -34,10 +34,6 @@ export default function DevRoute() {
         <StatusRow label="deviceStatus" value={ble.deviceStatus ?? '-'} />
         <StatusRow label="activeSessionId" value={ble.activeSessionId ?? '-'} />
         <StatusRow label="activeMeasurementKind" value={ble.activeMeasurementKind} />
-        <StatusRow
-          label="progress"
-          value={ble.progress ? `${ble.progress.step} ${ble.progress.percent}%` : '-'}
-        />
         <StatusRow label="deviceErrorCode" value={ble.deviceErrorCode ?? '-'} />
         <StatusRow label="resultSaved" value={String(ble.resultSaved)} />
         <StatusRow label="mockMode" value={String(ble.mockMode)} />

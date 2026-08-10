@@ -1,20 +1,7 @@
-import { protocolVersion } from '@/lib/ble/model';
-import type { PhoneContext } from '@/lib/ble/model';
-import { readHistoryEntries } from '@/lib/storage/history';
 import { readJson, writeJson } from '@/lib/storage/json';
 
-const profileKey = 'drunksafe.profile.v1';
 const baselineKey = 'drunksafe.baseline.v1';
 const conservativeBacEliminationMilliPercentPerHour = 13;
-
-export type Sex = 'male' | 'female';
-
-export type UserProfile = {
-  age_years: number | null;
-  height_cm: number | null;
-  weight_kg: number | null;
-  sex: Sex | null;
-};
 
 export type UserBaseline = {
   sober_alcohol_mg_l_x1000: number | null;
@@ -25,13 +12,6 @@ export type UserBaseline = {
   updated_at_unix_ms: number | null;
 };
 
-export const emptyProfile: UserProfile = {
-  age_years: null,
-  height_cm: null,
-  weight_kg: null,
-  sex: null,
-};
-
 export const emptyBaseline: UserBaseline = {
   sober_alcohol_mg_l_x1000: null,
   sober_alcohol_mad_mg_l_x1000: null,
@@ -40,18 +20,6 @@ export const emptyBaseline: UserBaseline = {
   sample_count: 0,
   updated_at_unix_ms: null,
 };
-
-export async function readProfile() {
-  return readJson(profileKey, createEmptyProfile, isUserProfile);
-}
-
-export async function writeProfile(profile: UserProfile) {
-  if (!isUserProfile(profile)) {
-    throw new Error('Invalid Drunksafe user profile');
-  }
-
-  await writeJson(profileKey, profile);
-}
 
 export async function readBaseline() {
   return readJson(baselineKey, createEmptyBaseline, isUserBaseline);
@@ -65,51 +33,12 @@ export async function writeBaseline(baseline: UserBaseline) {
   await writeJson(baselineKey, baseline);
 }
 
-export async function buildPhoneContext(
-  sessionId: string,
-  historyLimit: number
-): Promise<PhoneContext> {
-  const profile = await readProfile();
-  const baseline = await readBaseline();
-  const recent = await readHistoryEntries(clampHistoryLimit(historyLimit));
-  const profileComplete =
-    profile.age_years !== null &&
-    profile.height_cm !== null &&
-    profile.weight_kg !== null &&
-    profile.sex !== null;
-  const profileEliminationMgLPerHourX1000 = profileComplete
-    ? Math.ceil((conservativeBacEliminationMilliPercentPerHour * 100) / 21)
-    : null;
-
-  return {
-    v: protocolVersion,
-    session_id: sessionId,
-    phone_time_unix_ms: Date.now(),
-    recent,
-    sober_alcohol_mg_l_x1000: baseline.sober_alcohol_mg_l_x1000,
-    sober_alcohol_mad_mg_l_x1000: baseline.sober_alcohol_mad_mg_l_x1000,
-    elimination_mg_l_per_hour_x1000:
-      baseline.elimination_mg_l_per_hour_x1000 ?? profileEliminationMgLPerHourX1000,
-    resting_bpm: baseline.resting_bpm,
-  };
-}
-
-function createEmptyProfile() {
-  return { ...emptyProfile };
+export function conservativeEliminationMgLPerHourX1000() {
+  return Math.ceil((conservativeBacEliminationMilliPercentPerHour * 100) / 21);
 }
 
 function createEmptyBaseline() {
   return { ...emptyBaseline };
-}
-
-function isUserProfile(value: unknown): value is UserProfile {
-  return (
-    isRecord(value) &&
-    isNullableRange(value.age_years, 1, 130) &&
-    isNullableRange(value.height_cm, 30, 250) &&
-    isNullableRange(value.weight_kg, 2, 500) &&
-    (value.sex === null || value.sex === 'male' || value.sex === 'female')
-  );
 }
 
 function isUserBaseline(value: unknown): value is UserBaseline {
@@ -142,19 +71,4 @@ function isNullableU16(value: unknown): value is number | null {
 
 function isNullableU64(value: unknown): value is number | null {
   return value === null || isU64(value);
-}
-
-function isNullableRange(value: unknown, min: number, max: number): value is number | null {
-  return (
-    value === null ||
-    (typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max)
-  );
-}
-
-function clampHistoryLimit(limit: number) {
-  if (!Number.isInteger(limit)) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(limit, 50));
 }

@@ -11,6 +11,29 @@ const device = {
   serviceUUIDs: [],
 };
 
+test('connecting keeps the selected scan device', () => {
+  const transition = reduceBleSession(
+    {
+      ...initialBleSessionState,
+      bluetoothState: 'PoweredOn',
+      connection: {
+        phase: 'scanning',
+        devices: [device],
+        message: 'Drunksafe 장치를 찾는 중입니다.',
+      },
+    },
+    { type: 'connect_requested', deviceId: device.id }
+  );
+
+  assert.deepEqual(transition.state.connection, {
+    phase: 'connecting',
+    deviceId: device.id,
+    device,
+    reconnectAttempt: 0,
+    message: 'Drunksafe 장치에 연결하는 중입니다.',
+  });
+});
+
 test('measurement transition owns only fields valid for its discriminant', () => {
   let state = connectedState();
 

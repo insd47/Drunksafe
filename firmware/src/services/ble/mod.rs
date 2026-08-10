@@ -1,19 +1,19 @@
-mod gatt;
-mod model;
-#[allow(dead_code)]
-mod transport;
-
-pub use gatt::BleService;
 #[allow(unused_imports)]
 pub use model::{
     DeviceError, DeviceEvent, DeviceStatus, ErrorCode, MeasurementKind, MeasurementResult,
     MeasurementStarted, PhoneCommand, Pulse, Source, StatusKind,
 };
+pub use service::BleService;
 #[allow(unused_imports)]
 pub use transport::{
     DeviceEventTransport, PhoneCommandTransport, TransportError, DEVICE_EVENT_CHARACTERISTIC_UUID,
     DEVICE_NAME, MAX_BLE_JSON_PAYLOAD_BYTES, PHONE_COMMAND_CHARACTERISTIC_UUID, SERVICE_UUID,
 };
+mod gatt;
+mod model;
+mod service;
+#[allow(dead_code)]
+mod transport;
 
 /// 새 측정 세션 이벤트를 만든다.
 #[allow(dead_code)]

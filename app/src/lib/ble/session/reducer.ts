@@ -17,6 +17,7 @@ export type ConnectionState =
   | {
       phase: 'connecting';
       deviceId: string;
+      device: DrunksafeBleDevice;
       reconnectAttempt: number;
       message: string;
     }
@@ -157,7 +158,7 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
       return transition(
         {
           ...state,
-          connection: connectingState(event.deviceId, 0),
+          connection: connectingState(connectionTarget(state.connection, event.deviceId), 0),
           mockMode: false,
         },
         { type: 'initialize_client' },
@@ -215,19 +216,21 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
       return transition(
         {
           ...state,
-          connection: connectingState(event.deviceId, 1),
+          connection: connectingState(state.connection.device, 1),
           measurement: interruptMeasurement(state.measurement, 'connection_lost', event.message),
         },
         { type: 'disconnect_client' },
         { type: 'schedule_reconnect', deviceId: event.deviceId, reconnectAttempt: 1 }
       );
     case 'connection_attempt_failed': {
-      if (!isMatchingConnection(state.connection, event.deviceId)) return transition(state);
+      if (state.connection.phase !== 'connecting' || state.connection.deviceId !== event.deviceId) {
+        return transition(state);
+      }
 
       if (event.reconnectAttempt > 0 && event.reconnectAttempt < reconnectBackoffMs.length) {
         const nextAttempt = event.reconnectAttempt + 1;
         return transition(
-          { ...state, connection: connectingState(event.deviceId, nextAttempt) },
+          { ...state, connection: connectingState(state.connection.device, nextAttempt) },
           { type: 'disconnect_client' },
           { type: 'schedule_reconnect', deviceId: event.deviceId, reconnectAttempt: nextAttempt }
         );
@@ -513,20 +516,33 @@ function isConnectionBusy(connection: ConnectionState) {
   return connection.phase === 'connecting' || connection.phase === 'connected';
 }
 
-function isMatchingConnection(connection: ConnectionState, deviceId: string) {
-  return connection.phase === 'connecting' && connection.deviceId === deviceId;
-}
-
-function connectingState(deviceId: string, reconnectAttempt: number): ConnectionState {
+function connectingState(device: DrunksafeBleDevice, reconnectAttempt: number): ConnectionState {
   return {
     phase: 'connecting',
-    deviceId,
+    deviceId: device.id,
+    device,
     reconnectAttempt,
     message:
       reconnectAttempt === 0
         ? 'Drunksafe 장치에 연결하는 중입니다.'
         : `장치 자동 재연결을 시도합니다. (${reconnectAttempt}/${reconnectBackoffMs.length})`,
   };
+}
+
+function connectionTarget(connection: ConnectionState, deviceId: string): DrunksafeBleDevice {
+  if (connection.phase === 'scanning') {
+    const device = connection.devices.find((candidate) => candidate.id === deviceId);
+    if (device) return device;
+  }
+
+  if (
+    (connection.phase === 'connecting' || connection.phase === 'connected') &&
+    connection.device.id === deviceId
+  ) {
+    return connection.device;
+  }
+
+  return { id: deviceId, name: 'Drunksafe', rssi: null, serviceUUIDs: [] };
 }
 
 function disconnectedConnection(bluetoothState: string): ConnectionState {

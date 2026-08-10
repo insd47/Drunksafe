@@ -2,7 +2,9 @@ use crate::devices::display::DisplayDevice;
 use crate::error::Result;
 pub use view::View;
 
+mod icon;
 mod render;
+mod text;
 mod view;
 
 pub struct ScreenService<'d> {

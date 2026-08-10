@@ -9,8 +9,44 @@ export const mockBleDevice: DrunksafeBleDevice = {
   serviceUUIDs: [],
 };
 
-export function createMockSessionId(kind: MeasurementKind) {
-  return `${kind}-mock-${Date.now().toString(36)}`;
+const mockResultDelayMs = 3800;
+
+export class MockBleEventSource {
+  private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  private sequence = 0;
+
+  get pendingTimerCount() {
+    return this.timers.size;
+  }
+
+  start(kind: MeasurementKind, dispatch: (event: DeviceEvent) => void) {
+    this.stop();
+    this.sequence += 1;
+    const sessionId = createMockSessionId(kind, this.sequence);
+
+    dispatch(createMockStartedEvent(sessionId, kind));
+
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      dispatch(createMockResultEvent(sessionId, kind));
+    }, mockResultDelayMs);
+    this.timers.add(timer);
+
+    return sessionId;
+  }
+
+  cancel() {
+    this.stop();
+  }
+
+  stop() {
+    this.timers.forEach((timer) => clearTimeout(timer));
+    this.timers.clear();
+  }
+}
+
+export function createMockSessionId(kind: MeasurementKind, sequence = 0) {
+  return `${kind}-mock-${Date.now().toString(36)}-${sequence.toString(36)}`;
 }
 
 export function createMockStartedEvent(

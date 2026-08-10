@@ -5,7 +5,12 @@ import { ActionButton } from '@/components/action-button';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
-import { useBleSession } from '@/lib/ble/session';
+import {
+  useBleSession,
+  useBleVerification,
+  type ConnectionState,
+  type MeasurementState,
+} from '@/lib/ble/session';
 import { removeJson } from '@/lib/storage/json';
 import { emptyBaseline, writeBaseline } from '@/lib/storage/profile';
 
@@ -14,9 +19,12 @@ const historyKey = 'drunksafe.history.v1';
 
 export default function DevRoute() {
   const ble = useBleSession();
+  const { verificationLog, verificationEvidence } = useBleVerification();
+  const connection = ble.connection;
+  const measurement = ble.measurement;
   const [clearedAtUnixMs, setClearedAtUnixMs] = useState(0);
   const [maintenance, setMaintenance] = useState('대기');
-  const entries = ble.verificationLog.filter((entry) => entry.atUnixMs > clearedAtUnixMs);
+  const entries = verificationLog.filter((entry) => entry.atUnixMs > clearedAtUnixMs);
 
   function run(label: string, action: () => Promise<unknown>) {
     setMaintenance(`${label} 실행 중`);
@@ -29,15 +37,27 @@ export default function DevRoute() {
     <Screen>
       <Section eyebrow="Session" title="세션 상태">
         <StatusRow label="bluetoothState" value={ble.bluetoothState} />
-        <StatusRow label="connectionPhase" value={ble.connectionPhase} />
-        <StatusRow label="measurementPhase" value={ble.measurementPhase} />
-        <StatusRow label="deviceStatus" value={ble.deviceStatus ?? '-'} />
-        <StatusRow label="activeSessionId" value={ble.activeSessionId ?? '-'} />
-        <StatusRow label="activeMeasurementKind" value={ble.activeMeasurementKind} />
-        <StatusRow label="deviceErrorCode" value={ble.deviceErrorCode ?? '-'} />
-        <StatusRow label="resultSaved" value={String(ble.resultSaved)} />
+        <StatusRow label="connectionPhase" value={connection.phase} />
+        <StatusRow label="measurementPhase" value={measurement.phase} />
+        <StatusRow
+          label="deviceStatus"
+          value={connection.phase === 'connected' ? connection.status : '-'}
+        />
+        <StatusRow
+          label="activeSessionId"
+          value={measurement.phase === 'active' ? measurement.sessionId : '-'}
+        />
+        <StatusRow label="activeMeasurementKind" value={measurementKind(measurement)} />
+        <StatusRow
+          label="deviceErrorCode"
+          value={measurement.phase === 'error' ? measurement.code : '-'}
+        />
+        <StatusRow
+          label="resultSaved"
+          value={measurement.phase === 'result' ? String(measurement.saved) : '-'}
+        />
         <StatusRow label="mockMode" value={String(ble.mockMode)} />
-        <StatusRow label="message" value={ble.message ?? '-'} />
+        <StatusRow label="message" value={connectionMessage(connection) ?? '-'} />
       </Section>
 
       <Section eyebrow="Raw" title={`원시 이벤트 (${entries.length})`}>
@@ -58,7 +78,7 @@ export default function DevRoute() {
       />
 
       <Collapsible label="증거 집계">
-        {Object.entries(ble.verificationEvidence).map(([key, value]) => (
+        {Object.entries(verificationEvidence).map(([key, value]) => (
           <StatusRow key={key} label={key} value={value === null ? '-' : String(value)} />
         ))}
       </Collapsible>
@@ -84,6 +104,24 @@ export default function DevRoute() {
       />
     </Screen>
   );
+}
+
+/** idle을 뺀 모든 연결 상태가 사람이 읽을 메시지를 들고 있다. */
+function connectionMessage(connection: ConnectionState) {
+  return connection.phase === 'idle' ? null : connection.message;
+}
+
+function measurementKind(measurement: MeasurementState) {
+  switch (measurement.phase) {
+    case 'starting':
+    case 'active':
+    case 'error':
+      return measurement.kind;
+    case 'result':
+      return measurement.record.kind;
+    case 'idle':
+      return '-';
+  }
 }
 
 function Collapsible({ label, children }: PropsWithChildren<{ label: string }>) {

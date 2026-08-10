@@ -17,13 +17,16 @@ export default function ConnectRoute() {
   const initialize = ble.initialize;
   const startScan = ble.startScan;
   const stopScan = ble.stopScan;
-  const connectedDevice = ble.connectedDevice;
+  const connection = ble.connection;
+  const connectedDevice = connection.phase === 'connected' ? connection.device : null;
   const scannable = canRequestBleScan(ble.bluetoothState);
-  const scanning = ble.connectionPhase === 'scanning';
-  const connecting = ble.connectionPhase === 'connecting';
-  const failed = ble.connectionPhase === 'error';
+  const scanning = connection.phase === 'scanning';
+  const connecting = connection.phase === 'connecting';
+  const failed = connection.phase === 'error';
+  /** 발견된 기기 목록은 검색 중에만 존재한다. */
+  const devices = connection.phase === 'scanning' ? connection.devices : [];
   const [searchExpired, setSearchExpired] = useState(false);
-  const notFound = scanning && searchExpired && ble.devices.length === 0;
+  const notFound = scanning && searchExpired && devices.length === 0;
 
   useEffect(() => {
     initialize();
@@ -95,6 +98,13 @@ export default function ConnectRoute() {
         </View>
       ) : null}
 
+      {connecting ? (
+        <View className="flex-row items-center gap-3 border border-gray-200 p-4">
+          <ActivityIndicator color="#030712" size="small" />
+          <Text className="text-sm text-gray-600">기기에 연결하는 중입니다…</Text>
+        </View>
+      ) : null}
+
       {notFound ? (
         <View className="gap-1 border border-gray-200 p-4">
           <Text className="text-sm font-semibold text-gray-950">기기를 찾지 못했습니다</Text>
@@ -105,22 +115,17 @@ export default function ConnectRoute() {
       ) : null}
 
       <View className="border-y border-gray-200">
-        {ble.devices.map((device) => (
+        {devices.map((device) => (
           <Pressable
             accessibilityLabel={`${device.name} 연결`}
             accessibilityRole="button"
             className="flex-row items-center justify-between gap-4 py-4"
-            disabled={connecting}
             key={device.id}
             onPress={() => {
               void ble.connect(device.id);
             }}>
             <Text className="min-w-0 flex-1 text-sm font-medium text-gray-950">{device.name}</Text>
-            {connecting ? (
-              <ActivityIndicator color="#9ca3af" size="small" />
-            ) : (
-              <Text className="text-sm text-gray-400">연결</Text>
-            )}
+            <Text className="text-sm text-gray-400">연결</Text>
           </Pressable>
         ))}
       </View>

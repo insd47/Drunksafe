@@ -6,9 +6,8 @@ import { ActionButton } from '@/components/action-button';
 import { Banner } from '@/components/banner';
 import { Screen } from '@/components/screen';
 import { toneDotClass, toneTextClass, type Tone } from '@/components/tone';
-import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { ensureDrunksafeBlePermissions } from '@/lib/ble/permissions';
-import { useBleSession, type BleConnectionPhase } from '@/lib/ble/session';
+import { useBleSession, type ConnectionState, type MeasurementState } from '@/lib/ble/session';
 import {
   formatBac,
   formatDrivingStatus,
@@ -22,14 +21,12 @@ export default function HomeRoute() {
   const router = useRouter();
   const ble = useBleSession();
   const initialize = ble.initialize;
+  const connection = ble.connection;
   const [latest, setLatest] = useState<MeasurementRecord | null>(null);
   const cta = homeCta({
     bluetoothState: ble.bluetoothState,
-    connectionPhase: ble.connectionPhase,
-    connected: Boolean(ble.connectedDevice),
-    activeMeasurement: hasActiveMeasurement(ble),
-    pendingResultSessionId:
-      ble.measurementPhase === 'result' ? (ble.result?.session_id ?? null) : null,
+    connection,
+    measurement: ble.measurement,
   });
   const banner = ctaBanner[cta.kind];
 
@@ -88,9 +85,9 @@ export default function HomeRoute() {
   return (
     <Screen>
       <DeviceCard
-        name={ble.connectedDevice?.name ?? 'Drunksafe 기기'}
-        status={deviceStatusText(ble.connectionPhase, Boolean(ble.connectedDevice))}
-        tone={deviceTone(ble.connectionPhase, Boolean(ble.connectedDevice))}
+        name={connection.phase === 'connected' ? connection.device.name : 'Drunksafe 기기'}
+        status={deviceStatusText(connection)}
+        tone={deviceTone(connection)}
       />
 
       {banner ? (
@@ -178,32 +175,29 @@ async function allowBluetooth() {
   await Linking.openSettings();
 }
 
+/** 측정 상태가 연결 상태보다 우선한다 — 손에 든 결과와 진행 중인 측정이 먼저다. */
 function homeCta({
   bluetoothState,
-  connectionPhase,
-  connected,
-  activeMeasurement,
-  pendingResultSessionId,
+  connection,
+  measurement,
 }: {
   bluetoothState: string;
-  connectionPhase: BleConnectionPhase;
-  connected: boolean;
-  activeMeasurement: boolean;
-  pendingResultSessionId: string | null;
+  connection: ConnectionState;
+  measurement: MeasurementState;
 }): HomeCta {
-  if (pendingResultSessionId) {
-    return { kind: 'result', sessionId: pendingResultSessionId };
+  if (measurement.phase === 'result') {
+    return { kind: 'result', sessionId: measurement.record.session_id };
   }
 
-  if (activeMeasurement) {
+  if (measurement.phase === 'starting' || measurement.phase === 'active') {
     return { kind: 'resume' };
   }
 
-  if (connected) {
+  if (connection.phase === 'connected') {
     return { kind: 'start' };
   }
 
-  if (connectionPhase === 'connecting') {
+  if (connection.phase === 'connecting') {
     return { kind: 'connecting' };
   }
 
@@ -211,7 +205,7 @@ function homeCta({
     return { kind: 'permission' };
   }
 
-  if (bluetoothState === 'Unsupported' || connectionPhase === 'unsupported') {
+  if (bluetoothState === 'Unsupported' || connection.phase === 'unsupported') {
     return __DEV__ ? { kind: 'developer' } : { kind: 'connect' };
   }
 
@@ -222,32 +216,35 @@ function homeCta({
   return { kind: 'connect' };
 }
 
-function deviceStatusText(phase: BleConnectionPhase, connected: boolean) {
-  if (connected) {
-    return '연결됨';
+function deviceStatusText(connection: ConnectionState) {
+  switch (connection.phase) {
+    case 'connected':
+      return '연결됨';
+    case 'connecting':
+      return '연결하는 중입니다';
+    case 'scanning':
+      return '주변 기기를 찾는 중입니다';
+    case 'idle':
+    case 'bluetooth_off':
+    case 'unsupported':
+    case 'error':
+      return '연결되지 않았습니다';
   }
-
-  if (phase === 'connecting') {
-    return '연결하는 중입니다';
-  }
-
-  if (phase === 'scanning') {
-    return '주변 기기를 찾는 중입니다';
-  }
-
-  return '연결되지 않았습니다';
 }
 
-function deviceTone(phase: BleConnectionPhase, connected: boolean): Tone {
-  if (connected) {
-    return 'safe';
+function deviceTone(connection: ConnectionState): Tone {
+  switch (connection.phase) {
+    case 'connected':
+      return 'safe';
+    case 'connecting':
+    case 'scanning':
+      return 'caution';
+    case 'idle':
+    case 'bluetooth_off':
+    case 'unsupported':
+    case 'error':
+      return 'neutral';
   }
-
-  if (phase === 'connecting' || phase === 'scanning') {
-    return 'caution';
-  }
-
-  return 'neutral';
 }
 
 type HomeCta =

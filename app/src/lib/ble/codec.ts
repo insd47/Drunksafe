@@ -27,7 +27,7 @@ export function utf8ByteLength(value: string) {
 export function decodeUtf8Base64(value: string) {
   const clean = value.replace(/\s/g, '');
 
-  if (clean.length % 4 !== 0) {
+  if (clean.length % 4 !== 0 || !isCanonicalBase64Shape(clean)) {
     throw new Error('Invalid BLE base64 payload');
   }
 
@@ -38,6 +38,14 @@ export function decodeUtf8Base64(value: string) {
     const second = decodeBase64Char(clean[index + 1]);
     const third = clean[index + 2] === padding ? 0 : decodeBase64Char(clean[index + 2]);
     const fourth = clean[index + 3] === padding ? 0 : decodeBase64Char(clean[index + 3]);
+
+    if (
+      (clean[index + 2] === padding && (second & 15) !== 0) ||
+      (clean[index + 3] === padding && clean[index + 2] !== padding && (third & 3) !== 0)
+    ) {
+      throw new Error('Invalid BLE base64 payload');
+    }
+
     const triplet = (first << 18) | (second << 12) | (third << 6) | fourth;
 
     bytes.push((triplet >> 16) & 255);
@@ -52,6 +60,10 @@ export function decodeUtf8Base64(value: string) {
   }
 
   return utf8String(bytes);
+}
+
+function isCanonicalBase64Shape(value: string) {
+  return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value);
 }
 
 function decodeBase64Char(value: string | undefined) {

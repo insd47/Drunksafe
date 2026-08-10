@@ -24,7 +24,14 @@ export default function ResultRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const ble = useBleSession();
-  const liveResult = ble.result?.session_id === id ? ble.result : null;
+  const measurement = ble.measurement;
+  /** 방금 끝난 측정이 이 화면의 세션이면 저장을 기다리지 않고 그대로 보여준다. */
+  const liveResult =
+    measurement.phase === 'result' && measurement.record.session_id === id
+      ? measurement.record
+      : null;
+  const liveResultUnsaved =
+    measurement.phase === 'result' && measurement.record.session_id === id && !measurement.saved;
   const [lookup, setLookup] = useState<SavedLookup>({ id: null, record: null });
   const record = liveResult ?? (lookup.id === id ? lookup.record : null);
   const loading = !record && lookup.id !== id;
@@ -64,7 +71,7 @@ export default function ResultRoute() {
 
   return (
     <Screen>
-      {liveResult && !ble.resultSaved ? (
+      {liveResultUnsaved ? (
         <Banner
           description="기록 탭에 남지 않을 수 있습니다."
           title="결과를 저장하지 못했습니다"

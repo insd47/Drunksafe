@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
 import { deviceErrorCopy } from '@/components/device-error-copy';
-import { hasActiveMeasurement } from '@/lib/ble/measurement-phase';
 import { useBleSession } from '@/lib/ble/session';
 
 const slowBreathSeconds = 20;
@@ -29,9 +28,13 @@ export default function MeasureRoute() {
   const startMeasurement = ble.startMeasurement;
   const cancelMeasurement = ble.cancelMeasurement;
   const kind = params.kind === 'baseline' ? 'baseline' : 'measurement';
-  const activeMeasurement = hasActiveMeasurement(ble);
-  const resultSessionId = ble.result?.session_id ?? null;
-  const elapsedSeconds = useElapsedSeconds(ble.activeSessionId);
+  const measurement = ble.measurement;
+  const activeMeasurement = measurement.phase === 'starting' || measurement.phase === 'active';
+  const resultSessionId = measurement.phase === 'result' ? measurement.record.session_id : null;
+  const errorCode = measurement.phase === 'error' ? measurement.code : null;
+  const elapsedSeconds = useElapsedSeconds(
+    measurement.phase === 'active' ? measurement.startedAtUnixMs : null
+  );
   const requested = useRef(false);
   const staleResultSessionId = useRef(resultSessionId);
   const close = useCallback(() => {
@@ -70,20 +73,20 @@ export default function MeasureRoute() {
   }, [resultSessionId, router]);
 
   useEffect(() => {
-    if (ble.deviceErrorCode !== 'cancelled') {
+    if (errorCode !== 'cancelled') {
       return;
     }
 
     close();
-  }, [ble.deviceErrorCode, close]);
+  }, [errorCode, close]);
 
   function cancel() {
     void cancelMeasurement();
     close();
   }
 
-  if (ble.deviceErrorCode && ble.deviceErrorCode !== 'cancelled') {
-    const copy = deviceErrorCopy(ble.deviceErrorCode);
+  if (errorCode !== null && errorCode !== 'cancelled') {
+    const copy = deviceErrorCopy(errorCode);
 
     return (
       <MeasureLayout>
@@ -102,7 +105,9 @@ export default function MeasureRoute() {
     );
   }
 
-  if (ble.connectionPhase === 'error' || (!ble.connectedDevice && !activeMeasurement)) {
+  const connected = ble.connection.phase === 'connected';
+
+  if (ble.connection.phase === 'error' || (!connected && !activeMeasurement)) {
     return (
       <MeasureLayout>
         <MeasureNotice
@@ -117,7 +122,7 @@ export default function MeasureRoute() {
     );
   }
 
-  const started = ble.activeSessionId !== null && activeMeasurement;
+  const started = measurement.phase === 'active';
 
   return (
     <MeasureLayout>
@@ -208,26 +213,29 @@ function ElapsedRing({ seconds }: { seconds: number }) {
   );
 }
 
-/** measurement_started 수신 시각을 기준으로 앱이 직접 경과 시간을 센다. */
-function useElapsedSeconds(sessionId: string | null) {
-  const [elapsed, setElapsed] = useState<Elapsed>({ sessionId: null, seconds: 0 });
+/** 측정 시작 시각은 세션이 들고 있으므로 화면은 현재 시각만 흘려보내면 된다. */
+function useElapsedSeconds(startedAtUnixMs: number | null) {
+  const [nowUnixMs, setNowUnixMs] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!sessionId) {
+    if (startedAtUnixMs === null) {
       return;
     }
 
-    const startedAt = Date.now();
     const timer = setInterval(() => {
-      setElapsed({ sessionId, seconds: Math.floor((Date.now() - startedAt) / 1000) });
+      setNowUnixMs(Date.now());
     }, 1000);
 
     return () => {
       clearInterval(timer);
     };
-  }, [sessionId]);
+  }, [startedAtUnixMs]);
 
-  return elapsed.sessionId === sessionId ? elapsed.seconds : 0;
+  if (startedAtUnixMs === null) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor((nowUnixMs - startedAtUnixMs) / 1000));
 }
 
 function coachingHint(started: boolean, elapsedSeconds: number) {
@@ -248,8 +256,3 @@ function formatElapsed(seconds: number) {
 
   return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
 }
-
-type Elapsed = {
-  sessionId: string | null;
-  seconds: number;
-};

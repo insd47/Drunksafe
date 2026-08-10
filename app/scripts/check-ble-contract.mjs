@@ -145,6 +145,19 @@ test('BLE base64 codec keeps JSON payload bytes stable at the API boundary', () 
   assert.equal(decodeUtf8Base64(encodeUtf8Base64(payload)), payload);
 });
 
+test('BLE base64 codec rejects malformed padding and non-canonical pad bits', () => {
+  for (const malformed of ['A===', 'AA=A', '=AAA', 'YR==', 'YWJ=']) {
+    assert.throws(() => decodeUtf8Base64(malformed), /Invalid BLE base64 payload/);
+  }
+});
+
+test('BLE base64 codec defines empty and lone-surrogate behavior', () => {
+  assert.equal(encodeUtf8Base64(''), '');
+  assert.equal(decodeUtf8Base64(''), '');
+  assert.throws(() => encodeUtf8Base64('\ud800'), URIError);
+  assert.throws(() => decodeUtf8Base64('/w=='), URIError);
+});
+
 test('v8 rejects removed progress events and payer-free commands', () => {
   assert.throws(
     () =>

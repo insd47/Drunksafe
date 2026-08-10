@@ -17,6 +17,7 @@ const developerTapCount = 7;
 export default function SettingsRoute() {
   const router = useRouter();
   const ble = useBleSession();
+  const connectedDevice = ble.connection.phase === 'connected' ? ble.connection.device : null;
   const [baseline, setBaseline] = useState<UserBaseline>(emptyBaseline);
   const [versionTaps, setVersionTaps] = useState(0);
   const appVersion = Constants.expoConfig?.version ?? '-';
@@ -60,14 +61,14 @@ export default function SettingsRoute() {
     <Screen>
       <Section title="기기">
         <StatusRow
-          description={ble.connectedDevice?.name ?? '홈에서 기기를 연결할 수 있습니다.'}
+          description={connectedDevice ? connectedDevice.name : '홈에서 기기를 연결할 수 있습니다.'}
           label="연결 상태"
-          tone={ble.connectedDevice ? 'safe' : 'neutral'}
-          value={ble.connectedDevice ? '연결됨' : '연결 안 됨'}
+          tone={connectedDevice ? 'safe' : 'neutral'}
+          value={connectedDevice ? '연결됨' : '연결 안 됨'}
         />
       </Section>
       <ActionButton
-        disabled={!ble.connectedDevice}
+        disabled={!connectedDevice}
         label="연결 해제"
         onPress={() => {
           void ble.disconnect();

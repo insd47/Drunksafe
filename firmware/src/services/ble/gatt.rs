@@ -6,7 +6,7 @@ use esp_idf_svc::bt::ble::gap::{AdvConfiguration, BleGapEvent, EspBleGap};
 use esp_idf_svc::bt::ble::gatt::server::{ConnectionId, EspGatts, GattsEvent, TransferId};
 use esp_idf_svc::bt::ble::gatt::{
     set_local_mtu, AutoResponse, GattCharacteristic, GattDescriptor, GattId, GattInterface,
-    GattResponse, GattServiceId, GattStatus, Handle, Permission, Property,
+    GattServiceId, GattStatus, Handle, Permission, Property,
 };
 use esp_idf_svc::bt::{BdAddr, Ble, BtDriver, BtStatus, BtUuid};
 use esp_idf_svc::hal::modem::Modem;
@@ -92,8 +92,7 @@ struct State {
     event_handle: Option<Handle>,
     command_handle: Option<Handle>,
     event_cccd_handle: Option<Handle>,
-    connections: Vec<Connection>,
-    response: GattResponse,
+    connection: Option<Connection>,
     phone_transport: PhoneCommandTransport,
     event_transport: DeviceEventTransport,
     last_status: Option<DeviceEvent>,
@@ -119,7 +118,7 @@ impl GattServer {
     }
 
     fn notify(&self, event: &DeviceEvent) -> Result<(), EspError> {
-        let targets = {
+        let target = {
             let mut state = self.state.lock().unwrap();
 
             if let DeviceEvent::Status(_) = event {
@@ -133,41 +132,33 @@ impl GattServer {
                 return Ok(());
             };
 
-            let mut targets = Vec::new();
-
-            let connections = state
-                .connections
-                .iter()
-                .filter_map(|conn| {
-                    if !conn.subscribed {
-                        return None;
-                    }
-
-                    let mtu = conn.mtu?;
-                    Some((conn.conn_id, mtu.saturating_sub(3) as usize))
-                })
-                .collect::<Vec<_>>();
-
-            for (conn_id, max_payload_bytes) in connections {
-                let frames = state
-                    .event_transport
-                    .frames_with_max_payload_bytes(event, max_payload_bytes)
-                    .map_err(|error| {
-                        warn!("failed to serialize BLE event: {error}");
-                        EspError::from_infallible::<ESP_FAIL>()
-                    })?;
-
-                targets.push((gatt_if, conn_id, event_handle, frames));
+            let Some(connection) = state.connection.as_ref() else {
+                return Ok(());
+            };
+            if !connection.subscribed {
+                return Ok(());
             }
+            let Some(mtu) = connection.mtu else {
+                return Ok(());
+            };
 
-            targets
+            let conn_id = connection.conn_id;
+            let max_payload_bytes = mtu.saturating_sub(3) as usize;
+            let frames = state
+                .event_transport
+                .frames_with_max_payload_bytes(event, max_payload_bytes)
+                .map_err(|error| {
+                    warn!("failed to serialize BLE event: {error}");
+                    EspError::from_infallible::<ESP_FAIL>()
+                })?;
+
+            (gatt_if, conn_id, event_handle, frames)
         };
 
-        for (gatt_if, conn_id, event_handle, frames) in targets {
-            for frame in frames {
-                self.gatts
-                    .notify(gatt_if, conn_id, event_handle, frame.as_bytes())?;
-            }
+        let (gatt_if, conn_id, event_handle, frames) = target;
+        for frame in frames {
+            self.gatts
+                .notify(gatt_if, conn_id, event_handle, frame.as_bytes())?;
         }
 
         Ok(())
@@ -281,12 +272,32 @@ impl GattServer {
                 value,
                 ..
             } => {
-                let (handled, status_replay) = self.handle_write(conn_id, handle, offset, value)?;
+                if is_prep {
+                    self.send_write_response(
+                        gatt_if,
+                        conn_id,
+                        trans_id,
+                        need_rsp,
+                        GattStatus::ReqNotSupported,
+                    )?;
+                    return Ok(());
+                }
+
+                if offset != 0 {
+                    self.send_write_response(
+                        gatt_if,
+                        conn_id,
+                        trans_id,
+                        need_rsp,
+                        GattStatus::InvalidOffset,
+                    )?;
+                    return Ok(());
+                }
+
+                let (handled, status_replay) = self.handle_write(conn_id, handle, value)?;
 
                 if handled {
-                    self.send_write_response(
-                        gatt_if, conn_id, trans_id, handle, offset, need_rsp, is_prep, value,
-                    )?;
+                    self.send_write_response(gatt_if, conn_id, trans_id, need_rsp, GattStatus::Ok)?;
                 }
 
                 if let Some(event) = status_replay {
@@ -437,9 +448,9 @@ impl GattServer {
         let mut state = self.state.lock().unwrap();
 
         let subscribed = state
-            .connections
-            .iter_mut()
-            .find(|conn| conn.conn_id == conn_id)
+            .connection
+            .as_mut()
+            .filter(|connection| connection.conn_id == conn_id)
             .map(|conn| {
                 conn.mtu = Some(mtu);
                 conn.subscribed
@@ -460,18 +471,12 @@ impl GattServer {
     }
 
     fn add_connection(&self, conn_id: ConnectionId, addr: BdAddr) -> Result<(), EspError> {
-        {
-            let mut state = self.state.lock().unwrap();
-
-            if !state.connections.iter().any(|conn| conn.peer == addr) {
-                state.connections.push(Connection {
-                    peer: addr,
-                    conn_id,
-                    subscribed: false,
-                    mtu: None,
-                });
-            }
-        }
+        self.state.lock().unwrap().connection = Some(Connection {
+            peer: addr,
+            conn_id,
+            subscribed: false,
+            mtu: None,
+        });
 
         self.gap.stop_advertising()?;
         Ok(())
@@ -481,12 +486,12 @@ impl GattServer {
         {
             let mut state = self.state.lock().unwrap();
 
-            if let Some(index) = state
-                .connections
-                .iter()
-                .position(|Connection { peer, .. }| *peer == addr)
+            if state
+                .connection
+                .as_ref()
+                .is_some_and(|connection| connection.peer == addr)
             {
-                state.connections.swap_remove(index);
+                state.connection = None;
             }
         }
 
@@ -497,7 +502,6 @@ impl GattServer {
         &self,
         conn_id: ConnectionId,
         handle: Handle,
-        offset: u16,
         value: &[u8],
     ) -> Result<(bool, Option<DeviceEvent>), EspError> {
         let mut command = None;
@@ -507,15 +511,15 @@ impl GattServer {
             let mut state = self.state.lock().unwrap();
 
             if Some(handle) == state.event_cccd_handle {
-                if offset == 0 && value.len() == 2 {
+                if value.len() == 2 {
                     let value = u16::from_le_bytes([value[0], value[1]]);
                     let subscribed = value == NOTIFY_ENABLED || value == INDICATE_ENABLED;
                     let mut replay_ready = false;
 
                     if let Some(conn) = state
-                        .connections
-                        .iter_mut()
-                        .find(|conn| conn.conn_id == conn_id)
+                        .connection
+                        .as_mut()
+                        .filter(|connection| connection.conn_id == conn_id)
                     {
                         conn.subscribed = subscribed;
                         replay_ready = subscribed && conn.mtu.is_some();
@@ -558,44 +562,20 @@ impl GattServer {
         Ok((true, subscribe_status))
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn send_write_response(
         &self,
         gatt_if: GattInterface,
         conn_id: ConnectionId,
         trans_id: TransferId,
-        handle: Handle,
-        offset: u16,
         need_rsp: bool,
-        is_prep: bool,
-        value: &[u8],
+        status: GattStatus,
     ) -> Result<(), EspError> {
         if !need_rsp {
             return Ok(());
         }
 
-        if is_prep {
-            let mut state = self.state.lock().unwrap();
-
-            state
-                .response
-                .attr_handle(handle)
-                .auth_req(0)
-                .offset(offset)
-                .value(value)
-                .map_err(|_| EspError::from_infallible::<ESP_FAIL>())?;
-
-            self.gatts.send_response(
-                gatt_if,
-                conn_id,
-                trans_id,
-                GattStatus::Ok,
-                Some(&state.response),
-            )
-        } else {
-            self.gatts
-                .send_response(gatt_if, conn_id, trans_id, GattStatus::Ok, None)
-        }
+        self.gatts
+            .send_response(gatt_if, conn_id, trans_id, status, None)
     }
 
     fn check_esp_status(&self, status: Result<(), EspError>) {

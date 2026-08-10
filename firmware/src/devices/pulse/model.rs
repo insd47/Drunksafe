@@ -20,19 +20,4 @@ pub struct Analysis {
     pub stable: bool,
     /// 분석 결과 신뢰도를 0-100 정수로 표현한 값이다.
     pub confidence_percent: u8,
-    /// 최근 20초 이동평균 추세다.
-    pub trend_20s: Trend,
-    /// 최근 1분 이동평균 추세다.
-    pub trend_1m: Trend,
-    /// 최근 5분 이동평균 추세다.
-    pub trend_5m: Trend,
-}
-
-/// pulse BPM 이동평균과 직전 평균 대비 변화량이다.
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct Trend {
-    /// window가 충분히 채워졌을 때 계산되는 평균 BPM이다.
-    pub bpm: Option<f32>,
-    /// 직전 평균 BPM 대비 변화량이다.
-    pub delta: Option<f32>,
 }

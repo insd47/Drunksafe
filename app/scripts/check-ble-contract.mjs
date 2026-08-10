@@ -219,7 +219,7 @@ function deviceError(overrides = {}) {
     event: 'device_error',
     v: contract.protocolVersion,
     session_id: 'enum-fixture',
-    code: 'protocol',
+    code: 'cancelled',
     ...overrides,
   };
 }

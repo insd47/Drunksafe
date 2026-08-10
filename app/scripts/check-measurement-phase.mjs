@@ -13,19 +13,11 @@ test('active measurement phases block duplicate start commands', () => {
   }
 });
 
-test('status-only active sessions block duplicate start commands', () => {
+test('measuring status blocks duplicate start commands', () => {
   assert.equal(
     hasActiveMeasurement({
       measurementPhase: 'idle',
       deviceStatus: 'measuring',
-      activeSessionId: 'fw-1',
-    }),
-    true
-  );
-  assert.equal(
-    hasActiveMeasurement({
-      measurementPhase: 'idle',
-      deviceStatus: 'need_context',
       activeSessionId: 'fw-1',
     }),
     true

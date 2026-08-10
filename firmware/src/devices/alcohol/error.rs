@@ -40,9 +40,6 @@ pub enum Error {
         /// response frame에서 수신한 command byte다.
         actual: u8,
     },
-    /// response payload가 기대한 도메인 값으로 해석될 수 없다.
-    #[error("invalid alcohol sensor payload")]
-    InvalidPayload,
 }
 
 /// alcohol device에서 사용하는 결과 타입이다.

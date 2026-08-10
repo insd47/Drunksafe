@@ -13,7 +13,7 @@ export function isActiveMeasurementPhase(phase: BleMeasurementPhase) {
 }
 
 export function isActiveMeasurementStatus(status: StatusKind | null) {
-  return status === 'need_context' || status === 'measuring';
+  return status === 'measuring';
 }
 
 export function hasActiveMeasurement(snapshot: {

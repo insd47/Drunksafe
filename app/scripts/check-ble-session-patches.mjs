@@ -17,9 +17,9 @@ test('terminal device error clears stale measurement artifacts', () => {
     {
       v: 7,
       session_id: 'fw-7',
-      code: 'weak_breath',
+      code: 'alcohol_sensor',
     },
-    '호기 입력이 약합니다.'
+    '알코올 센서 오류가 감지됐습니다.'
   );
 
   assert.equal(patch.measurementPhase, 'error');
@@ -28,7 +28,7 @@ test('terminal device error clears stale measurement artifacts', () => {
   assert.equal(patch.result, null);
   assert.equal(patch.resultSaved, false);
   assert.equal(patch.deviceStatus, 'error');
-  assert.equal(patch.deviceErrorCode, 'weak_breath');
+  assert.equal(patch.deviceErrorCode, 'alcohol_sensor');
   assert.equal(patch.contextSentSessionId, null);
 });
 

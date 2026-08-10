@@ -1,10 +1,19 @@
 use super::checksum;
-use super::command::Command;
 use super::error::{Error, Result};
+use super::Error::{UnexpectedCommand, UnknownCommand};
+use serde::{Deserialize, Serialize};
 
 pub const FRAME_LEN: usize = 9;
 const START: u8 = 0xFF;
 const ADDRESS: u8 = 0x01;
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[repr(u8)]
+pub enum Command {
+    Status = 0x85,
+    Result = 0x86,
+    Work = 0x87,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RequestFrame {
@@ -13,9 +22,35 @@ pub struct RequestFrame {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ResponseFrame {
-    command: Command,
     payload: [u8; 6],
-    bytes: [u8; FRAME_LEN],
+}
+
+impl Command {
+    pub const fn byte(self) -> u8 {
+        self as u8
+    }
+
+    pub const fn from(byte: u8) -> Result<Self> {
+        match byte {
+            0x85 => Ok(Self::Status),
+            0x86 => Ok(Self::Result),
+            0x87 => Ok(Self::Work),
+            _ => Err(UnknownCommand { command: byte }),
+        }
+    }
+
+    pub fn expect(self, byte: u8) -> Result<()> {
+        let actual = Self::from(byte)?;
+
+        if actual == self {
+            Ok(())
+        } else {
+            Err(UnexpectedCommand {
+                expected: self.byte(),
+                actual: byte,
+            })
+        }
+    }
 }
 
 impl RequestFrame {
@@ -47,25 +82,10 @@ impl ResponseFrame {
         let mut payload = [0; 6];
         payload.copy_from_slice(&bytes[2..8]);
 
-        Ok(Self {
-            command,
-            payload,
-            bytes,
-        })
+        Ok(Self { payload })
     }
 
     pub const fn payload(&self) -> &[u8; 6] {
         &self.payload
-    }
-
-    pub fn word(&self, offset: usize) -> Result<u16> {
-        if offset + 1 >= self.payload.len() {
-            return Err(Error::InvalidPayload);
-        }
-
-        Ok(u16::from_be_bytes([
-            self.payload[offset],
-            self.payload[offset + 1],
-        ]))
     }
 }

@@ -5,7 +5,8 @@ use embassy_time::{Duration, Instant, Timer};
 
 const PULSE_SAMPLE: Duration = Duration::from_millis(10);
 const ALCOHOL_POLL: Duration = Duration::from_millis(200);
-const TIMEOUT: Duration = Duration::from_secs(30);
+const PULSE_TIMEOUT: Duration = Duration::from_secs(30);
+const ALCOHOL_RESULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
     device.reset();
@@ -19,7 +20,7 @@ pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
             return Ok(pulse_bpm);
         }
 
-        if started.elapsed() >= TIMEOUT {
+        if started.elapsed() >= PULSE_TIMEOUT {
             return Err(TimeoutKind::PulseMeasurement.into());
         }
 
@@ -28,10 +29,10 @@ pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<u16> {
 }
 
 pub async fn alcohol(device: &mut AlcoholDevice<'_>) -> Result<u16> {
-    device.work(true).await?;
+    device.start().await?;
     let result = alcohol_result(device).await;
 
-    if let Err(error) = device.stop_work().await {
+    if let Err(error) = device.stop().await {
         log::warn!("failed to stop alcohol sensor work mode after measurement: {error}");
     }
 
@@ -46,7 +47,7 @@ async fn alcohol_result(device: &mut AlcoholDevice<'_>) -> Result<u16> {
             return Ok(device.test().await?);
         }
 
-        if started.elapsed() >= TIMEOUT {
+        if started.elapsed() >= ALCOHOL_RESULT_TIMEOUT {
             return Err(TimeoutKind::AlcoholResult.into());
         }
 

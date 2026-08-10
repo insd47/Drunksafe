@@ -12,7 +12,6 @@ use std::time::{Duration, Instant};
 mod devices;
 mod error;
 mod services;
-mod utils;
 
 const IDLE_POLL: Duration = Duration::from_millis(20);
 const CONTEXT_WAIT: Duration = Duration::from_secs(5);
@@ -141,11 +140,12 @@ fn main() -> Result<()> {
                     continue;
                 }
                 Err(error) => {
-                    let error_code = ble_error_code(&error);
-                    notify_ble(
-                        &ble,
-                        ble::device_error(Some(session_id.clone()), error_code),
-                    );
+                    if let Some(error_code) = ble_error_code(&error) {
+                        notify_ble(
+                            &ble,
+                            ble::device_error(Some(session_id.clone()), error_code),
+                        );
+                    }
                     notify_ble(
                         &ble,
                         ble::device_status(StatusKind::Error, Some(session_id)),
@@ -285,11 +285,10 @@ fn measurement_cancel_requested(ble: &BleService, session_id: &str) -> bool {
     cancelled
 }
 
-fn ble_error_code(error: &error::Error) -> ErrorCode {
+fn ble_error_code(error: &error::Error) -> Option<ErrorCode> {
     match error {
-        error::Error::AlcoholDevice(_) => ErrorCode::AlcoholSensor,
-        error::Error::PulseDevice(_) => ErrorCode::PulseSensor,
-        error::Error::Timeout(_) => ErrorCode::MeasurementTimeout,
-        error::Error::Esp(_) => ErrorCode::Protocol,
+        error::Error::AlcoholDevice(_) => Some(ErrorCode::AlcoholSensor),
+        error::Error::Timeout(_) => Some(ErrorCode::MeasurementTimeout),
+        error::Error::PulseDevice(_) | error::Error::Esp(_) => None,
     }
 }

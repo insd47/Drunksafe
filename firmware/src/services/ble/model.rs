@@ -1,4 +1,3 @@
-use crate::devices::pulse;
 use serde::{Deserialize, Serialize};
 
 /// BLE payload schema version이다.
@@ -26,7 +25,6 @@ pub enum MeasurementKind {
 pub enum StatusKind {
     Idle,
     Connected,
-    NeedContext,
     Measuring,
     ResultReady,
     Error,
@@ -60,11 +58,8 @@ pub enum Risk {
 pub enum ErrorCode {
     ContextTimeout,
     AlcoholSensor,
-    PulseSensor,
-    WeakBreath,
     MeasurementTimeout,
     Cancelled,
-    Protocol,
 }
 
 /// 연결 직후와 상태 변경 시 앱에 보내는 장치 상태다.
@@ -135,16 +130,6 @@ pub struct Pulse {
     pub bpm: f32,
     pub stable: bool,
     pub confidence_percent: u8,
-}
-
-impl From<pulse::Analysis> for Pulse {
-    fn from(analysis: pulse::Analysis) -> Self {
-        Self {
-            bpm: analysis.bpm,
-            stable: analysis.stable,
-            confidence_percent: analysis.confidence_percent,
-        }
-    }
 }
 
 /// 최종 측정 결과다. BAC 값은 milli-percent 단위이며 30은 0.030% BAC를 뜻한다.

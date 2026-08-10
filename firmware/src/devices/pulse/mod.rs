@@ -59,12 +59,6 @@ impl<'d> PulseDevice<'d> {
         self.push(elapsed_ms, raw_12bit)
     }
 
-    /// 마지막으로 계산된 pulse 분석 결과를 반환한다.
-    #[allow(dead_code)]
-    pub fn analyze(&self) -> Option<Analysis> {
-        self.state.last_analysis()
-    }
-
     fn push(&mut self, elapsed_ms: u32, raw_12bit: u16) -> Result<Option<Analysis>> {
         if let Some(previous) = self.state.window().back() {
             validate_timestamp(previous.elapsed_ms, elapsed_ms)?;

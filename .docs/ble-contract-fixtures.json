@@ -9,14 +9,7 @@
   "enums": {
     "source": ["board_button", "phone"],
     "measurementKind": ["measurement", "baseline"],
-    "statusKind": [
-      "idle",
-      "connected",
-      "need_context",
-      "measuring",
-      "result_ready",
-      "error"
-    ],
+    "statusKind": ["idle", "connected", "measuring", "result_ready", "error"],
     "measurementStep": [
       "preparing",
       "warming_sensor",
@@ -30,11 +23,8 @@
     "errorCode": [
       "context_timeout",
       "alcohol_sensor",
-      "pulse_sensor",
-      "weak_breath",
       "measurement_timeout",
-      "cancelled",
-      "protocol"
+      "cancelled"
     ]
   },
   "payloadKinds": {

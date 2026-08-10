@@ -51,7 +51,7 @@ impl<'d> MeasureService<'d> {
         match select(self.run(), cancel).await {
             Either::First(result) => result.map(MeasureRun::Completed),
             Either::Second(()) => {
-                self.alcohol.stop_work().await?;
+                self.alcohol.stop().await?;
                 Ok(MeasureRun::Cancelled)
             }
         }

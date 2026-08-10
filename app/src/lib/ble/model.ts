@@ -7,7 +7,6 @@ export type MeasurementKind = 'measurement' | 'baseline';
 export type StatusKind =
   | 'idle'
   | 'connected'
-  | 'need_context'
   | 'measuring'
   | 'result_ready'
   | 'error';
@@ -26,11 +25,8 @@ export type Risk = 'safe' | 'caution' | 'danger';
 export type ErrorCode =
   | 'context_timeout'
   | 'alcohol_sensor'
-  | 'pulse_sensor'
-  | 'weak_breath'
   | 'measurement_timeout'
-  | 'cancelled'
-  | 'protocol';
+  | 'cancelled';
 
 export type DeviceStatus = {
   v: number;
@@ -290,7 +286,6 @@ function isStatusKind(value: unknown): value is StatusKind {
   return (
     value === 'idle' ||
     value === 'connected' ||
-    value === 'need_context' ||
     value === 'measuring' ||
     value === 'result_ready' ||
     value === 'error'
@@ -317,11 +312,8 @@ function isErrorCode(value: unknown): value is ErrorCode {
   return (
     value === 'context_timeout' ||
     value === 'alcohol_sensor' ||
-    value === 'pulse_sensor' ||
-    value === 'weak_breath' ||
     value === 'measurement_timeout' ||
-    value === 'cancelled' ||
-    value === 'protocol'
+    value === 'cancelled'
   );
 }
 

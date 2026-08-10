@@ -1,13 +1,12 @@
 use channel::Channel;
-use command::Command;
 pub use error::{Error, Result};
 use esp_idf_svc::hal::gpio::{InputPin, OutputPin};
 use esp_idf_svc::hal::uart::Uart;
+use protocol::Command;
 pub use status::Status;
 
 mod channel;
 mod checksum;
-mod command;
 mod error;
 mod protocol;
 mod status;
@@ -27,8 +26,10 @@ impl<'d> AlcoholDevice<'d> {
     }
 
     pub async fn test(&mut self) -> Result<u16> {
-        let res = self.channel.request(Command::Result, [0; 5]).await?;
-        res.word(0)
+        let response = self.channel.request(Command::Result, [0; 5]).await?;
+        let payload = response.payload();
+
+        Ok(u16::from_be_bytes([payload[0], payload[1]]))
     }
 
     pub async fn status(&mut self) -> Result<Status> {
@@ -36,26 +37,28 @@ impl<'d> AlcoholDevice<'d> {
         Ok(Status::from(res.payload()[0]))
     }
 
-    pub async fn work(&mut self, wake: bool) -> Result<()> {
-        let value = wake as u8;
+    pub async fn start(&mut self) -> Result<()> {
+        self.channel.clear().await?;
+        self.work(true).await
+    }
+
+    pub async fn stop(&mut self) -> Result<()> {
+        self.channel.clear().await?;
+
+        let Err(first) = self.work(false).await else {
+            return Ok(());
+        };
+
+        self.channel.clear().await?;
+        self.work(false).await.map_err(|_| first)
+    }
+
+    async fn work(&mut self, enabled: bool) -> Result<()> {
+        let value = enabled as u8;
         self.channel
             .request(Command::Work, [value, 0, 0, 0, 0])
             .await?;
 
         Ok(())
-    }
-
-    pub async fn stop_work(&mut self) -> Result<()> {
-        self.channel.drain_pending().await?;
-
-        let first = self.work(false).await;
-        let second = self.work(false).await;
-
-        self.channel.drain_pending().await?;
-
-        match (first, second) {
-            (_, Ok(())) => Ok(()),
-            (Err(error), Err(_)) | (Ok(()), Err(error)) => Err(error),
-        }
     }
 }

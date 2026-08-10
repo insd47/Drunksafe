@@ -1,14 +1,13 @@
 use super::model::{Analysis, Sample};
 use super::{params, state};
-use crate::utils::math;
 use std::collections::VecDeque;
 
 pub fn calculate(state: &mut state::State) -> Option<Analysis> {
     let peaks = find_peaks(state.window());
     let (mut bpm, mut ibi_stddev_ms, mut peak_amplitude, stable) = if peaks.len() >= 2 {
         let ibis = intervals(&peaks);
-        let mean_ibi = math::mean(&ibis);
-        let ibi_stddev_ms = math::stddev(&ibis, mean_ibi);
+        let mean_ibi = mean(&ibis);
+        let ibi_stddev_ms = stddev(&ibis, mean_ibi);
         let peak_amplitude =
             peaks.iter().map(|peak| peak.amplitude).sum::<f32>() / peaks.len() as f32;
         let bpm = if mean_ibi > 0.0 {
@@ -38,25 +37,18 @@ pub fn calculate(state: &mut state::State) -> Option<Analysis> {
         return None;
     }
 
-    bpm = math::round(bpm, 2);
-    ibi_stddev_ms = math::round(ibi_stddev_ms, 3);
-    peak_amplitude = math::round(peak_amplitude, 3);
+    bpm = round(bpm, 2);
+    ibi_stddev_ms = round(ibi_stddev_ms, 3);
+    peak_amplitude = round(peak_amplitude, 3);
 
-    let (trend_20s, trend_1m, trend_5m) = state.push_trends(bpm);
     let confidence_percent = if stable { 85 } else { 35 };
-    let analysis = Analysis {
+    Some(Analysis {
         bpm,
         ibi_stddev_ms,
         peak_amplitude,
         stable,
         confidence_percent,
-        trend_20s,
-        trend_1m,
-        trend_5m,
-    };
-
-    state.set_analysis(analysis);
-    Some(analysis)
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -130,4 +122,26 @@ fn intervals(peaks: &[Peak]) -> Vec<f32> {
         .windows(2)
         .map(|window| (window[1].elapsed_ms - window[0].elapsed_ms) as f32)
         .collect()
+}
+
+fn mean(values: &[f32]) -> f32 {
+    values.iter().sum::<f32>() / values.len() as f32
+}
+
+fn stddev(values: &[f32], mean: f32) -> f32 {
+    let variance = values
+        .iter()
+        .map(|value| {
+            let diff = value - mean;
+            diff * diff
+        })
+        .sum::<f32>()
+        / values.len() as f32;
+
+    variance.sqrt()
+}
+
+fn round(value: f32, places: i32) -> f32 {
+    let scale = 10_f32.powi(places);
+    (value * scale).round() / scale
 }

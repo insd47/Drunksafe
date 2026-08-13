@@ -3,7 +3,17 @@ import {
   notifySubscriptionReadyTimeoutMs,
   notifySubscriptionTimeoutMessage,
 } from '@/lib/ble/connection-readiness';
-import type { DeviceEvent, MeasurementResult } from '@/lib/ble/model';
+import type {
+  AlcoholStateLabel,
+  DeviceEvent,
+  MeasurementResult,
+  PpgSampleBatch,
+  PulseReading,
+  SessionRecord,
+  SessionStatus,
+} from '@/lib/ble/model';
+import { readBaseline } from '@/lib/storage/profile';
+import { persistSessionDownload, type ProcessedSession } from '@/lib/storage/sessions';
 import { MockBleEventSource } from '@/lib/ble/mock';
 import { persistMeasurementResult } from '@/lib/ble/session/persistence';
 import {
@@ -18,6 +28,34 @@ import type { MeasurementKind } from '@/lib/storage/history-records';
 
 type Removable = {
   remove: () => void;
+};
+
+/** A single PPG data point kept in the ring buffer. */
+export type PpgPoint = {
+  /** Monotonically increasing timestamp in ms from session start */
+  t: number;
+  /** Raw 12-bit ADC value (0-4095) */
+  raw: number;
+};
+
+/** Max number of PPG points kept in the app-side ring buffer (~50 seconds at 10 Hz notify) */
+const MAX_PPG_BUFFER = 500;
+
+/** UI snapshot for an ESP32-run drinking session (start → download at end). */
+export type SessionUiSnapshot = {
+  phase: 'idle' | 'active' | 'downloading' | 'complete';
+  status: SessionStatus | null;
+  received: number;
+  total: number;
+  result: ProcessedSession | null;
+};
+
+const idleSessionSnapshot: SessionUiSnapshot = {
+  phase: 'idle',
+  status: null,
+  received: 0,
+  total: 0,
+  result: null,
 };
 
 type SessionBleClient = Pick<
@@ -43,6 +81,8 @@ export class BleSessionStore {
 
   private readonly createClient: BleClientFactory;
   private readonly listeners = new Set<() => void>();
+  private readonly ppgListeners = new Set<() => void>();
+  private readonly pulseReadingListeners = new Set<() => void>();
   private readonly mockEvents = new MockBleEventSource();
   private readonly pendingResultSessions = new Set<string>();
   private client: SessionBleClient | null = null;
@@ -55,6 +95,16 @@ export class BleSessionStore {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private persistenceTail: Promise<void> = Promise.resolve();
   private snapshot: BleSessionState = initialBleSessionState;
+  private ppgBuffer: PpgPoint[] = [];
+  private ppgSnapshot: PpgPoint[] = [];
+  private latestPulseReading: PulseReading | null = null;
+  private pulseStreaming = false;
+  private readonly pulseStreamingListeners = new Set<() => void>();
+  private sessionUi: SessionUiSnapshot = idleSessionSnapshot;
+  private sessionRecordsBuffer: SessionRecord[] = [];
+  private readonly sessionListeners = new Set<() => void>();
+  private alcoholState: AlcoholStateLabel | null = null;
+  private readonly alcoholStateListeners = new Set<() => void>();
 
   constructor({ createClient }: { createClient: BleClientFactory }) {
     this.createClient = createClient;
@@ -67,11 +117,157 @@ export class BleSessionStore {
     };
   };
 
+  /** Subscribe to PPG data updates only (does not trigger on other state changes). */
+  subscribePpg = (listener: () => void) => {
+    this.ppgListeners.add(listener);
+    return () => {
+      this.ppgListeners.delete(listener);
+    };
+  };
+
+  /** Subscribe to live pulse-diagnostic reading updates only (developer tools). */
+  subscribePulseReading = (listener: () => void) => {
+    this.pulseReadingListeners.add(listener);
+    return () => {
+      this.pulseReadingListeners.delete(listener);
+    };
+  };
+
+  /** Subscribe to pulse-stream on/off changes (developer tools). Survives screen navigation. */
+  subscribePulseStreaming = (listener: () => void) => {
+    this.pulseStreamingListeners.add(listener);
+    return () => {
+      this.pulseStreamingListeners.delete(listener);
+    };
+  };
+
+  /** Whether a developer-tools pulse stream is currently active on the device. */
+  getPulseStreamingSnapshot = (): boolean => this.pulseStreaming;
+
+  /** Subscribe to drinking-session UI changes (status/download/result). */
+  subscribeSession = (listener: () => void) => {
+    this.sessionListeners.add(listener);
+    return () => {
+      this.sessionListeners.delete(listener);
+    };
+  };
+
+  getSessionSnapshot = (): SessionUiSnapshot => this.sessionUi;
+
+  /** Subscribe to ZE29A alcohol-state changes (blow-timing guidance). */
+  subscribeAlcoholState = (listener: () => void) => {
+    this.alcoholStateListeners.add(listener);
+    return () => {
+      this.alcoholStateListeners.delete(listener);
+    };
+  };
+
+  getAlcoholStateSnapshot = (): AlcoholStateLabel | null => this.alcoholState;
+
+  private setAlcoholState(state: AlcoholStateLabel | null) {
+    if (this.alcoholState === state) return;
+
+    this.alcoholState = state;
+    this.alcoholStateListeners.forEach((listener) => listener());
+  }
+
+  private setSessionUi(next: SessionUiSnapshot) {
+    this.sessionUi = next;
+    this.sessionListeners.forEach((listener) => listener());
+  }
+
+  /** Start an ESP32-run drinking session. The phone may sleep/disconnect afterward. */
+  startSession = async () => {
+    this.sessionRecordsBuffer = [];
+    this.setSessionUi({ ...idleSessionSnapshot, phase: 'active' });
+    // Seed the device's resting-HR baseline from the app baseline measurement, if any.
+    const baseline = await readBaseline().catch(() => null);
+    await this.sendCommand({
+      cmd: 'start_session',
+      resting_bpm: baseline?.resting_bpm ?? null,
+    });
+  };
+
+  /** End the session and download its log (device streams records back). */
+  endSession = async () => {
+    this.setSessionUi({ ...this.sessionUi, phase: 'downloading' });
+    await this.sendCommand({ cmd: 'end_session' });
+  };
+
+  private async processSessionComplete(records: SessionRecord[]) {
+    try {
+      const result = await persistSessionDownload(records, Date.now());
+      this.setSessionUi({
+        phase: 'complete',
+        status: this.sessionUi.status,
+        received: records.length,
+        total: records.length,
+        result,
+      });
+    } catch {
+      this.setSessionUi({ ...this.sessionUi, phase: 'complete', result: null });
+    }
+  }
+
+  private setPulseStreaming(active: boolean) {
+    if (this.pulseStreaming === active) return;
+
+    this.pulseStreaming = active;
+    this.pulseStreamingListeners.forEach((listener) => listener());
+  }
+
   getSnapshot = () => this.snapshot;
 
+  /** Returns the current PPG ring buffer snapshot (stable reference changes only when new data arrives). */
+  getPpgSnapshot = (): PpgPoint[] => this.ppgSnapshot;
+
+  /** Returns the latest live pulse-diagnostic reading (null until one arrives). */
+  getPulseReadingSnapshot = (): PulseReading | null => this.latestPulseReading;
   initialize = () => {
     void this.dispatch({ type: 'initialize_requested' });
   };
+
+  /** Clear the PPG ring buffer (call when starting a new measurement session). */
+  clearPpgBuffer = () => {
+    this.ppgBuffer = [];
+    this.ppgSnapshot = [];
+    this.ppgListeners.forEach((l) => l());
+  };
+
+  private clearPulseReading() {
+    this.latestPulseReading = null;
+    this.pulseReadingListeners.forEach((listener) => listener());
+  }
+
+  /**
+   * Ask the device to stream pulse diagnostics only (no alcohol). Developer tools.
+   * `streamRaw` additionally streams the raw PPG waveform (heavier BLE traffic).
+   */
+  startPulseStream = async (streamRaw: boolean) => {
+    this.clearPpgBuffer();
+    this.clearPulseReading();
+    this.setPulseStreaming(true);
+    await this.sendCommand({ cmd: 'start_pulse_stream', stream_raw: streamRaw });
+  };
+
+  /** Stop an in-progress pulse-only diagnostic stream. */
+  stopPulseStream = async () => {
+    this.setPulseStreaming(false);
+    await this.sendCommand({ cmd: 'stop_pulse_stream' });
+  };
+
+  private appendPpgSamples(batch: PpgSampleBatch) {
+    batch.samples.forEach((raw, index) => {
+      this.ppgBuffer.push({ t: batch.t0_ms + index * batch.dt_ms, raw });
+    });
+
+    if (this.ppgBuffer.length > MAX_PPG_BUFFER) {
+      this.ppgBuffer.splice(0, this.ppgBuffer.length - MAX_PPG_BUFFER);
+    }
+
+    this.ppgSnapshot = this.ppgBuffer.slice();
+    this.ppgListeners.forEach((listener) => listener());
+  }
 
   startScan = async () => {
     await this.dispatch({ type: 'start_scan_requested' });
@@ -95,6 +291,11 @@ export class BleSessionStore {
 
   startMeasurement = async (kind: MeasurementKind = 'measurement') => {
     await this.dispatch({ type: 'start_measurement_requested', kind });
+  };
+
+  /** 알코올 측정 완료(awaiting_pulse) 후, 이어서 심박 측정 단계를 시작한다. */
+  startPulsePhase = async () => {
+    await this.dispatch({ type: 'start_pulse_phase_requested' });
   };
 
   cancelMeasurement = async () => {
@@ -262,6 +463,7 @@ export class BleSessionStore {
     this.clearReconnectTimer();
     this.clearNotifyReadyWait();
     this.clearMonitors();
+    this.setPulseStreaming(false);
     await this.client?.disconnect().catch(() => {});
   }
 
@@ -269,6 +471,7 @@ export class BleSessionStore {
     this.clearReconnectTimer();
     this.clearNotifyReadyWait();
     this.clearMonitors();
+    this.setPulseStreaming(false);
     this.stateSubscription?.remove();
     this.stateSubscription = null;
     const client = this.client;
@@ -303,7 +506,59 @@ export class BleSessionStore {
   }
 
   private async receiveDeviceEvent(event: DeviceEvent) {
+    if (event.event === 'ppg_sample') {
+      this.appendPpgSamples(event);
+      return;
+    }
+
+    if (event.event === 'pulse_reading') {
+      this.latestPulseReading = event;
+      this.pulseReadingListeners.forEach((listener) => listener());
+      // A reading means the device is actively streaming — recover the flag even if the
+      // dev screen was remounted after navigating away.
+      this.setPulseStreaming(true);
+      return;
+    }
+
+    if (event.event === 'session_status') {
+      this.setSessionUi({
+        ...this.sessionUi,
+        phase: this.sessionUi.phase === 'idle' ? 'active' : this.sessionUi.phase,
+        status: event,
+      });
+      return;
+    }
+
+    if (event.event === 'session_record') {
+      this.sessionRecordsBuffer.push(event);
+      this.setSessionUi({
+        ...this.sessionUi,
+        phase: 'downloading',
+        received: this.sessionRecordsBuffer.length,
+        total: event.total,
+      });
+      return;
+    }
+
+    if (event.event === 'session_complete') {
+      const records = this.sessionRecordsBuffer.slice();
+      void this.processSessionComplete(records);
+      return;
+    }
+
+    if (event.event === 'alcohol_state') {
+      this.setAlcoholState(event.state);
+      this.verification.event(event);
+      return;
+    }
+
     this.verification.event(event);
+
+    if (event.event === 'measurement_started') {
+      this.clearPpgBuffer();
+      this.setAlcoholState(null);
+    }
+
     let readyDevice: DrunksafeBleDevice | null = null;
 
     if (event.event === 'status' && this.pendingConnectedDevice) {

@@ -13,7 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
 import { deviceErrorCopy } from '@/components/device-error-copy';
-import { useBleSession } from '@/lib/ble/session';
+import type { AlcoholStateLabel } from '@/lib/ble/model';
+import { useAlcoholState, useBleSession } from '@/lib/ble/session';
 
 const slowBreathSeconds = 20;
 
@@ -26,10 +27,16 @@ export default function MeasureRoute() {
   const ble = useBleSession();
   const initialize = ble.initialize;
   const startMeasurement = ble.startMeasurement;
+  const startPulsePhase = ble.startPulsePhase;
   const cancelMeasurement = ble.cancelMeasurement;
   const kind = params.kind === 'baseline' ? 'baseline' : 'measurement';
   const measurement = ble.measurement;
-  const activeMeasurement = measurement.phase === 'starting' || measurement.phase === 'active';
+  const alcoholState = useAlcoholState();
+  const activeMeasurement =
+    measurement.phase === 'starting' ||
+    measurement.phase === 'active' ||
+    measurement.phase === 'awaiting_pulse';
+  const stage = measurement.phase === 'active' ? measurement.stage : null;
   const resultSessionId = measurement.phase === 'result' ? measurement.record.session_id : null;
   const errorCode = measurement.phase === 'error' ? measurement.code : null;
   const elapsedSeconds = useElapsedSeconds(
@@ -122,7 +129,41 @@ export default function MeasureRoute() {
     );
   }
 
+  if (measurement.phase === 'awaiting_pulse') {
+    return (
+      <MeasureLayout>
+        <MeasureNotice
+          icon="💓"
+          message="이제 심박을 측정합니다. 센서에 손끝을 가만히 대고 준비되면 시작을 누르세요."
+          title="알코올 측정 완료"
+        />
+        <MeasureFooter>
+          <ActionButton
+            label="심박 측정 시작"
+            onPress={() => {
+              void startPulsePhase();
+            }}
+            size="lg"
+          />
+          <ActionButton label="취소" onPress={cancel} variant="secondary" />
+        </MeasureFooter>
+      </MeasureLayout>
+    );
+  }
+
   const started = measurement.phase === 'active';
+  const isPulseStage = stage === 'pulse';
+  const alcohol = started && stage === 'alcohol' ? alcoholCopy(alcoholState) : null;
+
+  const title =
+    measurement.phase === 'starting'
+      ? '기기를 준비하는 중입니다'
+      : isPulseStage
+        ? '심박을 측정하는 중입니다'
+        : (alcohol?.title ?? '숨을 크게 들이쉬고 4초간 세게 부세요');
+  const hint = isPulseStage
+    ? '센서에 손끝을 가만히 대고 있으세요.'
+    : (alcohol?.hint ?? coachingHint(started, elapsedSeconds));
 
   return (
     <MeasureLayout>
@@ -134,18 +175,18 @@ export default function MeasureRoute() {
 
       <View className="flex-1 items-center justify-center gap-10 px-8">
         <View className="gap-3">
-          <Text className="text-center text-2xl font-bold leading-9 text-gray-950">
-            {started ? '숨을 크게 들이쉬고 4초간 세게 부세요' : '기기를 준비하는 중입니다'}
-          </Text>
-          <Text className="text-center text-sm leading-6 text-gray-500">
-            {coachingHint(started, elapsedSeconds)}
-          </Text>
+          <Text className="text-center text-2xl font-bold leading-9 text-gray-950">{title}</Text>
+          <Text className="text-center text-sm leading-6 text-gray-500">{hint}</Text>
         </View>
 
         <ElapsedRing seconds={elapsedSeconds} />
 
         <Text className="text-xs text-gray-400">
-          {kind === 'baseline' ? '기준값 측정 · 최대 30초' : '최대 30초'}
+          {isPulseStage
+            ? '심박 측정 · 최대 1분'
+            : kind === 'baseline'
+              ? '기준값 측정 · 최대 30초'
+              : '알코올 측정 · 최대 30초'}
         </Text>
       </View>
 
@@ -236,6 +277,28 @@ function useElapsedSeconds(startedAtUnixMs: number | null) {
   }
 
   return Math.max(0, Math.floor((nowUnixMs - startedAtUnixMs) / 1000));
+}
+
+/** ZE29A 상태에 맞춰 "지금 부세요" 타이밍을 안내한다 (예열 중엔 불지 않도록). */
+function alcoholCopy(state: AlcoholStateLabel | null): { title: string; hint: string } {
+  switch (state) {
+    case 'preheating':
+      return { title: '센서 예열 중', hint: '잠시만 기다리세요. 곧 불라고 안내합니다.' };
+    case 'wait_blow':
+      return { title: '지금 세게 부세요!', hint: '2초 이상 끊지 말고 세게 부세요.' };
+    case 'blowing':
+      return { title: '계속 부세요!', hint: '멈추지 마세요.' };
+    case 'blow_interrupted':
+      return { title: '입김이 끊겼어요', hint: '다시 준비 중입니다. 신호가 오면 세게 부세요.' };
+    case 'calculating':
+      return { title: '계산 중…', hint: '잠시만 기다려 주세요.' };
+    case 'read_result':
+      return { title: '측정 완료', hint: '결과를 불러오는 중입니다.' };
+    case 'idle':
+    case 'unknown':
+    case null:
+      return { title: '측정을 준비하는 중입니다', hint: '곧 예열이 시작됩니다.' };
+  }
 }
 
 function coachingHint(started: boolean, elapsedSeconds: number) {

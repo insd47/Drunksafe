@@ -26,6 +26,10 @@ impl<'d> ScreenService<'d> {
         match view {
             View::Home => render::home(&mut self.display),
             View::Measuring => render::measuring(&mut self.display),
+            View::AwaitingPulse => render::awaiting_pulse(&mut self.display),
+            View::PulseStream => render::pulse_stream(&mut self.display),
+            View::Session => render::session(&mut self.display),
+            View::SessionConfirm => render::session_confirm(&mut self.display),
             View::Failed => render::failed(&mut self.display),
             View::Result(measurement) => render::result(&mut self.display, measurement),
         }

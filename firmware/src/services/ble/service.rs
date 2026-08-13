@@ -42,4 +42,14 @@ impl BleService {
     pub fn notify(&self, event: &DeviceEvent) -> Result<(), EspError> {
         self.server.notify(event)
     }
+
+    /// 현재 휴대폰이 연결돼 있는지 여부다.
+    pub fn is_connected(&self) -> bool {
+        self.server.is_connected()
+    }
+
+    /// advertising을 다시 시작한다 (결과 화면에서 대기 화면 복귀 시 재연결 허용용).
+    pub fn ensure_advertising(&self) -> Result<(), EspError> {
+        self.server.ensure_advertising()
+    }
 }

@@ -1,7 +1,7 @@
 use super::{icon, text};
 use crate::devices::display::DisplayDevice;
 use crate::error::Result;
-use crate::services::measure::Measurement;
+use crate::services::measure::{Measurement, PulseOutcome};
 
 pub fn home(display: &mut DisplayDevice<'_>) -> Result<()> {
     display.draw(|frame| {
@@ -22,6 +22,43 @@ pub fn measuring(display: &mut DisplayDevice<'_>) -> Result<()> {
     Ok(())
 }
 
+pub fn awaiting_pulse(display: &mut DisplayDevice<'_>) -> Result<()> {
+    display.draw(|frame| {
+        text::center(frame, 22, "심박 측정");
+        icon::separator(frame, 27);
+        text::center(frame, 46, "준비 완료");
+        text::center(frame, 60, "버튼을 눌러주세요");
+    })?;
+    Ok(())
+}
+
+pub fn pulse_stream(display: &mut DisplayDevice<'_>) -> Result<()> {
+    display.draw(|frame| {
+        text::center(frame, 30, "심박");
+        text::center(frame, 48, "측정 중");
+    })?;
+    Ok(())
+}
+
+pub fn session(display: &mut DisplayDevice<'_>) -> Result<()> {
+    display.draw(|frame| {
+        text::center(frame, 22, "심박 측정");
+        icon::separator(frame, 27);
+        text::center(frame, 48, "측정 중");
+    })?;
+    Ok(())
+}
+
+pub fn session_confirm(display: &mut DisplayDevice<'_>) -> Result<()> {
+    display.draw(|frame| {
+        text::center(frame, 22, "심박 측정");
+        icon::separator(frame, 27);
+        text::center(frame, 46, "버튼을");
+        text::center(frame, 60, "눌러주세요");
+    })?;
+    Ok(())
+}
+
 pub fn failed(display: &mut DisplayDevice<'_>) -> Result<()> {
     display.draw(|frame| {
         icon::cross(frame);
@@ -33,7 +70,10 @@ pub fn failed(display: &mut DisplayDevice<'_>) -> Result<()> {
 
 pub fn result(display: &mut DisplayDevice<'_>, measurement: Measurement) -> Result<()> {
     let alcohol = measurement.alcohol_mg_l_x1000();
-    let bpm = measurement.pulse().map(|pulse| pulse.bpm());
+    let bpm = match measurement.pulse() {
+        PulseOutcome::Measured { bpm, .. } => Some(bpm),
+        PulseOutcome::Unavailable { .. } => None,
+    };
 
     display.draw(|frame| {
         text::center(frame, 12, "측정 결과");

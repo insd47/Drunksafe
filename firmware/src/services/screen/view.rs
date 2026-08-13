@@ -4,6 +4,10 @@ use crate::services::measure::Measurement;
 pub enum View {
     Home,
     Measuring,
+    AwaitingPulse,
+    PulseStream,
+    Session,
+    SessionConfirm,
     Failed,
     Result(Measurement),
 }

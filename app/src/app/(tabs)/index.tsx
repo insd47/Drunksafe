@@ -101,6 +101,14 @@ export default function HomeRoute() {
         size="lg"
       />
 
+      {connection.phase === 'connected' ? (
+        <ActionButton
+          label="음주 세션 측정"
+          onPress={() => router.push('/session')}
+          variant="secondary"
+        />
+      ) : null}
+
       <LastResultCard
         record={latest}
         onPress={() => {
@@ -189,7 +197,11 @@ function homeCta({
     return { kind: 'result', sessionId: measurement.record.session_id };
   }
 
-  if (measurement.phase === 'starting' || measurement.phase === 'active') {
+  if (
+    measurement.phase === 'starting' ||
+    measurement.phase === 'active' ||
+    measurement.phase === 'awaiting_pulse'
+  ) {
     return { kind: 'resume' };
   }
 

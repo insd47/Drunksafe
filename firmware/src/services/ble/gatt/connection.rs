@@ -28,6 +28,10 @@ pub struct ConnectionState {
 }
 
 impl ConnectionState {
+    pub const fn is_connected(&self) -> bool {
+        self.connection.is_some()
+    }
+
     pub fn connected(&mut self, conn_id: ConnectionId, peer: BdAddr) -> ConnectionAction {
         self.connection = Some(Connection {
             peer,

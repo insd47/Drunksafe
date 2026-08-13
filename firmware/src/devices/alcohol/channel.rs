@@ -6,7 +6,9 @@ use esp_idf_svc::hal::gpio::{AnyIOPin, InputPin, OutputPin};
 use esp_idf_svc::hal::uart::{config, AsyncUartDriver, Uart, UartDriver};
 use esp_idf_svc::hal::units::Hertz;
 
-const READ_TIMEOUT: Duration = Duration::from_millis(100);
+// ZE29A가 이따금 응답이 느려도 한 번의 read timeout으로 측정 전체가 실패하지 않도록
+// 레퍼런스 스케치(status 500ms)에 가깝게 여유를 준다.
+const READ_TIMEOUT: Duration = Duration::from_millis(300);
 const CLEAR_TIMEOUT: Duration = Duration::from_millis(120);
 const MAX_CLEAR_BYTES: usize = FRAME_LEN * 4;
 

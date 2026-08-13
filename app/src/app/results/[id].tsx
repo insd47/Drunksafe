@@ -5,6 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { ActionButton } from '@/components/action-button';
 import { Banner } from '@/components/banner';
 import { LegalNotice } from '@/components/legal-notice';
+import { pulseIssueCopy } from '@/components/pulse-issue-copy';
 import { Screen } from '@/components/screen';
 import { StatusRow } from '@/components/status-row';
 import { cn } from '@/lib/utils/cn';
@@ -131,7 +132,7 @@ function MeasurementSummary({ record }: { record: MeasurementRecord }) {
         <StatusRow label="호기 알코올" value={formatAlcohol(record.alcohol_mg_l_x1000)} />
         <StatusRow label="BAC 추정" value={formatBac(record.bac_milli_percent)} />
         <StatusRow label="신뢰도" value={`${record.confidence_percent}%`} />
-        <StatusRow label="심박수" value={formatBpm(record.pulse_bpm)} />
+        <PulseStatusRow record={record} />
         <StatusRow label="측정 시각" value={formatMeasuredAt(record.measured_at_unix_ms)} />
       </Details>
     </>
@@ -150,10 +151,23 @@ function BaselineSummary({ record }: { record: MeasurementRecord }) {
 
       <Details>
         <StatusRow label="호기 알코올" value={formatAlcohol(record.alcohol_mg_l_x1000)} />
-        <StatusRow label="심박수" value={formatBpm(record.pulse_bpm)} />
+        <PulseStatusRow record={record} />
         <StatusRow label="측정 시각" value={formatMeasuredAt(record.measured_at_unix_ms)} />
       </Details>
     </>
+  );
+}
+
+function PulseStatusRow({ record }: { record: MeasurementRecord }) {
+  const value = formatBpm(record.pulse_bpm);
+
+  if (record.pulse_issue_reason === null) {
+    return <StatusRow label="심박수" value={value} />;
+  }
+
+  const copy = pulseIssueCopy(record.pulse_issue_reason);
+  return (
+    <StatusRow description={`${copy.title} · ${copy.action}`} label="심박수" value={value} />
   );
 }
 

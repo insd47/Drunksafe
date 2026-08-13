@@ -1,37 +1,116 @@
 use crate::devices::alcohol::Status;
+use crate::devices::pulse::{Diagnosis, PulseUnavailableReason};
 use crate::devices::{AlcoholDevice, PulseDevice};
 use crate::error::{Result, TimeoutKind};
-use crate::services::measure::PulseMeasurement;
+use crate::services::measure::PulseOutcome;
 use embassy_time::{Duration, Instant, Timer};
 
 const PULSE_SAMPLE: Duration = Duration::from_millis(10);
 const ALCOHOL_POLL: Duration = Duration::from_millis(200);
-const PULSE_TIMEOUT: Duration = Duration::from_secs(30);
 const ALCOHOL_RESULT_TIMEOUT: Duration = Duration::from_secs(30);
+/// 이만큼 연속으로 status read가 실패하면 통신 오류로 보고 측정을 실패 처리한다.
+const MAX_STATUS_ERRORS: u8 = 5;
 
-pub async fn pulse(device: &mut PulseDevice<'_>) -> Result<PulseMeasurement> {
+/// pulse 측정 단계(2단계)의 타임아웃이다.
+pub const PULSE_PHASE_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// 스트리밍 진단에서 필터가 자리 잡을 때까지 첫 reading을 미루는 warmup 시간이다.
+const PULSE_STREAM_WARMUP_MS: u32 = 2000;
+/// 스트리밍 진단에서 diagnosis reading을 내보내는 주기다.
+const PULSE_STREAM_READING_INTERVAL_MS: u32 = 1000;
+
+/// pulse를 측정한다. 안정적인 pulse를 `timeout` 안에 못 찾아도 하드웨어 오류가 아닌 이상
+/// `Err`가 아니라 `PulseOutcome::Unavailable`로 귀결된다 — 호출부가 이유를 앱에
+/// 전달할 수 있도록 하기 위함이다. `on_sample`은 매 raw ADC 샘플마다 호출된다.
+pub async fn pulse(
+    device: &mut PulseDevice<'_>,
+    timeout: Duration,
+    mut on_sample: impl FnMut(u32, u16),
+) -> Result<PulseOutcome> {
     device.reset();
     let started = Instant::now();
 
     loop {
         let elapsed_ms = started.elapsed().as_millis().min(u64::from(u32::MAX)) as u32;
 
-        if let Some(analysis) = device.sample(elapsed_ms)? {
+        let (raw, analysis) = device.sample(elapsed_ms)?;
+        on_sample(elapsed_ms, raw);
+
+        if let Some(analysis) = analysis {
             let bpm = analysis.bpm.round().clamp(0.0, u16::MAX as f32) as u16;
-            return Ok(PulseMeasurement::new(bpm, analysis.stable));
+            return Ok(PulseOutcome::Measured {
+                bpm,
+                stable: analysis.stable,
+            });
         }
 
-        if started.elapsed() >= PULSE_TIMEOUT {
-            return Err(TimeoutKind::PulseMeasurement.into());
+        if started.elapsed() >= timeout {
+            let reason = if device.any_peak_found() {
+                PulseUnavailableReason::Unstable
+            } else {
+                PulseUnavailableReason::NoSignal
+            };
+            return Ok(PulseOutcome::Unavailable { reason });
         }
 
         Timer::after(PULSE_SAMPLE).await;
     }
 }
 
-pub async fn alcohol(device: &mut AlcoholDevice<'_>) -> Result<u16> {
+/// pulse만 연속으로 측정하며 raw sample과 즉석 진단을 스트리밍한다 (알코올 미포함).
+/// 스스로 끝나지 않고 caller의 cancel(정지 명령/연결 해제)로만 종료된다.
+/// `on_sample`은 매 raw sample마다, `on_reading`은 warmup 후 주기마다 호출된다.
+pub async fn pulse_stream(
+    device: &mut PulseDevice<'_>,
+    mut on_sample: impl FnMut(u32, u16),
+    mut on_reading: impl FnMut(u32, Diagnosis),
+) -> Result<()> {
+    device.reset();
+    let started = Instant::now();
+    let mut last_reading_ms: u32 = 0;
+
+    loop {
+        let elapsed_ms = started.elapsed().as_millis().min(u64::from(u32::MAX)) as u32;
+
+        let raw = device.sample_raw(elapsed_ms)?;
+        on_sample(elapsed_ms, raw);
+
+        if elapsed_ms >= PULSE_STREAM_WARMUP_MS
+            && elapsed_ms.saturating_sub(last_reading_ms) >= PULSE_STREAM_READING_INTERVAL_MS
+        {
+            last_reading_ms = elapsed_ms;
+            on_reading(elapsed_ms, device.diagnose());
+        }
+
+        Timer::after(PULSE_SAMPLE).await;
+    }
+}
+
+/// 세션 중 HR 1건을 추정하기 위해 pulse를 `duration`만큼 샘플링하고 즉석 진단을 반환한다.
+pub async fn hr_burst(device: &mut PulseDevice<'_>, duration: Duration) -> Result<Diagnosis> {
+    device.reset();
+    let started = Instant::now();
+
+    loop {
+        let elapsed_ms = started.elapsed().as_millis().min(u64::from(u32::MAX)) as u32;
+        device.sample_raw(elapsed_ms)?;
+
+        if started.elapsed() >= duration {
+            return Ok(device.diagnose());
+        }
+
+        Timer::after(PULSE_SAMPLE).await;
+    }
+}
+
+/// 알코올을 측정한다. `on_state`는 ZE29A 상태가 바뀔 때마다 호출돼(예: Preheating→
+/// WaitBlow) 앱이 "지금 부세요" 타이밍을 안내할 수 있게 한다.
+pub async fn alcohol(
+    device: &mut AlcoholDevice<'_>,
+    on_state: impl FnMut(Status),
+) -> Result<u16> {
     device.start().await?;
-    let result = alcohol_result(device).await;
+    let result = alcohol_result(device, on_state).await;
 
     if let Err(error) = device.stop().await {
         log::warn!("failed to stop alcohol sensor work mode after measurement: {error}");
@@ -40,15 +119,63 @@ pub async fn alcohol(device: &mut AlcoholDevice<'_>) -> Result<u16> {
     result
 }
 
-async fn alcohol_result(device: &mut AlcoholDevice<'_>) -> Result<u16> {
+async fn alcohol_result(
+    device: &mut AlcoholDevice<'_>,
+    mut on_state: impl FnMut(Status),
+) -> Result<u16> {
     let started = Instant::now();
+    let mut last_status: Option<Status> = None;
+    let mut reached_wait_blow = false;
+    let mut consecutive_errors: u8 = 0;
 
     loop {
-        if device.status().await? == Status::ReadResult {
-            return Ok(device.test().await?);
+        // 산발적인 status read 실패로 측정 전체가 죽지 않도록 몇 번은 재시도한다.
+        let status = match device.status().await {
+            Ok(status) => {
+                consecutive_errors = 0;
+                status
+            }
+            Err(error) => {
+                consecutive_errors += 1;
+                log::warn!("[ALCOHOL] status read failed ({consecutive_errors}): {error}");
+
+                if consecutive_errors >= MAX_STATUS_ERRORS {
+                    return Err(error.into());
+                }
+                if started.elapsed() >= ALCOHOL_RESULT_TIMEOUT {
+                    return Err(TimeoutKind::AlcoholResult.into());
+                }
+
+                Timer::after(ALCOHOL_POLL).await;
+                continue;
+            }
+        };
+
+        // 매 측정마다 상태 전환을 로그로 남기고 앱에도 알린다: Idle→Preheating→WaitBlow
+        // →Blowing→Calculating→ReadResult 순서를 실제로 거치는지 확인할 수 있다.
+        if last_status != Some(status) {
+            log::info!("[ALCOHOL] status: {status:?}");
+            on_state(status);
+            if status == Status::WaitBlow {
+                reached_wait_blow = true;
+            }
+            last_status = Some(status);
+        }
+
+        match status {
+            Status::ReadResult => return Ok(device.test().await?),
+            // WaitBlow까지 갔다가 다시 Idle로 돌아왔다면 센서가 입김을 유효한 것으로
+            // 인정하지 못한 것이다(너무 약하거나 짧음, 또는 WaitBlow 창을 놓침). 30초를
+            // 기다리지 않고 바로 실패로 끝내 사용자가 즉시 다시 시도하게 한다.
+            Status::Idle if reached_wait_blow => {
+                log::warn!("[ALCOHOL] returned to Idle after WaitBlow — blow not accepted");
+                return Err(TimeoutKind::AlcoholResult.into());
+            }
+            _ => {}
         }
 
         if started.elapsed() >= ALCOHOL_RESULT_TIMEOUT {
+            log::warn!("[ALCOHOL] result timeout, last status: {last_status:?}");
             return Err(TimeoutKind::AlcoholResult.into());
         }
 

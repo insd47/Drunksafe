@@ -75,6 +75,7 @@ export function createMockResultEvent(
     kind,
     alcohol_mg_l_x1000: baseline ? 7 : 165,
     pulse: {
+      status: 'measured',
       bpm: baseline ? 71 : 96,
       stable: true,
     },

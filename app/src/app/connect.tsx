@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/action-button';
 import { Banner } from '@/components/banner';
@@ -114,21 +114,20 @@ export default function ConnectRoute() {
         </View>
       ) : null}
 
-      <View className="border-y border-gray-200">
-        {devices.map((device) => (
-          <Pressable
-            accessibilityLabel={`${device.name} 연결`}
-            accessibilityRole="button"
-            className="flex-row items-center justify-between gap-4 py-4"
-            key={device.id}
-            onPress={() => {
-              void ble.connect(device.id);
-            }}>
-            <Text className="min-w-0 flex-1 text-sm font-medium text-gray-950">{device.name}</Text>
-            <Text className="text-sm text-gray-400">연결</Text>
-          </Pressable>
-        ))}
-      </View>
+      {devices.length > 0 ? (
+        <View className="gap-3">
+          {devices.map((device) => (
+            <ActionButton
+              key={device.id}
+              label={`${device.name} 연결`}
+              onPress={() => {
+                void ble.connect(device.id);
+              }}
+              size="lg"
+            />
+          ))}
+        </View>
+      ) : null}
 
       {notFound || failed ? <ActionButton label="다시 검색" onPress={research} /> : null}
 

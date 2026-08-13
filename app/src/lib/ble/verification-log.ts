@@ -1,4 +1,4 @@
-import type { DeviceEvent, PhoneCommand } from '@/lib/ble/model';
+import type { DeviceEvent, PhoneCommand, PulseResult } from '@/lib/ble/model';
 
 export type BleVerificationLogKind = 'command' | 'event' | 'state';
 
@@ -73,6 +73,41 @@ export function bleCommandLogEntry(command: PhoneCommand): BleVerificationLogInp
         detail: 'phone requested cancel',
         sessionId: command.session_id,
       };
+    case 'start_pulse_phase':
+      return {
+        kind: 'command',
+        label: 'cmd:pulse_phase',
+        detail: 'phone requested pulse phase',
+        sessionId: command.session_id,
+      };
+    case 'start_pulse_stream':
+      return {
+        kind: 'command',
+        label: 'cmd:pulse_stream_start',
+        detail: `stream_raw=${command.stream_raw}`,
+        sessionId: null,
+      };
+    case 'stop_pulse_stream':
+      return {
+        kind: 'command',
+        label: 'cmd:pulse_stream_stop',
+        detail: 'phone stopped pulse stream',
+        sessionId: null,
+      };
+    case 'start_session':
+      return {
+        kind: 'command',
+        label: 'cmd:session_start',
+        detail: `resting_bpm=${command.resting_bpm ?? '-'}`,
+        sessionId: null,
+      };
+    case 'end_session':
+      return {
+        kind: 'command',
+        label: 'cmd:session_end',
+        detail: 'phone ended session',
+        sessionId: null,
+      };
   }
 }
 
@@ -96,7 +131,7 @@ export function bleEventLogEntry(event: DeviceEvent): BleVerificationLogInput {
       return {
         kind: 'event',
         label: 'event:result',
-        detail: `alcohol=${event.alcohol_mg_l_x1000} pulse=${event.pulse?.bpm ?? '-'}`,
+        detail: `alcohol=${event.alcohol_mg_l_x1000} pulse=${pulseLogDetail(event.pulse)}`,
         sessionId: event.session_id,
       };
     case 'device_error':
@@ -106,7 +141,53 @@ export function bleEventLogEntry(event: DeviceEvent): BleVerificationLogInput {
         detail: `code=${event.code}`,
         sessionId: event.session_id,
       };
+    case 'alcohol_state':
+      return {
+        kind: 'event',
+        label: 'event:alcohol_state',
+        detail: `state=${event.state}`,
+        sessionId: event.session_id,
+      };
+    case 'ppg_sample':
+      return {
+        kind: 'event',
+        label: 'event:ppg_sample',
+        detail: `samples=${event.samples.length} t0_ms=${event.t0_ms}`,
+        sessionId: event.session_id,
+      };
+    case 'pulse_reading':
+      return {
+        kind: 'event',
+        label: 'event:pulse_reading',
+        detail: `bpm=${event.bpm} peaks=${event.peak_count} stable=${event.stable}`,
+        sessionId: event.session_id,
+      };
+    case 'session_status':
+      return {
+        kind: 'event',
+        label: 'event:session_status',
+        detail: `state=${event.state} elapsed=${event.elapsed_ms} n=${event.records}`,
+        sessionId: event.session_id,
+      };
+    case 'session_record':
+      return {
+        kind: 'event',
+        label: 'event:session_record',
+        detail: `${event.index + 1}/${event.total} ${event.kind}`,
+        sessionId: event.session_id,
+      };
+    case 'session_complete':
+      return {
+        kind: 'event',
+        label: 'event:session_complete',
+        detail: `total=${event.total}`,
+        sessionId: event.session_id,
+      };
   }
+}
+
+function pulseLogDetail(pulse: PulseResult) {
+  return pulse.status === 'measured' ? `${pulse.bpm}` : `unavailable:${pulse.reason}`;
 }
 
 export function bleStateLogEntry(

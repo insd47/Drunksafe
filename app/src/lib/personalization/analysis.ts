@@ -119,7 +119,7 @@ function confidencePercent(result: MeasurementResult, state: MeasurementAnalysis
 
   const restingBpm = state.baseline.resting_bpm;
 
-  if (restingBpm !== null && result.pulse !== null) {
+  if (restingBpm !== null && result.pulse.status === 'measured') {
     confidence += Math.abs(result.pulse.bpm - restingBpm) <= 20 ? 5 : -10;
   } else if (restingBpm !== null) {
     confidence -= 5;

@@ -31,15 +31,20 @@ export type ConnectionState =
 
 export type MeasurementErrorCode = ErrorCode | 'bluetooth_off' | 'connection_lost' | 'ble_failure';
 
+/** 측정은 알코올(alcohol) 단계와 심박(pulse) 단계로 나뉜다. */
+export type MeasurementStage = 'alcohol' | 'pulse';
+
 export type MeasurementState =
   | { phase: 'idle' }
   | { phase: 'starting'; kind: MeasurementKind }
   | {
       phase: 'active';
+      stage: MeasurementStage;
       sessionId: string;
       kind: MeasurementKind;
       startedAtUnixMs: number;
     }
+  | { phase: 'awaiting_pulse'; sessionId: string; kind: MeasurementKind }
   | { phase: 'result'; record: MeasurementRecord; saved: boolean }
   | {
       phase: 'error';
@@ -74,6 +79,7 @@ export type SessionEvent =
   | { type: 'notify_ready_timeout'; message: string }
   | { type: 'bluetooth_changed'; bluetoothState: string }
   | { type: 'start_measurement_requested'; kind: MeasurementKind }
+  | { type: 'start_pulse_phase_requested' }
   | { type: 'cancel_measurement_requested' }
   | {
       type: 'device_event';
@@ -304,7 +310,11 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
             : state.connection,
       });
     case 'start_measurement_requested': {
-      if (state.measurement.phase === 'starting' || state.measurement.phase === 'active') {
+      if (
+        state.measurement.phase === 'starting' ||
+        state.measurement.phase === 'active' ||
+        state.measurement.phase === 'awaiting_pulse'
+      ) {
         return transition(state);
       }
 
@@ -327,27 +337,44 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
             command: { cmd: 'start', kind: event.kind },
           });
     }
-    case 'cancel_measurement_requested':
-      if (state.measurement.phase !== 'active') return transition(state);
+    case 'start_pulse_phase_requested': {
+      const measurement = state.measurement;
 
-      if (state.mockMode) {
+      if (
+        measurement.phase !== 'awaiting_pulse' ||
+        state.connection.phase !== 'connected' ||
+        state.mockMode
+      ) {
+        return transition(state);
+      }
+
+      return transition(state, {
+        type: 'send_command',
+        command: { cmd: 'start_pulse_phase', session_id: measurement.sessionId },
+      });
+    }
+    case 'cancel_measurement_requested': {
+      const measurement = state.measurement;
+
+      if (measurement.phase !== 'active' && measurement.phase !== 'awaiting_pulse') {
+        return transition(state);
+      }
+
+      if (state.mockMode && measurement.phase === 'active') {
         return transition(
           {
             ...state,
-            measurement: measurementError(
-              'cancelled',
-              '측정이 취소됐습니다.',
-              state.measurement.kind
-            ),
+            measurement: measurementError('cancelled', '측정이 취소됐습니다.', measurement.kind),
           },
-          { type: 'cancel_mock', sessionId: state.measurement.sessionId }
+          { type: 'cancel_mock', sessionId: measurement.sessionId }
         );
       }
 
       return transition(state, {
         type: 'send_command',
-        command: { cmd: 'cancel', session_id: state.measurement.sessionId },
+        command: { cmd: 'cancel', session_id: measurement.sessionId },
       });
+    }
     case 'device_event':
       return reduceDeviceEvent(state, event.event, event.atUnixMs, event.readyDevice);
     case 'record_persisted':
@@ -391,22 +418,41 @@ function reduceDeviceEvent(
     case 'status': {
       const connection = connectedAfterStatus(state.connection, event.status, readyDevice);
       let measurement = state.measurement;
+      const sessionId = event.active_session_id;
 
-      if (
-        event.status === 'measuring' &&
-        event.active_session_id &&
-        measurement.phase === 'starting'
-      ) {
-        measurement = {
-          phase: 'active',
-          sessionId: event.active_session_id,
-          kind: measurement.kind,
-          startedAtUnixMs: atUnixMs,
-        };
+      if (event.status === 'measuring' && sessionId) {
+        if (measurement.phase === 'starting') {
+          // 1단계 시작: 알코올 측정.
+          measurement = {
+            phase: 'active',
+            stage: 'alcohol',
+            sessionId,
+            kind: measurement.kind,
+            startedAtUnixMs: atUnixMs,
+          };
+        } else if (measurement.phase === 'awaiting_pulse' && measurement.sessionId === sessionId) {
+          // 2단계 시작: 심박 측정.
+          measurement = {
+            phase: 'active',
+            stage: 'pulse',
+            sessionId,
+            kind: measurement.kind,
+            startedAtUnixMs: atUnixMs,
+          };
+        }
+      } else if (event.status === 'awaiting_pulse' && sessionId) {
+        if (
+          measurement.phase === 'starting' ||
+          (measurement.phase === 'active' &&
+            measurement.stage === 'alcohol' &&
+            measurement.sessionId === sessionId)
+        ) {
+          measurement = { phase: 'awaiting_pulse', sessionId, kind: measurement.kind };
+        }
       } else if (
         event.status === 'idle' &&
-        event.active_session_id === null &&
-        measurement.phase === 'active'
+        sessionId === null &&
+        (measurement.phase === 'active' || measurement.phase === 'awaiting_pulse')
       ) {
         measurement = measurementError(
           'ble_failure',
@@ -421,6 +467,12 @@ function reduceDeviceEvent(
     }
     case 'measurement_started': {
       if (state.connection.phase !== 'connected') return transition(state);
+
+      // 이미 심박 대기/심박 측정 단계로 넘어간 뒤 도착한 중복 시작 이벤트는 무시한다.
+      if (state.measurement.phase === 'awaiting_pulse') return transition(state);
+      if (state.measurement.phase === 'active' && state.measurement.stage === 'pulse') {
+        return transition(state);
+      }
 
       if (
         state.measurement.phase === 'active' &&
@@ -437,6 +489,7 @@ function reduceDeviceEvent(
         ...state,
         measurement: {
           phase: 'active',
+          stage: 'alcohol',
           sessionId: event.session_id,
           kind: event.kind,
           startedAtUnixMs:
@@ -477,6 +530,16 @@ function reduceDeviceEvent(
         measurement: measurementError(event.code, measurementErrorMessage(event.code), kind),
       });
     }
+    case 'alcohol_state':
+    case 'ppg_sample':
+    case 'pulse_reading':
+    case 'session_status':
+    case 'session_record':
+    case 'session_complete':
+      // BleSessionStore.receiveDeviceEvent()가 리듀서로 보내기 전에 가로채 각각 알코올
+      // 상태 / ppg 링버퍼 / pulse 진단 / 세션 스토어에 직접 반영한다. 여기 도달하면 상태
+      // 변화 없이 무시한다 (타입 완전성 확보용).
+      return transition(state);
   }
 }
 
@@ -508,7 +571,8 @@ function canScan(state: BleSessionState) {
       state.connection.phase === 'error' ||
       state.connection.phase === 'scanning') &&
     state.measurement.phase !== 'starting' &&
-    state.measurement.phase !== 'active'
+    state.measurement.phase !== 'active' &&
+    state.measurement.phase !== 'awaiting_pulse'
   );
 }
 
@@ -558,7 +622,11 @@ function disconnectedConnection(bluetoothState: string): ConnectionState {
 }
 
 function measurementAfterDisconnect(measurement: MeasurementState): MeasurementState {
-  if (measurement.phase === 'starting' || measurement.phase === 'active') {
+  if (
+    measurement.phase === 'starting' ||
+    measurement.phase === 'active' ||
+    measurement.phase === 'awaiting_pulse'
+  ) {
     return measurementError('connection_lost', '측정 중 연결이 해제되었습니다.', measurement.kind);
   }
 
@@ -572,7 +640,13 @@ function interruptMeasurement(
   code: MeasurementErrorCode,
   message: string
 ): MeasurementState {
-  if (measurement.phase !== 'starting' && measurement.phase !== 'active') return measurement;
+  if (
+    measurement.phase !== 'starting' &&
+    measurement.phase !== 'active' &&
+    measurement.phase !== 'awaiting_pulse'
+  ) {
+    return measurement;
+  }
 
   return measurementError(code, message, measurement.kind);
 }
@@ -581,6 +655,7 @@ function activeMeasurementKind(measurement: MeasurementState): MeasurementKind {
   switch (measurement.phase) {
     case 'starting':
     case 'active':
+    case 'awaiting_pulse':
       return measurement.kind;
     case 'result':
       return measurement.record.kind;

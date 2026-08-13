@@ -13,6 +13,8 @@ pub enum Command {
     Status = 0x85,
     Result = 0x86,
     Work = 0x87,
+    SetBlowTime = 0x89,
+    SetBlowPressure = 0x93,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,6 +37,8 @@ impl Command {
             0x85 => Ok(Self::Status),
             0x86 => Ok(Self::Result),
             0x87 => Ok(Self::Work),
+            0x89 => Ok(Self::SetBlowTime),
+            0x93 => Ok(Self::SetBlowPressure),
             _ => Err(UnknownCommand { command: byte }),
         }
     }

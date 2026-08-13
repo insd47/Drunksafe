@@ -66,6 +66,18 @@ impl GattServer {
         Ok(())
     }
 
+    /// 현재 휴대폰이 연결돼 있는지 여부다.
+    pub fn is_connected(&self) -> bool {
+        self.state.lock().unwrap().connections.is_connected()
+    }
+
+    /// advertising 재시도 횟수를 리셋하고 다시 시작을 트리거한다. 결과 화면에서
+    /// 버튼 길게 누르기로 대기 화면에 복귀할 때, 연결이 없으면 호출한다.
+    pub fn ensure_advertising(&self) -> Result<(), EspError> {
+        log::info!("BLE advertising restart requested");
+        self.begin_advertising()
+    }
+
     pub fn notify(&self, event: &DeviceEvent) -> Result<(), EspError> {
         let target = {
             let mut state = self.state.lock().unwrap();

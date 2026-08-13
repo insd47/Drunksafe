@@ -1,11 +1,13 @@
+use crate::devices::pulse::PulseUnavailableReason;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Measurement {
     alcohol_mg_l_x1000: u16,
-    pulse: Option<PulseMeasurement>,
+    pulse: PulseOutcome,
 }
 
 impl Measurement {
-    pub fn new(alcohol_mg_l_x1000: u16, pulse: Option<PulseMeasurement>) -> Self {
+    pub fn new(alcohol_mg_l_x1000: u16, pulse: PulseOutcome) -> Self {
         Self {
             alcohol_mg_l_x1000,
             pulse,
@@ -16,27 +18,15 @@ impl Measurement {
         self.alcohol_mg_l_x1000
     }
 
-    pub const fn pulse(&self) -> Option<PulseMeasurement> {
+    pub const fn pulse(&self) -> PulseOutcome {
         self.pulse
     }
 }
 
+/// pulse 측정의 최종 결과다. 실제 하드웨어 오류(ADC/타임스탬프 오류)가 아닌 이상
+/// 항상 `Ok`로 귀결되며, 신호를 못 찾았거나 불안정했던 경우도 값으로 표현한다.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PulseMeasurement {
-    bpm: u16,
-    stable: bool,
-}
-
-impl PulseMeasurement {
-    pub const fn new(bpm: u16, stable: bool) -> Self {
-        Self { bpm, stable }
-    }
-
-    pub const fn bpm(self) -> u16 {
-        self.bpm
-    }
-
-    pub const fn stable(self) -> bool {
-        self.stable
-    }
+pub enum PulseOutcome {
+    Measured { bpm: u16, stable: bool },
+    Unavailable { reason: PulseUnavailableReason },
 }

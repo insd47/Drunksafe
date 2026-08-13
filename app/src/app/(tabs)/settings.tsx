@@ -96,6 +96,16 @@ export default function SettingsRoute() {
         </Pressable>
       </Section>
 
+      {__DEV__ ? (
+        <ActionButton
+          label="개발자 도구 · PPG 파형"
+          onPress={() => {
+            router.push('/dev');
+          }}
+          variant="secondary"
+        />
+      ) : null}
+
       <LegalNotice />
     </Screen>
   );

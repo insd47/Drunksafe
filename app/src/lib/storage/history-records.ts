@@ -1,4 +1,4 @@
-import type { MeasurementKind, MeasurementResult } from '@/lib/ble/model';
+import type { MeasurementKind, MeasurementResult, PulseUnavailableReason } from '@/lib/ble/model';
 import {
   analyzeMeasurement,
   type MeasurementAnalysisState,
@@ -22,6 +22,7 @@ export type MeasurementRecord = {
   confidence_percent: number;
   pulse_bpm: number | null;
   pulse_stable: boolean | null;
+  pulse_issue_reason: PulseUnavailableReason | null;
 };
 
 export function recordFromResult(
@@ -42,8 +43,9 @@ export function recordFromResult(
     sober_time_minutes: analysis.sober_time_minutes,
     risk: analysis.risk,
     confidence_percent: analysis.confidence_percent,
-    pulse_bpm: result.pulse?.bpm ?? null,
-    pulse_stable: result.pulse?.stable ?? null,
+    pulse_bpm: result.pulse.status === 'measured' ? result.pulse.bpm : null,
+    pulse_stable: result.pulse.status === 'measured' ? result.pulse.stable : null,
+    pulse_issue_reason: result.pulse.status === 'unavailable' ? result.pulse.reason : null,
   };
 }
 

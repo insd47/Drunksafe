@@ -1,9 +1,42 @@
-use super::model::{Analysis, Sample};
+use super::model::{Analysis, Diagnosis, Sample};
 use super::{params, state};
 use std::collections::VecDeque;
 
+/// first_stable gate 없이 현재 window를 즉석 분석한다. 실시간 스트리밍 진단용이며
+/// 분석 상태(peak_found, first_stable 등)를 바꾸지 않는 순수 계산이다.
+pub fn diagnose(window: &VecDeque<Sample>) -> Diagnosis {
+    let peaks = find_peaks(window);
+    let peak_count = peaks.len() as u16;
+
+    if peaks.len() < 2 {
+        return Diagnosis {
+            bpm: 0.0,
+            ibi_stddev_ms: 0.0,
+            peak_count,
+            stable: false,
+        };
+    }
+
+    let ibis = intervals(&peaks);
+    let mean_ibi = mean(&ibis);
+    let ibi_stddev_ms = stddev(&ibis, mean_ibi);
+    let bpm = if mean_ibi > 0.0 { 60_000.0 / mean_ibi } else { 0.0 };
+
+    Diagnosis {
+        bpm: round(bpm, 1),
+        ibi_stddev_ms: round(ibi_stddev_ms, 1),
+        peak_count,
+        stable: ibi_stddev_ms <= params::IBI_STDEV_UNSTABLE_MS,
+    }
+}
+
 pub fn calculate(state: &mut state::State) -> Option<Analysis> {
     let peaks = find_peaks(state.window());
+
+    if !peaks.is_empty() {
+        state.mark_peak_found();
+    }
+
     let (mut bpm, mut ibi_stddev_ms, mut peak_amplitude, stable) = if peaks.len() >= 2 {
         let ibis = intervals(&peaks);
         let mean_ibi = mean(&ibis);

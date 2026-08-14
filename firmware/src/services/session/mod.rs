@@ -24,6 +24,10 @@ const SESSION_TICK: Duration = Duration::from_millis(500);
 const DORMANT_ALCOHOL_INTERVAL: Duration = Duration::from_secs(30 * 60);
 /// TRACK에서 하강 곡선을 위한 dense 알코올 측정 주기다.
 const TRACK_ALCOHOL_INTERVAL: Duration = Duration::from_secs(15 * 60);
+/// 알코올 추적(개발자 도구)에서 임계를 넘기 전 측정 주기다 (상승기를 잡기 위해 촘촘히).
+const ALCOHOL_TRACK_PRE_INTERVAL: Duration = Duration::from_secs(5 * 60);
+/// 알코올 추적에서 이 값을 넘으면 TRACK(15분 간격)으로 전환한다.
+const ALCOHOL_TRACK_THRESHOLD: u16 = 10;
 /// PROBE 단계에서 사용자 확인을 기다리는 최대 시간이다.
 const PROBE_MAX: Duration = Duration::from_secs(10 * 60);
 /// BPM 이동평균이 resting baseline 대비 이만큼 오르면 "상승"으로 본다.
@@ -187,6 +191,67 @@ pub fn run(
     }
 
     log::info!("session ending: streaming {} records", log.len());
+    stream_log(ble, &session_id, &log);
+    screen.show(View::Home);
+}
+
+/// 개발자 도구: 심박/스케줄 없이 알코올 값만 주기적으로 측정해 분해 곡선을 추적한다.
+/// 값이 `ALCOHOL_TRACK_THRESHOLD`를 넘으면 기존 TRACK처럼 15분 간격으로 dense 측정한다.
+/// 로그 형식은 일반 세션과 같아 앱의 저장·회귀·기록 화면을 그대로 재사용한다.
+pub fn run_alcohol_track(
+    ble: &BleService,
+    measure: &mut MeasureService<'_>,
+    buzzer: &mut BuzzerDevice,
+    screen: &mut ScreenService<'_>,
+    trigger: &mut TriggerDevice,
+    session_id: String,
+) {
+    let start = Instant::now();
+    let mut log: Vec<LogEntry> = Vec::new();
+    let mut state = SessionStateLabel::Dormant;
+    let mut crossed = false;
+    let mut next_alcohol = Instant::now(); // 시작하자마자 첫 측정
+
+    log.push(state_entry(0, state));
+    screen.show(View::Session);
+    log::info!("alcohol-track session started: id={session_id}");
+    let _ = buzzer.beep(80);
+
+    loop {
+        if Instant::now() >= next_alcohol {
+            if let Some(value) = measure_alcohol_step(measure, buzzer, screen, start, &mut log) {
+                // 값이 임계를 처음 넘으면 TRACK으로 전환 — 이후 알코올 점은 track 상태로 로깅돼
+                // 앱의 하강 회귀(피크 이후 구간)에 그대로 쓰인다.
+                if value > ALCOHOL_TRACK_THRESHOLD && !crossed {
+                    crossed = true;
+                    state = SessionStateLabel::Track;
+                    log.push(state_entry(elapsed_ms(start), state));
+                }
+            }
+
+            next_alcohol = Instant::now()
+                + if crossed {
+                    TRACK_ALCOHOL_INTERVAL
+                } else {
+                    ALCOHOL_TRACK_PRE_INTERVAL
+                };
+        }
+
+        notify_status(ble, &session_id, state, elapsed_ms(start), log.len(), None, None);
+
+        if end_requested(ble) || trigger.poll() == ButtonEvent::LongPress {
+            break;
+        }
+
+        if log.len() >= MAX_RECORDS {
+            log::warn!("alcohol-track log full ({MAX_RECORDS}), ending");
+            break;
+        }
+
+        sleep(SESSION_TICK);
+    }
+
+    log::info!("alcohol-track ending: streaming {} records", log.len());
     stream_log(ble, &session_id, &log);
     screen.show(View::Home);
 }

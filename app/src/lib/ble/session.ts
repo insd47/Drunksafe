@@ -31,10 +31,12 @@ export type BleSessionHook = BleSessionState & {
   startMeasurement: (kind?: MeasurementKind) => Promise<void>;
   startPulsePhase: () => Promise<void>;
   cancelMeasurement: () => Promise<void>;
+  timeoutMeasurement: () => Promise<void>;
   connectMockDevice: () => Promise<void>;
   startPulseStream: (streamRaw: boolean) => Promise<void>;
   stopPulseStream: () => Promise<void>;
   startSession: () => Promise<void>;
+  startAlcoholTrack: () => Promise<void>;
   endSession: () => Promise<void>;
 };
 
@@ -55,10 +57,12 @@ export function useBleSession(): BleSessionHook {
     startMeasurement: bleSession.startMeasurement,
     startPulsePhase: bleSession.startPulsePhase,
     cancelMeasurement: bleSession.cancelMeasurement,
+    timeoutMeasurement: bleSession.timeoutMeasurement,
     connectMockDevice: bleSession.connectMockDevice,
     startPulseStream: bleSession.startPulseStream,
     stopPulseStream: bleSession.stopPulseStream,
     startSession: bleSession.startSession,
+    startAlcoholTrack: bleSession.startAlcoholTrack,
     endSession: bleSession.endSession,
   };
 }

@@ -69,6 +69,7 @@ fn main() -> Result<()> {
         let mut phone_start = None;
         let mut phone_pulse_stream = None;
         let mut phone_session: Option<Option<u16>> = None;
+        let mut phone_alcohol_track = false;
 
         while let Some(command) = ble.try_recv_command() {
             match command {
@@ -89,6 +90,9 @@ fn main() -> Result<()> {
                 }
                 PhoneCommand::StartSession { resting_bpm } => {
                     phone_session = Some(resting_bpm);
+                }
+                PhoneCommand::StartAlcoholTrack => {
+                    phone_alcohol_track = true;
                 }
                 PhoneCommand::EndSession => {
                     log::debug!("ignoring end_session while idle");
@@ -114,6 +118,23 @@ fn main() -> Result<()> {
                 &mut trigger,
                 session_id,
                 resting_bpm,
+            );
+            notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
+            on_result_screen = false;
+            std::thread::sleep(IDLE_POLL);
+            continue;
+        }
+
+        if phone_alcohol_track {
+            session_seq = session_seq.wrapping_add(1);
+            let session_id = format!("fw-alctrack-{session_seq}");
+            session::run_alcohol_track(
+                &ble,
+                &mut measure,
+                &mut buzzer,
+                &mut screen,
+                &mut trigger,
+                session_id,
             );
             notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
             on_result_screen = false;
@@ -368,6 +389,7 @@ fn measurement_cancel_requested(ble: &BleService, session_id: &str) -> bool {
             | PhoneCommand::StartPulseStream { .. }
             | PhoneCommand::StartPulsePhase { .. }
             | PhoneCommand::StartSession { .. }
+            | PhoneCommand::StartAlcoholTrack
             | PhoneCommand::EndSession => {
                 log::debug!("ignoring start/session command while finishing active measurement");
             }
@@ -412,6 +434,7 @@ fn pulse_stream_stop_requested(ble: &BleService) -> bool {
             | PhoneCommand::StartPulseStream { .. }
             | PhoneCommand::StartPulsePhase { .. }
             | PhoneCommand::StartSession { .. }
+            | PhoneCommand::StartAlcoholTrack
             | PhoneCommand::EndSession => {
                 log::debug!("ignoring start/session command during pulse stream");
             }

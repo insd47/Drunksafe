@@ -130,6 +130,7 @@ export type PhoneCommand =
   | { cmd: 'start_pulse_stream'; stream_raw: boolean }
   | { cmd: 'stop_pulse_stream' }
   | { cmd: 'start_session'; resting_bpm: number | null }
+  | { cmd: 'start_alcohol_track' }
   | { cmd: 'end_session' };
 
 export type DeviceEvent =
@@ -365,6 +366,7 @@ function isPhoneCommand(value: unknown): value is PhoneCommand {
     case 'start_session':
       return value.resting_bpm === null || isU16(value.resting_bpm);
     case 'stop_pulse_stream':
+    case 'start_alcohol_track':
     case 'end_session':
       return true;
     default:

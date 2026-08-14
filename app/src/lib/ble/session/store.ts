@@ -188,6 +188,13 @@ export class BleSessionStore {
     });
   };
 
+  /** Developer tool: alcohol-only tracking session (no HR/schedule) for descent fitting. */
+  startAlcoholTrack = async () => {
+    this.sessionRecordsBuffer = [];
+    this.setSessionUi({ ...idleSessionSnapshot, phase: 'active' });
+    await this.sendCommand({ cmd: 'start_alcohol_track' });
+  };
+
   /** End the session and download its log (device streams records back). */
   endSession = async () => {
     this.setSessionUi({ ...this.sessionUi, phase: 'downloading' });
@@ -300,6 +307,11 @@ export class BleSessionStore {
 
   cancelMeasurement = async () => {
     await this.dispatch({ type: 'cancel_measurement_requested' });
+  };
+
+  /** Client-side safety net: end an active measurement whose result never arrived. */
+  timeoutMeasurement = async () => {
+    await this.dispatch({ type: 'measurement_client_timeout' });
   };
 
   destroy = async () => {

@@ -210,6 +210,9 @@ pub enum PhoneCommand {
         #[serde(default)]
         resting_bpm: Option<u16>,
     },
+    /// 개발자 도구: 심박/스케줄(DORMANT/PROBE) 없이 알코올 값만 추적한다(분해 곡선 fitting용).
+    /// 값이 임계(10)를 넘으면 기존 TRACK처럼 15분 간격으로 측정한다. EndSession으로 종료·다운로드.
+    StartAlcoholTrack,
     /// 진행 중인 세션을 종료하고 저장된 로그 다운로드를 시작한다.
     EndSession,
 }

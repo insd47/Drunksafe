@@ -37,6 +37,8 @@ export default function MeasureRoute() {
     measurement.phase === 'active' ||
     measurement.phase === 'awaiting_pulse';
   const stage = measurement.phase === 'active' ? measurement.stage : null;
+  const activeStartedAt = measurement.phase === 'active' ? measurement.startedAtUnixMs : null;
+  const timeoutMeasurement = ble.timeoutMeasurement;
   const resultSessionId = measurement.phase === 'result' ? measurement.record.session_id : null;
   const errorCode = measurement.phase === 'error' ? measurement.code : null;
   const elapsedSeconds = useElapsedSeconds(
@@ -86,6 +88,26 @@ export default function MeasureRoute() {
 
     close();
   }, [errorCode, close]);
+
+  // 안전장치: 기기 결과 이벤트가 유실돼도 화면이 무한히 '측정 중'에 머물지 않도록,
+  // 단계별 펌웨어 타임아웃(+여유) 후에는 앱이 스스로 타임아웃 처리한다.
+  useEffect(() => {
+    if (activeStartedAt === null) {
+      return;
+    }
+
+    const limitMs = (stage === 'pulse' ? 85 : 50) * 1000;
+    const timer = setTimeout(
+      () => {
+        void timeoutMeasurement();
+      },
+      Math.max(0, limitMs - (Date.now() - activeStartedAt))
+    );
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [activeStartedAt, stage, timeoutMeasurement]);
 
   function cancel() {
     void cancelMeasurement();

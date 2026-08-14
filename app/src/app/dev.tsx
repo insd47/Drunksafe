@@ -6,14 +6,17 @@ import { PpgSparkline } from '@/components/ppg-sparkline';
 import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
+import type { SessionStateLabel } from '@/lib/ble/model';
 import {
   useBleSession,
   useBleVerification,
   usePpgSnapshot,
   usePulseReading,
   usePulseStreaming,
+  useSession,
   type ConnectionState,
   type MeasurementState,
+  type SessionUiSnapshot,
 } from '@/lib/ble/session';
 import { removeJson } from '@/lib/storage/json';
 import { emptyBaseline, writeBaseline } from '@/lib/storage/profile';
@@ -65,6 +68,7 @@ export default function DevRoute() {
       </Section>
 
       <PulseStreamSection />
+      <AlcoholTrackSection />
 
       <Section eyebrow="Raw" title={`원시 이벤트 (${entries.length})`}>
         {entries.length === 0 ? <StatusRow label="기록 없음" value="-" /> : null}
@@ -203,6 +207,80 @@ function PulseStreamSection() {
       />
     </>
   );
+}
+
+/**
+ * 심박/스케줄(DORMANT·PROBE) 없이 알코올 값만 추적해 분해 곡선을 얻는다.
+ * 값이 10을 넘으면 15분 간격으로 dense 측정. 종료하면 일반 세션으로 저장돼
+ * 기록 탭 > 음주 세션에서 하강 회귀 결과를 상세히 볼 수 있다.
+ */
+function AlcoholTrackSection() {
+  const ble = useBleSession();
+  const session = useSession();
+  const connected = ble.connection.phase === 'connected' && !ble.mockMode;
+  const active = session.phase === 'active' || session.phase === 'downloading';
+  const status = session.status;
+
+  return (
+    <>
+      <Section eyebrow="Alcohol" title="알코올 분해 곡선 측정 (심박 제외)">
+        <StatusRow label="상태" value={alcoholTrackPhaseText(session)} />
+        <StatusRow label="단계" value={status ? sessionStateText(status.state) : '-'} />
+        <StatusRow label="측정 횟수" value={status ? String(status.records) : '-'} />
+        <StatusRow label="경과(ms)" value={status ? String(status.elapsed_ms) : '-'} />
+        {session.phase === 'complete' ? (
+          <StatusRow
+            label="분해속도"
+            tone={session.result?.eliminationMgLPerHourX1000 != null ? 'safe' : 'neutral'}
+            value={formatElimination(session.result?.eliminationMgLPerHourX1000 ?? null)}
+          />
+        ) : null}
+      </Section>
+      <ActionButton
+        disabled={!connected || active}
+        label="알코올 추적 시작"
+        onPress={() => {
+          void ble.startAlcoholTrack();
+        }}
+      />
+      <ActionButton
+        disabled={!connected || !active}
+        label="종료 & 데이터 받기"
+        onPress={() => {
+          void ble.endSession();
+        }}
+        variant="secondary"
+      />
+    </>
+  );
+}
+
+function alcoholTrackPhaseText(session: SessionUiSnapshot) {
+  switch (session.phase) {
+    case 'idle':
+      return '대기';
+    case 'active':
+      return '측정 중';
+    case 'downloading':
+      return '데이터 받는 중';
+    case 'complete':
+      return '완료';
+  }
+}
+
+function sessionStateText(state: SessionStateLabel) {
+  switch (state) {
+    case 'dormant':
+      return '관찰 (임계 이하)';
+    case 'probe':
+      return '확인';
+    case 'track':
+      return '추적 (15분 간격)';
+  }
+}
+
+function formatElimination(mgLPerHourX1000: number | null) {
+  return mgLPerHourX1000 === null ? '추정 불가' : `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h`;
 }
 
 /** 개발자 도구에서만 쓰는 단순 체크박스 행 (외부 UI 의존성 없이 Pressable로 구현). */

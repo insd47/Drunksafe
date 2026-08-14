@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/action-button';
 import { Banner } from '@/components/banner';
@@ -115,16 +115,30 @@ export default function ConnectRoute() {
       ) : null}
 
       {devices.length > 0 ? (
-        <View className="gap-3">
+        <View className="gap-2">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            검색된 기기 {devices.length}개
+          </Text>
           {devices.map((device) => (
-            <ActionButton
+            <Pressable
+              accessibilityLabel={`${device.name} ${device.id} 연결`}
+              accessibilityRole="button"
+              className="flex-row items-center justify-between gap-3 border border-gray-300 bg-white px-4 py-3"
               key={device.id}
-              label={`${device.name} 연결`}
               onPress={() => {
                 void ble.connect(device.id);
-              }}
-              size="lg"
-            />
+              }}>
+              <View className="min-w-0 flex-1 gap-0.5">
+                <Text className="text-sm font-semibold text-gray-950" numberOfLines={1}>
+                  {device.name}
+                </Text>
+                <Text className="text-xs text-gray-500" numberOfLines={1}>
+                  {device.id}
+                  {device.rssi != null ? ` · ${device.rssi} dBm` : ''}
+                </Text>
+              </View>
+              <Text className="shrink-0 text-sm font-semibold text-gray-950">연결 ›</Text>
+            </Pressable>
           ))}
         </View>
       ) : null}

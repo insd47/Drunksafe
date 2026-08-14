@@ -101,6 +101,13 @@ export function bleCommandLogEntry(command: PhoneCommand): BleVerificationLogInp
         detail: `resting_bpm=${command.resting_bpm ?? '-'}`,
         sessionId: null,
       };
+    case 'start_alcohol_track':
+      return {
+        kind: 'command',
+        label: 'cmd:alcohol_track',
+        detail: 'phone started alcohol track',
+        sessionId: null,
+      };
     case 'end_session':
       return {
         kind: 'command',

@@ -29,6 +29,8 @@ export type SessionSummary = {
   id: string;
   downloaded_at_unix_ms: number;
   record_count: number;
+  /** 세션 길이(ms). 이전 버전 데이터에는 없을 수 있다. */
+  duration_ms?: number;
   elimination_mg_l_per_hour_x1000: number | null;
 };
 
@@ -72,6 +74,7 @@ export async function persistSessionDownload(
     id,
     downloaded_at_unix_ms: downloadedAtUnixMs,
     record_count: ordered.length,
+    duration_ms: lastT,
     elimination_mg_l_per_hour_x1000: elimination,
   };
   const nextIndex = [summary, ...index.filter((item) => item.id !== id)].slice(0, maxStoredSessions);
@@ -107,8 +110,30 @@ export async function readSessionIndex(): Promise<SessionSummary[]> {
   return readJson(sessionIndexKey, () => [], isSessionIndex);
 }
 
+/** 저장된 세션 원본(샘플 포함)을 읽는다. 없거나 손상되면 null. */
+export async function readSession(id: string): Promise<StoredSession | null> {
+  return readJson<StoredSession | null>(sessionDataKey(id), () => null, isNullableStoredSession);
+}
+
 function sessionDataKey(id: string) {
   return `drunksafe.session.${id}.v1`;
+}
+
+function isNullableStoredSession(value: unknown): value is StoredSession | null {
+  return value === null || isStoredSession(value);
+}
+
+function isStoredSession(value: unknown): value is StoredSession {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === 'string' &&
+    typeof record.session_start_unix_ms === 'number' &&
+    Array.isArray(record.samples)
+  );
 }
 
 function isSessionIndex(value: unknown): value is SessionSummary[] {

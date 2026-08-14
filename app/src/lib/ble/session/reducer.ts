@@ -81,6 +81,7 @@ export type SessionEvent =
   | { type: 'start_measurement_requested'; kind: MeasurementKind }
   | { type: 'start_pulse_phase_requested' }
   | { type: 'cancel_measurement_requested' }
+  | { type: 'measurement_client_timeout' }
   | {
       type: 'device_event';
       event: DeviceEvent;
@@ -351,6 +352,22 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
       return transition(state, {
         type: 'send_command',
         command: { cmd: 'start_pulse_phase', session_id: measurement.sessionId },
+      });
+    }
+    case 'measurement_client_timeout': {
+      // 기기 응답(결과 이벤트)이 유실돼 화면이 무한히 '측정 중'에 머무는 것을 막는
+      // 앱 측 안전장치다. 실제 측정 단계에 있을 때만 타임아웃 오류로 전환한다.
+      if (state.measurement.phase !== 'active') {
+        return transition(state);
+      }
+
+      return transition({
+        ...state,
+        measurement: measurementError(
+          'measurement_timeout',
+          '기기 응답이 지연되어 측정을 종료했습니다. 다시 시도하세요.',
+          state.measurement.kind
+        ),
       });
     }
     case 'cancel_measurement_requested': {

@@ -16,12 +16,16 @@ import {
 } from '@/lib/ble/session';
 import type { AlcoholStateLabel, SessionStateLabel } from '@/lib/ble/model';
 import { baselineIssueCopy, baselineIssues } from '@/lib/personalization/baseline-acceptance';
-import { estimateSessionSoberTime } from '@/lib/personalization/session-sober-time';
+import {
+  estimateExponentialSoberTime,
+  readFittingProfile,
+  type AlcoholFittingProfile,
+} from '@/lib/personalization/fitting-profile';
 import { emptyBaseline, readBaseline, type UserBaseline } from '@/lib/storage/profile';
 
 /**
- * 음주 세션은 ESP32가 자율 실행한다. 폰은 시작만 지시하고 잠가도 되며,
- * 종료할 때 다시 연결해 데이터를 받는다.
+ * 음주 세션의 센서 스케줄은 ESP32가 실행한다. 현재 하드웨어 검증에서는
+ * BLE 이벤트 유실을 피하기 위해 휴대폰 화면과 앱을 켜 둔다.
  */
 export default function SessionRoute() {
   const router = useRouter();
@@ -29,6 +33,7 @@ export default function SessionRoute() {
   const session = useSession();
   const connected = ble.connection.phase === 'connected';
   const [baseline, setBaseline] = useState<UserBaseline>(emptyBaseline);
+  const [fittingProfile, setFittingProfile] = useState<AlcoholFittingProfile | null>(null);
   const [starting, setStarting] = useState(false);
   const issues = baselineIssues(baseline);
   const baselineReady = issues.length === 0;
@@ -42,6 +47,9 @@ export default function SessionRoute() {
         .catch(() => {
           if (mounted) setBaseline(emptyBaseline);
         });
+      void readFittingProfile().then((saved) => {
+        if (mounted) setFittingProfile(saved);
+      });
       return () => {
         mounted = false;
       };
@@ -81,7 +89,7 @@ export default function SessionRoute() {
   if (session.phase === 'active') {
     return (
       <SessionActive
-        baseline={baseline}
+        fittingProfile={fittingProfile}
         connected={connected}
         onEnd={() => void ble.endSession()}
         onMeasureAlcohol={() => {
@@ -150,6 +158,12 @@ export default function SessionRoute() {
         onPress={() => void start()}
         size="lg"
       />
+      <ActionButton
+        disabled={!connected}
+        label="먼저 개인 분해곡선 fitting 측정"
+        onPress={() => router.push('/fitting')}
+        variant="secondary"
+      />
       {!baselineReady && (
         <ActionButton
           label="기준값 측정하기"
@@ -167,13 +181,13 @@ function SessionActive({
   connected,
   onEnd,
   onMeasureAlcohol,
-  baseline,
+  fittingProfile,
 }: {
   session: SessionUiSnapshot;
   connected: boolean;
   onEnd: () => void;
   onMeasureAlcohol: () => void;
-  baseline: UserBaseline;
+  fittingProfile: AlcoholFittingProfile | null;
 }) {
   const status = session.status;
   const alcoholState = useAlcoholState();
@@ -253,7 +267,7 @@ function SessionActive({
             const estimate =
               result.alcohol_mg_l_x1000 === null
                 ? null
-                : estimateSessionSoberTime(result.alcohol_mg_l_x1000, baseline);
+                : estimateExponentialSoberTime(result.alcohol_mg_l_x1000, fittingProfile);
             return (
               <StatusRow
                 description={alcoholEstimateDescription(result.alcohol_mg_l_x1000, estimate)}
@@ -425,7 +439,7 @@ function formatElapsed(ms: number) {
 
 function alcoholEstimateDescription(
   alcoholMgLX1000: number | null,
-  estimate: ReturnType<typeof estimateSessionSoberTime>
+  estimate: ReturnType<typeof estimateExponentialSoberTime>
 ) {
   if (alcoholMgLX1000 === null) {
     return '센서가 제한 시간 안에 유효한 값을 반환하지 못했습니다. 버튼으로 다시 측정할 수 있습니다.';
@@ -433,12 +447,12 @@ function alcoholEstimateDescription(
   if (estimate === null) {
     return `BrAC ${(alcoholMgLX1000 / 1000).toFixed(3)} mg/L · 저장된 개인 분해속도가 없어 해소 예상 시간을 계산하지 않았습니다.`;
   }
-  return `BrAC ${(alcoholMgLX1000 / 1000).toFixed(3)} mg/L · 개인 분해속도 ${(estimate.eliminationMgLPerHourX1000 / 1000).toFixed(3)} mg/L·h 적용. 추가 음주·흡수 중에는 더 길어질 수 있습니다.`;
+  return `BrAC ${(alcoholMgLX1000 / 1000).toFixed(3)} mg/L · 지수 k=${estimate.kPerMinute.toFixed(6)}/분 적용 · 범위 ${estimate.earliestMinutes}~${estimate.latestMinutes}분. 추가 음주·흡수 중에는 더 길어질 수 있습니다.`;
 }
 
 function alcoholEstimateValue(
   alcoholMgLX1000: number | null,
-  estimate: ReturnType<typeof estimateSessionSoberTime>
+  estimate: ReturnType<typeof estimateExponentialSoberTime>
 ) {
   if (alcoholMgLX1000 === null) return '측정 실패 · 재시도 가능';
   return estimate === null ? '추정 불가' : `약 ${formatEstimateMinutes(estimate.minutes)}`;

@@ -2,7 +2,7 @@ use crate::devices::pulse::PulseUnavailableReason;
 use serde::{Deserialize, Serialize};
 
 /// BLE payload schema version이다.
-pub const PROTOCOL_VERSION: u8 = 12;
+pub const PROTOCOL_VERSION: u8 = 13;
 
 /// 측정 세션을 시작한 입력 출처다.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -171,6 +171,7 @@ pub enum SessionStateLabel {
 pub enum SessionRecordKind {
     State,
     Alcohol,
+    AlcoholMissed,
     Heart,
     DrinkConfirmed,
 }

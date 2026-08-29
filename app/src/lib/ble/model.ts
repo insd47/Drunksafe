@@ -1,11 +1,16 @@
-export const protocolVersion = 12;
+export const protocolVersion = 13;
 
 export type Source = 'board_button' | 'phone';
 
 export type MeasurementKind = 'measurement' | 'baseline';
 
 export type StatusKind =
-  'idle' | 'connected' | 'measuring' | 'awaiting_pulse' | 'result_ready' | 'error';
+  | 'idle'
+  | 'connected'
+  | 'measuring'
+  | 'awaiting_pulse'
+  | 'result_ready'
+  | 'error';
 
 export type ErrorCode = 'alcohol_sensor' | 'measurement_timeout' | 'cancelled';
 
@@ -95,7 +100,12 @@ export type PulseReading = {
 
 export type SessionStateLabel = 'dormant' | 'probe' | 'track';
 
-export type SessionRecordKind = 'state' | 'alcohol' | 'heart' | 'drink_confirmed';
+export type SessionRecordKind =
+  | 'state'
+  | 'alcohol'
+  | 'alcohol_missed'
+  | 'heart'
+  | 'drink_confirmed';
 
 /** 세션 진행 상태 (연결돼 있을 때 주기적으로 수신). */
 export type SessionStatus = {
@@ -326,7 +336,11 @@ function isSessionStateLabel(value: unknown): value is SessionStateLabel {
 
 function isSessionRecordKind(value: unknown): value is SessionRecordKind {
   return (
-    value === 'state' || value === 'alcohol' || value === 'heart' || value === 'drink_confirmed'
+    value === 'state' ||
+    value === 'alcohol' ||
+    value === 'alcohol_missed' ||
+    value === 'heart' ||
+    value === 'drink_confirmed'
   );
 }
 

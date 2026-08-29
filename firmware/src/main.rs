@@ -4,9 +4,7 @@ use embassy_time::{Duration as EmbassyDuration, Timer};
 use error::Result;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::task::block_on;
-use services::ble::{
-    self, BleService, ErrorCode, MeasurementKind, PhoneCommand, Source, StatusKind,
-};
+use services::ble::{self, BleService, ErrorCode, PhoneCommand, Source, StatusKind};
 use services::measure::{MeasureService, Measurement, PhaseRun, PulseOutcome};
 use services::screen::{ScreenService, View};
 use services::session;
@@ -40,15 +38,21 @@ fn main() -> Result<()> {
     if let Err(error) = buzzer.beep(80) {
         log::warn!("buzzer self-test failed: {error}");
     }
-    // 결과/실패 화면에 머무는 동안에만 GPIO0 길게 누르기로 대기 화면에 복귀시킨다.
+    // GPIO0 짧게 누르기는 측정 대기 상태에서만 사용한다. 2초 누르기는 비상 탈출이다.
     let mut on_result_screen = false;
     let mut last_advertising_watchdog = Instant::now();
+    let mut last_home_connected = false;
 
     log::debug!("firmware devices initialized");
-    screen.show(View::Home);
+    screen.show(View::HomeDisconnected);
     notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
 
     loop {
+        let home_connected = ble.is_connected();
+        if !on_result_screen && home_connected != last_home_connected {
+            last_home_connected = home_connected;
+            screen.show(home_view(&ble));
+        }
         // On the home screen, retry indefinitely after asynchronous GAP failures.
         // `ensure_advertising` is a no-op while connected or already advertising.
         if !on_result_screen && last_advertising_watchdog.elapsed() >= Duration::from_secs(3) {
@@ -59,10 +63,10 @@ fn main() -> Result<()> {
         }
         let button = trigger.poll();
 
-        // 결과 화면에서 길게 누르면 대기 화면으로 복귀하고, 연결이 없으면 다시 advertising한다.
-        if button == ButtonEvent::LongPress && on_result_screen {
-            log::info!("long-press on result screen: returning to home");
-            screen.show(View::Home);
+        // 유휴/결과 화면에서 2초 길게 누르면 비상 탈출해 BLE 상태에 맞는 홈으로 돌아간다.
+        if button == ButtonEvent::LongPress {
+            log::info!("emergency long-press: returning to home");
+            screen.show(home_view(&ble));
             on_result_screen = false;
             last_advertising_watchdog = Instant::now();
             notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
@@ -184,9 +188,8 @@ fn main() -> Result<()> {
             continue;
         }
 
-        let start = if button == ButtonEvent::ShortPress {
-            Some((Source::BoardButton, MeasurementKind::Measurement))
-        } else if let Some(kind) = phone_start {
+        // 홈 화면의 짧은 버튼은 아무 동작도 하지 않는다. 측정 시작은 앱 명령만 허용한다.
+        let start = if let Some(kind) = phone_start {
             Some((Source::Phone, kind))
         } else {
             None
@@ -213,7 +216,7 @@ fn main() -> Result<()> {
             };
             let alcohol = match block_on(measure.run_alcohol_until_cancelled(
                 &mut buzzer,
-                wait_for_measurement_cancel(&ble, &session_id),
+                wait_for_measurement_cancel(&ble, &session_id, &mut trigger),
                 on_alcohol_state,
             )) {
                 Ok(PhaseRun::Completed(value)) => value,
@@ -259,7 +262,7 @@ fn main() -> Result<()> {
             );
             screen.show(View::PulseStream);
             let pulse = match block_on(measure.run_pulse_until_cancelled(
-                wait_for_measurement_cancel(&ble, &session_id),
+                wait_for_measurement_cancel(&ble, &session_id, &mut trigger),
                 |elapsed_ms, diagnosis| {
                     notify_ble(
                         &ble,
@@ -304,7 +307,7 @@ fn finish_cancelled(ble: &BleService, screen: &mut ScreenService<'_>, session_id
         ble::device_error(Some(session_id.to_string()), ErrorCode::Cancelled),
     );
     notify_ble(ble, ble::device_status(StatusKind::Idle, None));
-    screen.show(View::Home);
+    screen.show(home_view(ble));
 }
 
 /// 알코올 측정 완료 후 심박 측정 단계로 넘어갈지(사용자 버튼/앱 명령) 아니면 취소할지를 기다린다.
@@ -319,8 +322,10 @@ fn wait_for_pulse_phase(
     trigger: &mut TriggerDevice,
 ) -> PulsePhaseSignal {
     loop {
-        if trigger.poll() == ButtonEvent::ShortPress {
-            return PulsePhaseSignal::Proceed;
+        match trigger.poll() {
+            ButtonEvent::ShortPress => return PulsePhaseSignal::Proceed,
+            ButtonEvent::LongPress => return PulsePhaseSignal::Cancel,
+            ButtonEvent::None => {}
         }
 
         while let Some(command) = ble.try_recv_command() {
@@ -414,7 +419,15 @@ fn run_pulse_stream(
     }
 
     notify_ble(ble, ble::device_status(StatusKind::Idle, None));
-    screen.show(View::Home);
+    screen.show(home_view(ble));
+}
+
+fn home_view(ble: &BleService) -> View {
+    if ble.is_connected() {
+        View::HomeReady
+    } else {
+        View::HomeDisconnected
+    }
 }
 
 fn notify_ble(ble: &BleService, event: ble::DeviceEvent) {
@@ -423,9 +436,14 @@ fn notify_ble(ble: &BleService, event: ble::DeviceEvent) {
     }
 }
 
-async fn wait_for_measurement_cancel(ble: &BleService, session_id: &str) {
+async fn wait_for_measurement_cancel(
+    ble: &BleService,
+    session_id: &str,
+    trigger: &mut TriggerDevice,
+) {
     loop {
-        if measurement_cancel_requested(ble, session_id) {
+        if measurement_cancel_requested(ble, session_id) || trigger.poll() == ButtonEvent::LongPress
+        {
             return;
         }
 

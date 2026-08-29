@@ -3,6 +3,7 @@ import { estimateEliminationMgLPerHourX1000 } from '@/lib/personalization/sessio
 import { createSessionStorageId } from '@/lib/sessions/identity';
 import { readJson, writeJson } from '@/lib/storage/json';
 import { readBaseline, writeBaseline } from '@/lib/storage/profile';
+import { fitExponentialProfile, writeFittingProfile } from '@/lib/personalization/fitting-profile';
 
 const sessionIndexKey = 'drunksafe.sessions.index.v1';
 /** 이만큼 세션이 모여야 분해속도 평균을 baseline에 반영한다. */
@@ -81,6 +82,11 @@ export async function persistSessionDownload(
   };
 
   await writeJson(sessionDataKey(id), stored);
+
+  if (deviceSessionId.startsWith('fw-alctrack-')) {
+    const profile = fitExponentialProfile(ordered);
+    if (profile) await writeFittingProfile(profile);
+  }
 
   const elimination = estimateEliminationMgLPerHourX1000(records);
   const index = await readSessionIndex();

@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 12,
+  "protocolVersion": 13,
   "gatt": {
     "serviceUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12201",
     "deviceEventCharacteristicUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12202",
@@ -39,20 +39,20 @@
   "deviceEvents": [
     {
       "event": "status",
-      "v": 12,
+      "v": 13,
       "status": "connected",
       "active_session_id": null
     },
     {
       "event": "measurement_started",
-      "v": 12,
+      "v": 13,
       "session_id": "fw-fixture-1",
       "source": "phone",
       "kind": "measurement"
     },
     {
       "event": "measurement_result",
-      "v": 12,
+      "v": 13,
       "session_id": "fw-fixture-1",
       "kind": "measurement",
       "alcohol_mg_l_x1000": 165,
@@ -64,13 +64,13 @@
     },
     {
       "event": "device_error",
-      "v": 12,
+      "v": 13,
       "session_id": "fw-fixture-1",
       "code": "measurement_timeout"
     },
     {
       "event": "session_alcohol_result",
-      "v": 12,
+      "v": 13,
       "session_id": "fw-hrwatch-1",
       "elapsed_ms": 600000,
       "trigger_percent": 20,

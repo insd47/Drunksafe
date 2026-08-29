@@ -184,7 +184,7 @@ test('BLE base64 codec defines empty and lone-surrogate behavior', () => {
   assert.throws(() => decodeUtf8Base64('/w=='), URIError);
 });
 
-test('v12 rejects removed progress events and payer-free commands', () => {
+test('v13 rejects removed progress events and payer-free commands', () => {
   assert.throws(
     () =>
       parseDeviceEvent(

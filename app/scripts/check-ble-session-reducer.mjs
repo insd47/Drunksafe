@@ -53,6 +53,7 @@ test('measurement transition owns only fields valid for its discriminant', () =>
     phase: 'active',
     sessionId: 'fw-baseline',
     kind: 'baseline',
+    stage: 'alcohol',
     startedAtUnixMs: 1_798_848_000_000,
   });
   assert.equal(Object.hasOwn(state.measurement, 'record'), false);

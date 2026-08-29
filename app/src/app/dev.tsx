@@ -1,5 +1,5 @@
-import { useState, type PropsWithChildren } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useState, type PropsWithChildren } from 'react';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { ActionButton } from '@/components/action-button';
 import { PpgSparkline } from '@/components/ppg-sparkline';
@@ -20,6 +20,16 @@ import {
 } from '@/lib/ble/session';
 import { removeJson } from '@/lib/storage/json';
 import { emptyBaseline, writeBaseline } from '@/lib/storage/profile';
+import {
+  readFittingProfile,
+  writeFittingProfile,
+  type AlcoholFittingProfile,
+} from '@/lib/personalization/fitting-profile';
+import { demoPrediction, fittingDemoUsers } from '@/lib/personalization/fitting-demo';
+import {
+  readConnectionIncidents,
+  type ConnectionIncident,
+} from '@/lib/storage/connection-incidents';
 
 /** lib/storage/history.ts가 소유한 키 — 개발자 도구에서만 직접 지운다. */
 const historyKey = 'drunksafe.history.v1';
@@ -69,6 +79,9 @@ export default function DevRoute() {
 
       <PulseStreamSection />
       <AlcoholTrackSection />
+      <FittingProfileSection />
+      <FittingDemoSection />
+      <ConnectionIncidentSection />
 
       <Section eyebrow="Raw" title={`원시 이벤트 (${entries.length})`}>
         {entries.length === 0 ? <StatusRow label="기록 없음" value="-" /> : null}
@@ -210,9 +223,8 @@ function PulseStreamSection() {
 }
 
 /**
- * 심박/스케줄(DORMANT·PROBE) 없이 알코올 값만 추적해 분해 곡선을 얻는다.
- * 값이 10을 넘으면 15분 간격으로 dense 측정. 종료하면 일반 세션으로 저장돼
- * 기록 탭 > 음주 세션에서 하강 회귀 결과를 상세히 볼 수 있다.
+ * 심박/스케줄(DORMANT·PROBE) 없이 10분 고정 구간으로 알코올 값을 측정한다.
+ * 종료 후 다운로드가 완료되면 peak 이후 데이터로 개인 지수 감쇠 profile을 저장한다.
  */
 function AlcoholTrackSection() {
   const ble = useBleSession();
@@ -238,9 +250,16 @@ function AlcoholTrackSection() {
       </Section>
       <ActionButton
         disabled={!connected || active}
-        label="알코올 추적 시작"
+        label="10분 간격 fitting 측정 시작"
         onPress={() => {
           void ble.startAlcoholTrack();
+        }}
+      />
+      <ActionButton
+        disabled={!connected || session.phase !== 'active' || session.alcoholMeasurementPending}
+        label={session.alcoholMeasurementPending ? '측정 진행 중…' : '알코올 측정'}
+        onPress={() => {
+          void ble.measureSessionAlcohol();
         }}
       />
       <ActionButton
@@ -252,6 +271,156 @@ function AlcoholTrackSection() {
         variant="secondary"
       />
     </>
+  );
+}
+
+function FittingProfileSection() {
+  const [profile, setProfile] = useState<AlcoholFittingProfile | null>(null);
+  const [k, setK] = useState('0.009796');
+  const [low, setLow] = useState('0.008680');
+  const [high, setHigh] = useState('0.011310');
+  const [message, setMessage] = useState('미저장');
+  useEffect(() => {
+    void readFittingProfile().then((p) => {
+      if (!p) return;
+      setProfile(p);
+      setK(String(p.kPerMinute));
+      setLow(String(p.kLowPerMinute));
+      setHigh(String(p.kHighPerMinute));
+      setMessage('저장값 불러옴');
+    });
+  }, []);
+  const fields: [string, string, (v: string) => void][] = [
+    ['k (/분)', k, setK],
+    ['k 하한', low, setLow],
+    ['k 상한', high, setHigh],
+  ];
+  return (
+    <Section eyebrow="Fitting" title="임시 개인 fitting 데이터">
+      {fields.map(([label, value, set]) => (
+        <View className="gap-1" key={label}>
+          <Text className="text-xs text-gray-600">{label}</Text>
+          <TextInput
+            className="border border-gray-300 px-3 py-2 text-gray-950"
+            keyboardType="decimal-pad"
+            onChangeText={set}
+            value={value}
+          />
+        </View>
+      ))}
+      <StatusRow label="상태" value={message} />
+      {profile?.diagnostics ? (
+        <>
+          <StatusRow
+            label="C0 / 사용점"
+            value={`${profile.diagnostics.c0} · ${profile.diagnostics.includedPoints}/${profile.diagnostics.totalDescentPoints}`}
+          />
+          <StatusRow
+            label="R² / RMSE / 등급"
+            value={`${profile.diagnostics.rSquare.toFixed(3)} / ${profile.diagnostics.rmse.toFixed(2)} / ${profile.diagnostics.grade}`}
+          />
+          <StatusRow
+            label="K21"
+            value={
+              profile.diagnostics.k21Low === null
+                ? '교집합 없음'
+                : `${profile.diagnostics.k21Low.toFixed(6)}~${profile.diagnostics.k21High?.toFixed(6)}`
+            }
+          />
+          <StatusRow
+            label="K95"
+            value={`${profile.diagnostics.k95Low.toFixed(6)}~${profile.diagnostics.k95High.toFixed(6)}`}
+          />
+          <StatusRow
+            label="Kjoint"
+            value={
+              profile.diagnostics.kJointLow === null
+                ? '충돌 · K95 적용'
+                : `${profile.diagnostics.kJointLow.toFixed(6)}~${profile.diagnostics.kJointHigh?.toFixed(6)}`
+            }
+          />
+          <StatusRow label="예측 적용 범위" value={profile.diagnostics.appliedRange} />
+        </>
+      ) : null}
+      <ActionButton
+        label="k와 범위 저장"
+        onPress={() => {
+          const next = {
+            kPerMinute: Number(k),
+            kLowPerMinute: Number(low),
+            kHighPerMinute: Number(high),
+            source: 'developer_input' as const,
+            updatedAtUnixMs: Date.now(),
+          };
+          void writeFittingProfile(next)
+            .then(() => {
+              setProfile(next);
+              setMessage('음주 세션에 적용됨');
+            })
+            .catch((e) => setMessage(e instanceof Error ? e.message : '저장 실패'));
+        }}
+      />
+    </Section>
+  );
+}
+
+function FittingDemoSection() {
+  return (
+    <Section eyebrow="Demo" title="5명 fitting·검증 결과">
+      {fittingDemoUsers.map((user) => (
+        <Collapsible key={user.name} label={`${user.name} · ${user.grade}등급`}>
+          <StatusRow label="fitting 세션" value={`세션 ${user.fittingSession}`} />
+          <StatusRow
+            label="k (K95)"
+            value={`${user.k.toFixed(6)} (${user.kLow.toFixed(6)}~${user.kHigh.toFixed(6)})`}
+          />
+          <StatusRow
+            label="R² / RMSE"
+            value={`${user.rSquare.toFixed(3)} / ${user.rmse.toFixed(2)}`}
+          />
+          {user.validations.flatMap((validation) =>
+            validation.points.map((point, index) => {
+              const p = demoPrediction(point, index, validation, user);
+              const actual =
+                p.actualFinish === null
+                  ? '실제 완료 미관측'
+                  : `실제 완료 ${p.actualFinish}분${p.relativeErrorPercent === null ? '' : ` · 오차 ${p.relativeErrorPercent.toFixed(1)}%`}`;
+              return (
+                <StatusRow
+                  key={`${validation.session}-${index}`}
+                  label={`S${validation.session} · ${point[0]}분 · 값 ${point[1]}`}
+                  description={actual}
+                  value={`예상 잔여 ${p.remaining}분 · 완료 ${p.finish}분 (범위 ${p.earliest}~${p.latest})`}
+                />
+              );
+            })
+          )}
+        </Collapsible>
+      ))}
+    </Section>
+  );
+}
+
+function ConnectionIncidentSection() {
+  const [items, setItems] = useState<ConnectionIncident[]>([]);
+  useEffect(() => {
+    void readConnectionIncidents().then(setItems);
+  }, []);
+  return (
+    <Section eyebrow="BLE" title="비정상 연결 종료 기록">
+      {items.length === 0 ? (
+        <StatusRow label="기록 없음" value="-" />
+      ) : (
+        items.map((item, index) => (
+          <StatusRow
+            key={`${item.atUnixMs}-${index}`}
+            label={new Date(item.atUnixMs).toLocaleString()}
+            description={item.message}
+            value={item.sessionId ?? '세션 없음'}
+          />
+        ))
+      )}
+    </Section>
   );
 }
 
@@ -275,7 +444,7 @@ function sessionStateText(state: SessionStateLabel) {
     case 'probe':
       return '확인';
     case 'track':
-      return '추적 (15분 간격)';
+      return 'fitting (10분 알림)';
   }
 }
 

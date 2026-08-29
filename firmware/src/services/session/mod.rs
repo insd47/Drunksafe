@@ -42,11 +42,13 @@ pub fn run_hr_watch(
     let mut last_reported_phase: Option<&'static str> = None;
     let mut last_reported_state: Option<SessionStateLabel> = None;
     let mut next_sample = Instant::now();
+    let mut disconnect_alerted = false;
     let mut pending_alcohol_triggers = VecDeque::new();
     measure.reset_hr_monitor();
     screen.show(View::Session);
 
     loop {
+        alert_disconnect_once(ble, buzzer, &mut disconnect_alerted);
         match hr_watch_command(ble) {
             HrWatchCommand::End => break,
             HrWatchCommand::MeasureAlcohol => {
@@ -153,7 +155,7 @@ pub fn run_hr_watch(
     }
     log.push(state_entry(elapsed_ms(start), state));
     stream_log(ble, &session_id, &log);
-    screen.show(View::Home);
+    screen.show(home_view(ble));
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -175,7 +177,7 @@ fn run_requested_hr_watch_alcohol(
     if trigger_percent.is_none() {
         let _ = buzzer.beep_pattern(2, 120, 120);
     }
-    measure_hr_watch_alcohol(
+    let measured = measure_hr_watch_alcohol(
         ble,
         measure,
         buzzer,
@@ -195,7 +197,9 @@ fn run_requested_hr_watch_alcohol(
         *state = next_state;
         log.push(state_entry(elapsed_ms(start), next_state));
     }
-    screen.show(if pending_triggers.is_empty() {
+    screen.show(if measured {
+        View::CheckApp
+    } else if pending_triggers.is_empty() {
         View::Session
     } else {
         View::SessionConfirm
@@ -232,7 +236,7 @@ fn measure_hr_watch_alcohol(
     log: &mut Vec<LogEntry>,
     session_id: &str,
     trigger_percent: Option<u16>,
-) {
+) -> bool {
     screen.show(View::Measuring);
     let alcohol_session_id = session_id.to_owned();
     let result = block_on(measure.measure_session_alcohol(buzzer, |status| {
@@ -253,7 +257,7 @@ fn measure_hr_watch_alcohol(
         ble,
         ble::session_alcohol_result(session_id.to_owned(), measured_at, trigger_percent, value),
     );
-    screen.show(View::Session);
+    value.is_some()
 }
 
 // --- 튜닝 상수 (기본값) ---
@@ -265,10 +269,8 @@ const SESSION_TICK: Duration = Duration::from_millis(500);
 const DORMANT_ALCOHOL_INTERVAL: Duration = Duration::from_secs(30 * 60);
 /// TRACK에서 하강 곡선을 위한 dense 알코올 측정 주기다.
 const TRACK_ALCOHOL_INTERVAL: Duration = Duration::from_secs(15 * 60);
-/// 알코올 추적(개발자 도구)에서 임계를 넘기 전 측정 주기다 (상승기를 잡기 위해 촘촘히).
-const ALCOHOL_TRACK_PRE_INTERVAL: Duration = Duration::from_secs(5 * 60);
-/// 알코올 추적에서 이 값을 넘으면 TRACK(15분 간격)으로 전환한다.
-const ALCOHOL_TRACK_THRESHOLD: u16 = 10;
+/// 개인 지수 감쇠 fitting 세션의 측정 알림 간격이다.
+const FITTING_ALCOHOL_INTERVAL: Duration = Duration::from_secs(10 * 60);
 /// PROBE 단계에서 사용자 확인을 기다리는 최대 시간이다.
 const PROBE_MAX: Duration = Duration::from_secs(10 * 60);
 /// BPM 이동평균이 resting baseline 대비 이만큼 오르면 "상승"으로 본다.
@@ -323,13 +325,15 @@ pub fn run(
     let mut rise_since: Option<Instant> = None;
     let mut last_bpm: Option<u16> = None;
     let mut next_alcohol = start + DORMANT_ALCOHOL_INTERVAL;
+    let mut disconnect_alerted = false;
 
     log.push(state_entry(0, state));
-    screen.show(View::Session);
+    screen.show(View::FittingWaiting);
     log::info!("session started: id={session_id}");
     let _ = buzzer.beep(80);
 
     loop {
+        alert_disconnect_once(ble, buzzer, &mut disconnect_alerted);
         screen.show(View::Session);
 
         // A) HR 추정 → BPM 이동평균의 "지속 상승"으로만 PROBE 트리거 (단발 노이즈 무시)
@@ -443,12 +447,10 @@ pub fn run(
 
     log::info!("session ending: streaming {} records", log.len());
     stream_log(ble, &session_id, &log);
-    screen.show(View::Home);
+    screen.show(home_view(ble));
 }
 
-/// 개발자 도구: 심박/스케줄 없이 알코올 값만 주기적으로 측정해 분해 곡선을 추적한다.
-/// 값이 `ALCOHOL_TRACK_THRESHOLD`를 넘으면 기존 TRACK처럼 15분 간격으로 dense 측정한다.
-/// 로그 형식은 일반 세션과 같아 앱의 저장·회귀·기록 화면을 그대로 재사용한다.
+/// Fitting 세션: 심박 없이 10분마다 측정 시점을 알리고 GPIO0/앱 확인 후 측정한다.
 pub fn run_alcohol_track(
     ble: &BleService,
     measure: &mut MeasureService<'_>,
@@ -459,9 +461,12 @@ pub fn run_alcohol_track(
 ) {
     let start = Instant::now();
     let mut log: Vec<LogEntry> = Vec::new();
-    let mut state = SessionStateLabel::Dormant;
-    let mut crossed = false;
-    let mut next_alcohol = Instant::now(); // 시작하자마자 첫 측정
+    let state = SessionStateLabel::Track;
+    let mut next_slot = Instant::now();
+    let mut slot_deadline = next_slot + FITTING_ALCOHOL_INTERVAL;
+    let mut measurement_due = false;
+    let mut failed_attempts = 0_u8;
+    let mut disconnect_alerted = false;
 
     log.push(state_entry(0, state));
     screen.show(View::Session);
@@ -469,23 +474,40 @@ pub fn run_alcohol_track(
     let _ = buzzer.beep(80);
 
     loop {
-        if Instant::now() >= next_alcohol {
-            if let Some(value) = measure_alcohol_step(measure, buzzer, screen, start, &mut log) {
-                // 값이 임계를 처음 넘으면 TRACK으로 전환 — 이후 알코올 점은 track 상태로 로깅돼
-                // 앱의 하강 회귀(피크 이후 구간)에 그대로 쓰인다.
-                if value > ALCOHOL_TRACK_THRESHOLD && !crossed {
-                    crossed = true;
-                    state = SessionStateLabel::Track;
-                    log.push(state_entry(elapsed_ms(start), state));
-                }
-            }
+        if Instant::now() >= next_slot && !measurement_due {
+            measurement_due = true;
+            failed_attempts = 0;
+            slot_deadline = next_slot + FITTING_ALCOHOL_INTERVAL;
+            next_slot += FITTING_ALCOHOL_INTERVAL;
+            let _ = buzzer.beep(250);
+            screen.show(View::FittingConfirm);
+        }
 
-            next_alcohol = Instant::now()
-                + if crossed {
-                    TRACK_ALCOHOL_INTERVAL
-                } else {
-                    ALCOHOL_TRACK_PRE_INTERVAL
-                };
+        if measurement_due && Instant::now() >= slot_deadline {
+            log.push(alcohol_missed_entry(elapsed_ms(start)));
+            measurement_due = false;
+            screen.show(View::FittingSlotMissed);
+        }
+
+        let command = fitting_command(ble);
+        let button = trigger.poll();
+        if matches!(command, FittingCommand::End) || button == ButtonEvent::LongPress {
+            break;
+        }
+        if measurement_due
+            && (matches!(command, FittingCommand::Measure) || button == ButtonEvent::ShortPress)
+        {
+            failed_attempts = failed_attempts.saturating_add(1);
+            if measure_fitting_alcohol(ble, measure, buzzer, screen, start, &mut log, &session_id) {
+                measurement_due = false;
+                screen.show(View::FittingWaiting);
+            } else if failed_attempts >= 3 {
+                log.push(alcohol_missed_entry(elapsed_ms(start)));
+                measurement_due = false;
+                screen.show(View::FittingSlotMissed);
+            } else {
+                screen.show(View::FittingRetry);
+            }
         }
 
         notify_status(
@@ -498,8 +520,12 @@ pub fn run_alcohol_track(
             None,
         );
 
-        if end_requested(ble) || trigger.poll() == ButtonEvent::LongPress {
-            break;
+        if !ble.is_connected() && !disconnect_alerted {
+            disconnect_alerted = true;
+            let _ = buzzer.beep(1200);
+            log::warn!("fitting session BLE disconnected; retaining records for reconnect");
+        } else if ble.is_connected() {
+            disconnect_alerted = false;
         }
 
         if log.len() >= MAX_RECORDS {
@@ -512,7 +538,60 @@ pub fn run_alcohol_track(
 
     log::info!("alcohol-track ending: streaming {} records", log.len());
     stream_log(ble, &session_id, &log);
-    screen.show(View::Home);
+    screen.show(home_view(ble));
+}
+
+enum FittingCommand {
+    None,
+    Measure,
+    End,
+}
+
+fn fitting_command(ble: &BleService) -> FittingCommand {
+    let mut requested = FittingCommand::None;
+    while let Some(command) = ble.try_recv_command() {
+        match command {
+            PhoneCommand::MeasureSessionAlcohol => requested = FittingCommand::Measure,
+            PhoneCommand::EndSession => return FittingCommand::End,
+            other => log::debug!("ignoring command during fitting session: {other:?}"),
+        }
+    }
+    requested
+}
+
+fn measure_fitting_alcohol(
+    ble: &BleService,
+    measure: &mut MeasureService<'_>,
+    buzzer: &mut BuzzerDevice,
+    screen: &mut ScreenService<'_>,
+    start: Instant,
+    log: &mut Vec<LogEntry>,
+    session_id: &str,
+) -> bool {
+    screen.show(View::Measuring);
+    let id = session_id.to_owned();
+    let result = block_on(measure.measure_session_alcohol(buzzer, |status| {
+        if matches!(status, crate::devices::alcohol::Status::WaitBlow) {
+            screen.show(View::BlowNow);
+        }
+        notify_event(ble, ble::alcohol_state(id.clone(), status));
+    }));
+    let measured_at = elapsed_ms(start);
+    let value = match result {
+        Ok(value) => {
+            log.push(alcohol_entry(measured_at, value));
+            Some(value)
+        }
+        Err(error) => {
+            log::warn!("fitting alcohol measurement failed: {error}");
+            None
+        }
+    };
+    notify_event(
+        ble,
+        ble::session_alcohol_result(id, measured_at, None, value),
+    );
+    value.is_some()
 }
 
 /// PROBE: 부저로 알리고 알코올 1회 측정 + 사용자 버튼 확인을 기다린다.
@@ -644,33 +723,57 @@ fn notify_event(ble: &BleService, event: ble::DeviceEvent) {
 
 fn stream_log(ble: &BleService, session_id: &str, log: &[LogEntry]) {
     let total = clamp_u16(log.len());
-
-    for (index, entry) in log.iter().enumerate() {
-        if index >= u16::MAX as usize {
-            break;
+    loop {
+        while !ble.is_connected() {
+            freertos_delay(Duration::from_millis(500));
         }
-
-        let event = ble::session_record(
-            session_id.to_string(),
-            index as u16,
-            total,
-            entry.t_ms,
-            entry.kind,
-            entry.state,
-            entry.mg_l_x1000,
-            entry.bpm,
-        );
-
-        if let Err(error) = ble.notify(&event) {
-            log::warn!("session record notify failed: {error}");
+        let mut complete = true;
+        for (index, entry) in log.iter().enumerate() {
+            if index >= u16::MAX as usize {
+                break;
+            }
+            let event = ble::session_record(
+                session_id.to_string(),
+                index as u16,
+                total,
+                entry.t_ms,
+                entry.kind,
+                entry.state,
+                entry.mg_l_x1000,
+                entry.bpm,
+            );
+            if let Err(error) = ble.notify(&event) {
+                log::warn!("session record notify interrupted; retrying after reconnect: {error}");
+                complete = false;
+                break;
+            }
+            freertos_delay(Duration::from_millis(20));
         }
-
-        freertos_delay(Duration::from_millis(20));
+        if complete {
+            let done = ble::session_complete(session_id.to_string(), total);
+            if ble.notify(&done).is_ok() {
+                return;
+            }
+        }
+        freertos_delay(Duration::from_millis(500));
     }
+}
 
-    let done = ble::session_complete(session_id.to_string(), total);
-    if let Err(error) = ble.notify(&done) {
-        log::warn!("session complete notify failed: {error}");
+fn alert_disconnect_once(ble: &BleService, buzzer: &mut BuzzerDevice, alerted: &mut bool) {
+    if !ble.is_connected() && !*alerted {
+        *alerted = true;
+        let _ = buzzer.beep(1200);
+        log::warn!("BLE unexpectedly disconnected; session data remains buffered");
+    } else if ble.is_connected() {
+        *alerted = false;
+    }
+}
+
+fn home_view(ble: &BleService) -> View {
+    if ble.is_connected() {
+        View::HomeReady
+    } else {
+        View::HomeDisconnected
     }
 }
 
@@ -736,6 +839,16 @@ fn alcohol_entry(t_ms: u32, mg_l_x1000: u16) -> LogEntry {
         kind: SessionRecordKind::Alcohol,
         state: None,
         mg_l_x1000: Some(mg_l_x1000),
+        bpm: None,
+    }
+}
+
+fn alcohol_missed_entry(t_ms: u32) -> LogEntry {
+    LogEntry {
+        t_ms,
+        kind: SessionRecordKind::AlcoholMissed,
+        state: None,
+        mg_l_x1000: None,
         bpm: None,
     }
 }

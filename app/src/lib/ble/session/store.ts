@@ -28,6 +28,7 @@ import {
 } from '@/lib/ble/session/reducer';
 import { BleVerificationStore } from '@/lib/ble/session/verification';
 import type { MeasurementKind } from '@/lib/storage/history-records';
+import { appendConnectionIncident } from '@/lib/storage/connection-incidents';
 
 type Removable = {
   remove: () => void;
@@ -263,9 +264,10 @@ export class BleSessionStore {
   measureSessionAlcohol = async () => {
     if (
       this.sessionUi.phase !== 'active' ||
-      this.sessionUi.status?.session_id.startsWith('fw-hrwatch-') !== true
+      (this.sessionUi.status?.session_id.startsWith('fw-hrwatch-') !== true &&
+        this.sessionUi.status?.session_id.startsWith('fw-alctrack-') !== true)
     ) {
-      throw new Error('진행 중인 심박 관찰 세션에서 사용할 수 있습니다.');
+      throw new Error('진행 중인 음주 또는 fitting 세션에서 사용할 수 있습니다.');
     }
     if (this.sessionUi.alcoholMeasurementPending) {
       throw new Error('알코올 측정이 이미 진행 중입니다.');
@@ -538,6 +540,12 @@ export class BleSessionStore {
         if (generation !== this.monitorGeneration) return;
 
         const message = error?.message ?? 'Drunksafe 장치 연결이 예기치 않게 해제되었습니다.';
+        void appendConnectionIncident({
+          atUnixMs: Date.now(),
+          deviceId,
+          sessionId: this.sessionUi.status?.session_id ?? null,
+          message,
+        });
         this.clearNotifyReadyWait();
         this.clearMonitors();
         this.setPulseStreaming(false);
@@ -659,7 +667,11 @@ export class BleSessionStore {
     }
 
     if (event.event === 'session_record') {
-      this.sessionRecordsBuffer.push(event);
+      const existing = this.sessionRecordsBuffer.findIndex(
+        (record) => record.session_id === event.session_id && record.index === event.index
+      );
+      if (existing >= 0) this.sessionRecordsBuffer[existing] = event;
+      else this.sessionRecordsBuffer.push(event);
       this.setSessionUi({
         ...this.sessionUi,
         phase: 'downloading',

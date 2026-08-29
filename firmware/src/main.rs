@@ -2,14 +2,15 @@ use devices::pulse::PulseUnavailableReason;
 use devices::{ButtonEvent, TriggerDevice};
 use embassy_time::{Duration as EmbassyDuration, Timer};
 use error::Result;
+use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::task::block_on;
 use services::ble::{
     self, BleService, ErrorCode, MeasurementKind, PhoneCommand, Source, StatusKind,
 };
-use services::measure::{Measurement, MeasureService, PhaseRun, PulseOutcome};
+use services::measure::{MeasureService, Measurement, PhaseRun, PulseOutcome};
 use services::screen::{ScreenService, View};
 use services::session;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 mod devices;
 mod error;
@@ -17,8 +18,8 @@ mod services;
 
 const IDLE_POLL: Duration = Duration::from_millis(20);
 const MEASUREMENT_CANCEL_POLL: EmbassyDuration = EmbassyDuration::from_millis(20);
-const PPG_BATCH_SAMPLES: usize = 20;
-const PPG_SAMPLE_PERIOD_MS: u16 = 10;
+const PPG_BATCH_SAMPLES: usize = 10;
+const PPG_SAMPLE_PERIOD_MS: u16 = 40;
 
 fn main() -> Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -41,12 +42,21 @@ fn main() -> Result<()> {
     }
     // 결과/실패 화면에 머무는 동안에만 GPIO0 길게 누르기로 대기 화면에 복귀시킨다.
     let mut on_result_screen = false;
+    let mut last_advertising_watchdog = Instant::now();
 
     log::debug!("firmware devices initialized");
     screen.show(View::Home);
     notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
 
     loop {
+        // On the home screen, retry indefinitely after asynchronous GAP failures.
+        // `ensure_advertising` is a no-op while connected or already advertising.
+        if !on_result_screen && last_advertising_watchdog.elapsed() >= Duration::from_secs(3) {
+            last_advertising_watchdog = Instant::now();
+            if let Err(error) = ble.ensure_advertising() {
+                log::warn!("home advertising watchdog retry failed: {error:?}");
+            }
+        }
         let button = trigger.poll();
 
         // 결과 화면에서 길게 누르면 대기 화면으로 복귀하고, 연결이 없으면 다시 advertising한다.
@@ -54,6 +64,7 @@ fn main() -> Result<()> {
             log::info!("long-press on result screen: returning to home");
             screen.show(View::Home);
             on_result_screen = false;
+            last_advertising_watchdog = Instant::now();
             notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
 
             if !ble.is_connected() {
@@ -62,7 +73,7 @@ fn main() -> Result<()> {
                 }
             }
 
-            std::thread::sleep(IDLE_POLL);
+            freertos_delay(IDLE_POLL);
             continue;
         }
 
@@ -70,6 +81,7 @@ fn main() -> Result<()> {
         let mut phone_pulse_stream = None;
         let mut phone_session: Option<Option<u16>> = None;
         let mut phone_alcohol_track = false;
+        let mut phone_hr_watch = None;
 
         while let Some(command) = ble.try_recv_command() {
             match command {
@@ -91,8 +103,14 @@ fn main() -> Result<()> {
                 PhoneCommand::StartSession { resting_bpm } => {
                     phone_session = Some(resting_bpm);
                 }
+                PhoneCommand::StartHrWatch { resting_bpm } => {
+                    phone_hr_watch = Some(resting_bpm);
+                }
                 PhoneCommand::StartAlcoholTrack => {
                     phone_alcohol_track = true;
+                }
+                PhoneCommand::MeasureSessionAlcohol => {
+                    log::debug!("ignoring manual session alcohol measurement while idle");
                 }
                 PhoneCommand::EndSession => {
                     log::debug!("ignoring end_session while idle");
@@ -101,9 +119,33 @@ fn main() -> Result<()> {
         }
 
         if let Some(stream_raw) = phone_pulse_stream {
-            run_pulse_stream(&ble, &mut measure, &mut screen, &mut session_seq, stream_raw);
+            run_pulse_stream(
+                &ble,
+                &mut measure,
+                &mut screen,
+                &mut trigger,
+                &mut session_seq,
+                stream_raw,
+            );
             on_result_screen = false;
-            std::thread::sleep(IDLE_POLL);
+            freertos_delay(IDLE_POLL);
+            continue;
+        }
+
+        if let Some(resting_bpm) = phone_hr_watch {
+            session_seq = session_seq.wrapping_add(1);
+            session::run_hr_watch(
+                &ble,
+                &mut measure,
+                &mut buzzer,
+                &mut screen,
+                &mut trigger,
+                format!("fw-hrwatch-{session_seq}"),
+                resting_bpm,
+            );
+            notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
+            on_result_screen = false;
+            freertos_delay(IDLE_POLL);
             continue;
         }
 
@@ -121,7 +163,7 @@ fn main() -> Result<()> {
             );
             notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
             on_result_screen = false;
-            std::thread::sleep(IDLE_POLL);
+            freertos_delay(IDLE_POLL);
             continue;
         }
 
@@ -138,7 +180,7 @@ fn main() -> Result<()> {
             );
             notify_ble(&ble, ble::device_status(StatusKind::Idle, None));
             on_result_screen = false;
-            std::thread::sleep(IDLE_POLL);
+            freertos_delay(IDLE_POLL);
             continue;
         }
 
@@ -170,6 +212,7 @@ fn main() -> Result<()> {
                 notify_ble(&ble, ble::alcohol_state(session_id.clone(), status));
             };
             let alcohol = match block_on(measure.run_alcohol_until_cancelled(
+                &mut buzzer,
                 wait_for_measurement_cancel(&ble, &session_id),
                 on_alcohol_state,
             )) {
@@ -192,7 +235,7 @@ fn main() -> Result<()> {
                     screen.show(View::Failed);
                     on_result_screen = true;
                     log::error!("alcohol phase failed: error={error}");
-                    std::thread::sleep(IDLE_POLL);
+                    freertos_delay(IDLE_POLL);
                     continue;
                 }
             };
@@ -203,8 +246,7 @@ fn main() -> Result<()> {
                 ble::device_status(StatusKind::AwaitingPulse, Some(session_id.clone())),
             );
             screen.show(View::AwaitingPulse);
-            if let PulsePhaseSignal::Cancel =
-                wait_for_pulse_phase(&ble, &session_id, &mut trigger)
+            if let PulsePhaseSignal::Cancel = wait_for_pulse_phase(&ble, &session_id, &mut trigger)
             {
                 finish_cancelled(&ble, &mut screen, &session_id);
                 continue;
@@ -216,9 +258,15 @@ fn main() -> Result<()> {
                 ble::device_status(StatusKind::Measuring, Some(session_id.clone())),
             );
             screen.show(View::PulseStream);
-            let pulse = match block_on(
-                measure.run_pulse_until_cancelled(wait_for_measurement_cancel(&ble, &session_id)),
-            ) {
+            let pulse = match block_on(measure.run_pulse_until_cancelled(
+                wait_for_measurement_cancel(&ble, &session_id),
+                |elapsed_ms, diagnosis| {
+                    notify_ble(
+                        &ble,
+                        ble::pulse_reading(session_id.clone(), elapsed_ms, diagnosis),
+                    );
+                },
+            )) {
                 Ok(PhaseRun::Completed(outcome)) => outcome,
                 Ok(PhaseRun::Cancelled) => {
                     finish_cancelled(&ble, &mut screen, &session_id);
@@ -245,7 +293,7 @@ fn main() -> Result<()> {
             on_result_screen = true;
         }
 
-        std::thread::sleep(IDLE_POLL);
+        freertos_delay(IDLE_POLL);
     }
 }
 
@@ -298,7 +346,7 @@ fn wait_for_pulse_phase(
             return PulsePhaseSignal::Cancel;
         }
 
-        std::thread::sleep(IDLE_POLL);
+        freertos_delay(IDLE_POLL);
     }
 }
 
@@ -308,11 +356,13 @@ fn run_pulse_stream(
     ble: &BleService,
     measure: &mut MeasureService<'_>,
     screen: &mut ScreenService<'_>,
+    trigger: &mut TriggerDevice,
     session_seq: &mut u32,
     stream_raw: bool,
 ) {
     *session_seq = session_seq.wrapping_add(1);
     let session_id = format!("fw-pulse-{session_seq}");
+    let connection_generation = ble.connection_generation();
 
     notify_ble(
         ble,
@@ -323,8 +373,13 @@ fn run_pulse_stream(
     // raw 파형은 앱이 명시적으로 요청한 경우에만 전송한다 (BPM reading은 항상 전송).
     let mut ppg_batch: Vec<u16> = Vec::with_capacity(PPG_BATCH_SAMPLES);
     let mut ppg_batch_t0_ms: Option<u32> = None;
+    let mut raw_decimation = 0_u8;
     let on_ppg_sample = |elapsed_ms: u32, raw: u16| {
         if !stream_raw {
+            return;
+        }
+        raw_decimation = raw_decimation.wrapping_add(1);
+        if raw_decimation % 4 != 0 {
             return;
         }
 
@@ -344,11 +399,14 @@ fn run_pulse_stream(
         }
     };
     let on_reading = |elapsed_ms, diagnosis| {
-        notify_ble(ble, ble::pulse_reading(session_id.clone(), elapsed_ms, diagnosis));
+        notify_ble(
+            ble,
+            ble::pulse_live_reading(session_id.clone(), elapsed_ms, diagnosis),
+        );
     };
 
     if let Err(error) = block_on(measure.run_pulse_stream(
-        wait_for_pulse_stream_stop(ble),
+        wait_for_pulse_stream_stop(ble, trigger, connection_generation),
         on_ppg_sample,
         on_reading,
     )) {
@@ -389,7 +447,9 @@ fn measurement_cancel_requested(ble: &BleService, session_id: &str) -> bool {
             | PhoneCommand::StartPulseStream { .. }
             | PhoneCommand::StartPulsePhase { .. }
             | PhoneCommand::StartSession { .. }
+            | PhoneCommand::StartHrWatch { .. }
             | PhoneCommand::StartAlcoholTrack
+            | PhoneCommand::MeasureSessionAlcohol
             | PhoneCommand::EndSession => {
                 log::debug!("ignoring start/session command while finishing active measurement");
             }
@@ -408,9 +468,17 @@ fn measurement_cancel_requested(ble: &BleService, session_id: &str) -> bool {
 }
 
 /// pulse 스트리밍을 멈춰야 하는지 확인한다 — 정지/취소 명령이 오거나 연결이 끊기면 멈춘다.
-async fn wait_for_pulse_stream_stop(ble: &BleService) {
+async fn wait_for_pulse_stream_stop(
+    ble: &BleService,
+    trigger: &mut TriggerDevice,
+    connection_generation: u32,
+) {
     loop {
-        if pulse_stream_stop_requested(ble) || !ble.is_connected() {
+        if pulse_stream_stop_requested(ble)
+            || !ble.is_connected()
+            || ble.connection_generation() != connection_generation
+            || trigger.poll() == ButtonEvent::LongPress
+        {
             return;
         }
 
@@ -434,7 +502,9 @@ fn pulse_stream_stop_requested(ble: &BleService) -> bool {
             | PhoneCommand::StartPulseStream { .. }
             | PhoneCommand::StartPulsePhase { .. }
             | PhoneCommand::StartSession { .. }
+            | PhoneCommand::StartHrWatch { .. }
             | PhoneCommand::StartAlcoholTrack
+            | PhoneCommand::MeasureSessionAlcohol
             | PhoneCommand::EndSession => {
                 log::debug!("ignoring start/session command during pulse stream");
             }
@@ -450,4 +520,16 @@ fn ble_error_code(error: &error::Error) -> Option<ErrorCode> {
         error::Error::Timeout(_) => Some(ErrorCode::MeasurementTimeout),
         error::Error::PulseDevice(_) | error::Error::Esp(_) => None,
     }
+}
+
+fn freertos_delay(duration: Duration) {
+    let micros = duration.as_micros();
+    if micros == 0 {
+        return;
+    }
+    let millis = micros
+        .saturating_add(999)
+        .saturating_div(1_000)
+        .min(u128::from(u32::MAX)) as u32;
+    FreeRtos::delay_ms(millis);
 }

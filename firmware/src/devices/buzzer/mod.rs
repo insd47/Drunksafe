@@ -1,7 +1,6 @@
 use crate::error::Result;
+use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{Output, OutputPin, PinDriver};
-use std::thread::sleep;
-use std::time::Duration;
 
 /// active 부저(자체 발진)를 active-low로 구동하는 device handle이다.
 /// LOW = 소리 남, HIGH = 무음. 세션 중 알코올 측정 알림 등에 쓴다.
@@ -33,7 +32,7 @@ impl BuzzerDevice {
     /// `ms`밀리초 동안 한 번 울린다.
     pub fn beep(&mut self, ms: u64) -> Result<()> {
         self.on()?;
-        sleep(Duration::from_millis(ms));
+        FreeRtos::delay_ms(ms.min(u64::from(u32::MAX)) as u32);
         self.off()?;
         Ok(())
     }
@@ -44,7 +43,7 @@ impl BuzzerDevice {
         for index in 0..count {
             self.beep(on_ms)?;
             if index + 1 < count {
-                sleep(Duration::from_millis(off_ms));
+                FreeRtos::delay_ms(off_ms.min(u64::from(u32::MAX)) as u32);
             }
         }
         Ok(())

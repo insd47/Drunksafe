@@ -31,7 +31,7 @@ test('verification log keeps the newest bounded timeline with stable keys', () =
   assert.equal(new Set(entries.map((entry) => entry.id)).size, entries.length);
 });
 
-test('verification log formats the two v8 phone commands', () => {
+test('verification log formats core v12 phone commands', () => {
   assert.deepEqual(bleCommandLogEntry({ cmd: 'start', kind: 'measurement' }), {
     kind: 'command',
     label: 'cmd:start',
@@ -46,7 +46,7 @@ test('verification log formats the two v8 phone commands', () => {
   });
 });
 
-test('verification log formats raw-only v8 device events', () => {
+test('verification log formats v12 device events', () => {
   assert.deepEqual(
     bleEventLogEntry({
       event: 'status',
@@ -83,12 +83,12 @@ test('verification log formats raw-only v8 device events', () => {
       session_id: 'fw-result',
       kind: 'measurement',
       alcohol_mg_l_x1000: 120,
-      pulse: null,
+      pulse: { status: 'unavailable', reason: 'no_signal' },
     }),
     {
       kind: 'event',
       label: 'event:result',
-      detail: 'alcohol=120 pulse=-',
+      detail: 'alcohol=120 pulse=unavailable:no_signal',
       sessionId: 'fw-result',
     }
   );
@@ -116,7 +116,7 @@ test('cancel evidence derives latency from command and terminal error entries', 
   assert.equal(entries[1].atUnixMs - entries[0].atUnixMs, 460);
 });
 
-test('verification evidence summary keeps current v8 proof fields beyond the timeline', () => {
+test('verification evidence summary keeps current v12 proof fields beyond the timeline', () => {
   let entries = [];
   let summary = emptyBleVerificationEvidenceSummary;
 
@@ -166,7 +166,7 @@ test('verification evidence summary keeps current v8 proof fields beyond the tim
       session_id: 'measure-2',
       kind: 'measurement',
       alcohol_mg_l_x1000: 120,
-      pulse: null,
+      pulse: { status: 'unavailable', reason: 'no_signal' },
     },
     1800000001100
   );

@@ -102,11 +102,20 @@ export default function HomeRoute() {
       />
 
       {connection.phase === 'connected' ? (
-        <ActionButton
-          label="음주 세션 측정"
-          onPress={() => router.push('/session')}
-          variant="secondary"
-        />
+        <>
+          <ActionButton
+            label="음주 세션 측정"
+            onPress={() => router.push('/session')}
+            variant="secondary"
+          />
+          <ActionButton
+            label="기기 연결 해제"
+            onPress={() => {
+              void ble.disconnect();
+            }}
+            variant="secondary"
+          />
+        </>
       ) : null}
 
       <LastResultCard
@@ -183,7 +192,7 @@ async function allowBluetooth() {
   await Linking.openSettings();
 }
 
-/** 측정 상태가 연결 상태보다 우선한다 — 손에 든 결과와 진행 중인 측정이 먼저다. */
+/** 연결이 끊겼다면 이전 결과보다 재연결 동작을 우선한다. */
 function homeCta({
   bluetoothState,
   connection,
@@ -193,22 +202,6 @@ function homeCta({
   connection: ConnectionState;
   measurement: MeasurementState;
 }): HomeCta {
-  if (measurement.phase === 'result') {
-    return { kind: 'result', sessionId: measurement.record.session_id };
-  }
-
-  if (
-    measurement.phase === 'starting' ||
-    measurement.phase === 'active' ||
-    measurement.phase === 'awaiting_pulse'
-  ) {
-    return { kind: 'resume' };
-  }
-
-  if (connection.phase === 'connected') {
-    return { kind: 'start' };
-  }
-
   if (connection.phase === 'connecting') {
     return { kind: 'connecting' };
   }
@@ -225,7 +218,23 @@ function homeCta({
     return { kind: 'bluetooth_settings' };
   }
 
-  return { kind: 'connect' };
+  if (connection.phase !== 'connected') {
+    return { kind: 'connect' };
+  }
+
+  if (measurement.phase === 'result') {
+    return { kind: 'result', sessionId: measurement.record.session_id };
+  }
+
+  if (
+    measurement.phase === 'starting' ||
+    measurement.phase === 'active' ||
+    measurement.phase === 'awaiting_pulse'
+  ) {
+    return { kind: 'resume' };
+  }
+
+  return { kind: 'start' };
 }
 
 function deviceStatusText(connection: ConnectionState) {

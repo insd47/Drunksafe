@@ -3,15 +3,25 @@ import test from 'node:test';
 
 import {
   maxSoberBaselineAlcoholMgLX1000,
-  baselineResultDescription,
+  baselineIssueCopy,
+  baselineIssues,
   savedResultMessage,
   shouldAcceptSoberBaselineSample,
   shouldUpdateSoberBaseline,
 } from '@/lib/personalization/baseline-acceptance';
+import { baselineAfterResult } from '@/lib/ble/session/persistence';
 
-test('sober baseline accepts only low safe alcohol results', () => {
+test('sober baseline accepts only low alcohol and stable resting HR', () => {
   assert.equal(shouldUpdateSoberBaseline(result({ risk: 'safe', alcohol: 8 })), true);
-  assert.equal(shouldAcceptSoberBaselineSample({ risk: 'safe', alcohol_mg_l_x1000: 8 }), true);
+  assert.equal(
+    shouldAcceptSoberBaselineSample({
+      risk: 'safe',
+      alcohol_mg_l_x1000: 8,
+      pulse_bpm: 72,
+      pulse_stable: true,
+    }),
+    true
+  );
   assert.equal(
     shouldUpdateSoberBaseline(
       result({
@@ -35,30 +45,77 @@ test('sober baseline rejects high or risky baseline sessions', () => {
   );
   assert.equal(shouldUpdateSoberBaseline(result({ risk: 'caution', alcohol: 20 })), false);
   assert.equal(shouldUpdateSoberBaseline(result({ risk: 'danger', alcohol: 20 })), false);
+  assert.equal(shouldUpdateSoberBaseline(result({ risk: 'safe', alcohol: 8, bpm: 59 })), false);
+  assert.equal(shouldUpdateSoberBaseline(result({ risk: 'safe', alcohol: 8, bpm: 91 })), false);
+  assert.equal(
+    shouldUpdateSoberBaseline(result({ risk: 'safe', alcohol: 8, stable: false })),
+    false
+  );
 });
 
-test('baseline result copy explains whether the sample updates sober baseline', () => {
-  assert.equal(
-    baselineResultDescription({ risk: 'safe', alcohol_mg_l_x1000: 8 }),
-    '개인 sober 기준값에 반영 가능한 결과입니다.'
-  );
-  assert.equal(
-    baselineResultDescription({
+test('baseline reports heart-rate and alcohol failures independently', () => {
+  assert.deepEqual(
+    baselineIssues({
       risk: 'safe',
-      alcohol_mg_l_x1000: maxSoberBaselineAlcoholMgLX1000 + 1,
+      alcohol_mg_l_x1000: 8,
+      pulse_bpm: 96,
+      pulse_stable: true,
     }),
-    '히스토리에는 저장하지만 sober baseline에는 반영하지 않습니다.'
+    ['heart_rate']
   );
-  assert.equal(
-    baselineResultDescription({ risk: 'caution', alcohol_mg_l_x1000: 8 }),
-    '히스토리에는 저장하지만 sober baseline에는 반영하지 않습니다.'
+  assert.deepEqual(
+    baselineIssues({
+      risk: 'caution',
+      alcohol_mg_l_x1000: 51,
+      pulse_bpm: 72,
+      pulse_stable: true,
+    }),
+    ['alcohol']
+  );
+  assert.deepEqual(
+    baselineIssues({
+      risk: 'caution',
+      alcohol_mg_l_x1000: 51,
+      pulse_bpm: null,
+      pulse_stable: false,
+    }),
+    ['heart_rate', 'alcohol']
+  );
+  assert.match(baselineIssueCopy('heart_rate').description, /60~90 BPM/);
+  assert.match(baselineIssueCopy('alcohol').description, /환기/);
+});
+
+test('stored baseline uses the same validity rules', () => {
+  assert.deepEqual(
+    baselineIssues({
+      sample_count: 2,
+      resting_bpm: 95,
+      sober_alcohol_mg_l_x1000: 8,
+    }),
+    ['heart_rate']
+  );
+  assert.deepEqual(
+    baselineIssues({
+      sample_count: 2,
+      resting_bpm: 72,
+      sober_alcohol_mg_l_x1000: 51,
+    }),
+    ['alcohol']
+  );
+  assert.deepEqual(
+    baselineIssues({
+      sample_count: 0,
+      resting_bpm: null,
+      sober_alcohol_mg_l_x1000: null,
+    }),
+    ['missing', 'heart_rate', 'alcohol']
   );
 });
 
 test('baseline result copy distinguishes history save from baseline acceptance', () => {
   assert.equal(
     savedResultMessage({ kind: 'baseline', baselineAccepted: false }),
-    '결과를 히스토리에 저장했습니다. Baseline 조건은 충족하지 못했습니다.'
+    '결과를 히스토리에 저장했지만, 개인 baseline에는 반영하지 않았습니다.'
   );
   assert.equal(
     savedResultMessage({ kind: 'baseline', baselineAccepted: true }),
@@ -70,7 +127,25 @@ test('baseline result copy distinguishes history save from baseline acceptance',
   );
 });
 
-function result({ risk, alcohol }) {
+test('a valid controlled baseline replaces a stale reference instead of averaging with it', () => {
+  const next = baselineAfterResult(
+    {
+      sober_alcohol_mg_l_x1000: 40,
+      sober_alcohol_mad_mg_l_x1000: 5,
+      elimination_mg_l_per_hour_x1000: 62,
+      resting_bpm: 60,
+      sample_count: 100,
+      updated_at_unix_ms: 1,
+    },
+    result({ risk: 'safe', alcohol: 8, bpm: 76 })
+  );
+  assert.equal(next.resting_bpm, 76);
+  assert.equal(next.sober_alcohol_mg_l_x1000, 8);
+  assert.equal(next.sample_count, 1);
+  assert.equal(next.elimination_mg_l_per_hour_x1000, 62);
+});
+
+function result({ risk, alcohol, bpm = 72, stable = true }) {
   return {
     id: `baseline:${risk}:${alcohol}`,
     session_id: `baseline-${risk}-${alcohol}`,
@@ -82,7 +157,7 @@ function result({ risk, alcohol }) {
     sober_time_minutes: 0,
     risk,
     confidence_percent: 88,
-    pulse_bpm: 72,
-    pulse_stable: true,
+    pulse_bpm: bpm,
+    pulse_stable: stable,
   };
 }

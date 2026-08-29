@@ -71,11 +71,23 @@ impl GattServer {
         self.state.lock().unwrap().connections.is_connected()
     }
 
+    pub fn connection_generation(&self) -> u32 {
+        self.state.lock().unwrap().connections.generation()
+    }
+
     /// advertising 재시도 횟수를 리셋하고 다시 시작을 트리거한다. 결과 화면에서
     /// 버튼 길게 누르기로 대기 화면에 복귀할 때, 연결이 없으면 호출한다.
     pub fn ensure_advertising(&self) -> Result<(), EspError> {
+        if !self.needs_advertising_restart() {
+            return Ok(());
+        }
         log::info!("BLE advertising restart requested");
         self.begin_advertising()
+    }
+
+    pub fn needs_advertising_restart(&self) -> bool {
+        let state = self.state.lock().unwrap();
+        !state.connections.is_connected() && !state.advertising.is_active()
     }
 
     pub fn notify(&self, event: &DeviceEvent) -> Result<(), EspError> {
@@ -296,7 +308,10 @@ impl GattServer {
     fn execute_connection(&self, action: ConnectionAction) -> Result<(), EspError> {
         match action {
             ConnectionAction::None => Ok(()),
-            ConnectionAction::StopAdvertising => self.gap.stop_advertising(),
+            ConnectionAction::StopAdvertising => {
+                self.state.lock().unwrap().advertising.mark_inactive();
+                self.gap.stop_advertising()
+            }
             ConnectionAction::BeginAdvertising => self.begin_advertising(),
         }
     }

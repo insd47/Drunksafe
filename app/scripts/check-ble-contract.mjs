@@ -8,6 +8,7 @@ import { decodeUtf8Base64, encodeUtf8Base64, utf8ByteLength } from '@/lib/ble/co
 import { parseDeviceEvent, protocolVersion, toPhoneCommandPayload } from '@/lib/ble/model';
 import {
   DeviceEventFrameAssembler,
+  maxBleJsonPayloadBytes,
   maxBleTransportChunks,
   minimumChunkedBlePayloadBytes,
   serializePhoneCommandFrames,
@@ -29,6 +30,31 @@ test('device event fixtures parse through the app validator', () => {
   for (const event of contract.deviceEvents) {
     assert.deepEqual(parseDeviceEvent(JSON.stringify(event)), event);
   }
+});
+
+test('developer live pulse and decimated raw batches each fit one negotiated-MTU payload', () => {
+  const pulse = {
+    event: 'pulse_reading',
+    v: protocolVersion,
+    session_id: 'fw-pulse-65535',
+    elapsed_ms: 3_600_000,
+    bpm: 123.4,
+    ibi_stddev_ms: 299.9,
+    peak_count: 65535,
+    stable: false,
+  };
+  const raw = {
+    event: 'ppg_sample',
+    v: protocolVersion,
+    session_id: 'fw-pulse-65535',
+    t0_ms: 3_600_000,
+    dt_ms: 40,
+    samples: Array.from({ length: 10 }, () => 4095),
+  };
+  assert.doesNotThrow(() => parseDeviceEvent(JSON.stringify(pulse)));
+  assert.doesNotThrow(() => parseDeviceEvent(JSON.stringify(raw)));
+  assert.ok(utf8ByteLength(JSON.stringify(pulse)) <= maxBleJsonPayloadBytes);
+  assert.ok(utf8ByteLength(JSON.stringify(raw)) <= maxBleJsonPayloadBytes);
 });
 
 test('app validator accepts every BLE enum value from the contract fixture', () => {
@@ -158,7 +184,7 @@ test('BLE base64 codec defines empty and lone-surrogate behavior', () => {
   assert.throws(() => decodeUtf8Base64('/w=='), URIError);
 });
 
-test('v8 rejects removed progress events and payer-free commands', () => {
+test('v12 rejects removed progress events and payer-free commands', () => {
   assert.throws(
     () =>
       parseDeviceEvent(
@@ -206,7 +232,7 @@ function measurementResult(overrides = {}) {
     session_id: 'enum-fixture',
     kind: 'measurement',
     alcohol_mg_l_x1000: 0,
-    pulse: null,
+    pulse: { status: 'measured', bpm: 72, stable: true },
     ...overrides,
   };
 }

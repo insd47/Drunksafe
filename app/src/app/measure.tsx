@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -12,6 +12,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
+import { PulseContactGuide } from '@/components/pulse-contact-guide';
 import { deviceErrorCopy } from '@/components/device-error-copy';
 import type { AlcoholStateLabel } from '@/lib/ble/model';
 import { useAlcoholState, useBleSession } from '@/lib/ble/session';
@@ -195,13 +196,24 @@ export default function MeasureRoute() {
         </Pressable>
       </View>
 
-      <View className="flex-1 items-center justify-center gap-10 px-8">
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 20,
+          paddingHorizontal: 24,
+          paddingVertical: 16,
+        }}>
         <View className="gap-3">
           <Text className="text-center text-2xl font-bold leading-9 text-gray-950">{title}</Text>
           <Text className="text-center text-sm leading-6 text-gray-500">{hint}</Text>
         </View>
 
         <ElapsedRing seconds={elapsedSeconds} />
+        {isPulseStage && measurement.phase === 'active' && (
+          <PulseContactGuide sessionId={measurement.sessionId} />
+        )}
 
         <Text className="text-xs text-gray-400">
           {isPulseStage
@@ -210,7 +222,7 @@ export default function MeasureRoute() {
               ? '기준값 측정 · 최대 30초'
               : '알코올 측정 · 최대 30초'}
         </Text>
-      </View>
+      </ScrollView>
 
       <MeasureFooter>
         <ActionButton label="측정 취소" onPress={cancel} variant="secondary" />

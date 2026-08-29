@@ -189,9 +189,78 @@ test('verification updates do not notify session snapshot subscribers', async ()
   await harness.store.destroy();
 });
 
-async function createHarness() {
+test('HR watch requires baseline, waits for firmware ack, and sends no alcohol command', async () => {
+  const harness = await createHarness({ resting_bpm: 71, sample_count: 3 });
+  await connectReady(harness);
+  const startedPromise = harness.store.startSession();
+  await waitFor(() => harness.client.commands.length === 1);
+  assert.deepEqual(harness.client.commands[0], { cmd: 'start_hr_watch', resting_bpm: 71 });
+  assert.equal(harness.store.getSessionSnapshot().phase, 'idle');
+  harness.client.emit(sessionStatus('fw-hrwatch-1', 'dormant', 0, 71, null));
+  await startedPromise;
+  assert.equal(harness.store.getSessionSnapshot().phase, 'active');
+  harness.client.emit(sessionStatus('fw-hrwatch-1', 'probe', 300000, 71, null));
+  await settle();
+  assert.equal(harness.store.getSessionSnapshot().status?.state, 'probe');
+  assert.equal(
+    harness.client.commands.some((command) => command.cmd === 'start'),
+    false
+  );
+  await harness.store.destroy();
+});
+
+test('HR watch refuses to start without a measured resting baseline', async () => {
+  const harness = await createHarness({ resting_bpm: null, sample_count: 0 });
+  await connectReady(harness);
+  await assert.rejects(() => harness.store.startSession(), /baseline/);
+  assert.equal(harness.client.commands.length, 0);
+  assert.equal(harness.store.getSessionSnapshot().phase, 'idle');
+  await harness.store.destroy();
+});
+
+test('manual session alcohol measurement is available before an HR trigger and re-enables after a result', async () => {
+  const harness = await createHarness({ resting_bpm: 71, sample_count: 3 });
+  await connectReady(harness);
+  const startedPromise = harness.store.startSession();
+  await waitFor(() => harness.client.commands.length === 1);
+  harness.client.emit(sessionStatus('fw-hrwatch-1', 'dormant', 120000, 71, 71));
+  await startedPromise;
+
+  await harness.store.measureSessionAlcohol();
+  assert.deepEqual(harness.client.commands.at(-1), { cmd: 'measure_session_alcohol' });
+  assert.equal(harness.store.getSessionSnapshot().alcoholMeasurementPending, true);
+  await assert.rejects(
+    () => harness.store.measureSessionAlcohol(),
+    /알코올 측정이 이미 진행 중입니다/
+  );
+
+  harness.client.emit({
+    event: 'session_alcohol_result',
+    v: protocolVersion,
+    session_id: 'fw-hrwatch-1',
+    elapsed_ms: 140000,
+    trigger_percent: null,
+    alcohol_mg_l_x1000: 132,
+  });
+  await settle();
+  assert.equal(harness.store.getSessionSnapshot().alcoholMeasurementPending, false);
+  assert.equal(harness.store.getSessionSnapshot().alcoholResults.at(-1)?.alcohol_mg_l_x1000, 132);
+  await harness.store.destroy();
+});
+
+async function createHarness(baseline = { resting_bpm: 71, sample_count: 1 }) {
   const client = new FakeBleClient();
-  const store = new BleSessionStore({ createClient: () => client });
+  const store = new BleSessionStore({
+    createClient: () => client,
+    baselineReader: () =>
+      Promise.resolve({
+        sober_alcohol_mg_l_x1000: 8,
+        sober_alcohol_mad_mg_l_x1000: null,
+        elimination_mg_l_per_hour_x1000: null,
+        updated_at_unix_ms: null,
+        ...baseline,
+      }),
+  });
   store.initialize();
   await settle();
   return { client, store };
@@ -229,7 +298,25 @@ function result(sessionId) {
     session_id: sessionId,
     kind: 'measurement',
     alcohol_mg_l_x1000: 160,
-    pulse: null,
+    pulse: { status: 'unavailable', reason: 'no_signal' },
+  };
+}
+
+function sessionStatus(sessionId, state, elapsed, r0, lastBpm, overrides = {}) {
+  return {
+    event: 'session_status',
+    v: protocolVersion,
+    session_id: sessionId,
+    state,
+    elapsed_ms: elapsed,
+    records: 1,
+    r0_bpm: r0,
+    last_bpm: lastBpm,
+    valid_minutes: null,
+    high_minutes: null,
+    next_threshold_percent: null,
+    alerted_percent: null,
+    ...overrides,
   };
 }
 

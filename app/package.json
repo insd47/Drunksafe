@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "packageManager": "pnpm@10.24.0",
   "scripts": {
-    "test": "pnpm test:ble-contract && pnpm test:ble-readiness && pnpm test:ble-permissions && pnpm test:baseline-acceptance && pnpm test:ble-session-reducer && pnpm test:history-insights && pnpm test:history-storage && pnpm test:ble-session-runtime && pnpm test:ble-verification-log && pnpm test:measurement-format && pnpm test:mvp-evidence-template && pnpm test:mvp-run-record && pnpm test:mvp-hardware-preflight",
+    "test:pulse-feedback": "tsx --tsconfig tsconfig.json scripts/check-pulse-feedback.mjs",
+    "test:session-insight": "tsx --tsconfig tsconfig.json scripts/check-session-insight.mjs",
+    "test:session-sober-time": "tsx --tsconfig tsconfig.json scripts/check-session-sober-time.mjs",
+    "test:session-identity": "tsx --tsconfig tsconfig.json scripts/check-session-identity.mjs",
+    "test": "pnpm test:ble-contract && pnpm test:ble-readiness && pnpm test:ble-permissions && pnpm test:baseline-acceptance && pnpm test:ble-session-reducer && pnpm test:history-insights && pnpm test:history-storage && pnpm test:session-identity && pnpm test:ble-session-runtime && pnpm test:ble-verification-log && pnpm test:measurement-format && pnpm test:session-sober-time && pnpm test:mvp-evidence-template && pnpm test:mvp-run-record && pnpm test:mvp-hardware-preflight",
     "lint": "eslint \"**/*.{js,jsx,ts,tsx}\" && prettier -c \"**/*.{js,jsx,ts,tsx,json}\"",
     "test:ble-contract": "tsx --tsconfig tsconfig.json scripts/check-ble-contract.mjs",
     "test:ble-readiness": "tsx --tsconfig tsconfig.json scripts/check-ble-readiness.mjs",

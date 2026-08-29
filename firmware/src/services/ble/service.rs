@@ -48,6 +48,10 @@ impl BleService {
         self.server.is_connected()
     }
 
+    pub fn connection_generation(&self) -> u32 {
+        self.server.connection_generation()
+    }
+
     /// advertising을 다시 시작한다 (결과 화면에서 대기 화면 복귀 시 재연결 허용용).
     pub fn ensure_advertising(&self) -> Result<(), EspError> {
         self.server.ensure_advertising()

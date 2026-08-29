@@ -5,7 +5,7 @@ use crate::services::measure::{Measurement, PulseOutcome};
 
 pub fn home(display: &mut DisplayDevice<'_>) -> Result<()> {
     display.draw(|frame| {
-        text::center(frame, 16, "드렁세이프");
+        text::center(frame, 16, "drunksafe");
         icon::separator(frame, 22);
         text::center(frame, 42, "준비 완료");
         text::center(frame, 59, "버튼을 눌러주세요");

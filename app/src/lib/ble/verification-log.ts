@@ -95,9 +95,10 @@ export function bleCommandLogEntry(command: PhoneCommand): BleVerificationLogInp
         sessionId: null,
       };
     case 'start_session':
+    case 'start_hr_watch':
       return {
         kind: 'command',
-        label: 'cmd:session_start',
+        label: command.cmd === 'start_hr_watch' ? 'cmd:hr_watch_start' : 'cmd:session_start',
         detail: `resting_bpm=${command.resting_bpm ?? '-'}`,
         sessionId: null,
       };
@@ -106,6 +107,13 @@ export function bleCommandLogEntry(command: PhoneCommand): BleVerificationLogInp
         kind: 'command',
         label: 'cmd:alcohol_track',
         detail: 'phone started alcohol track',
+        sessionId: null,
+      };
+    case 'measure_session_alcohol':
+      return {
+        kind: 'command',
+        label: 'cmd:session_alcohol',
+        detail: 'phone requested session alcohol measurement',
         sessionId: null,
       };
     case 'end_session':
@@ -188,6 +196,13 @@ export function bleEventLogEntry(event: DeviceEvent): BleVerificationLogInput {
         kind: 'event',
         label: 'event:session_complete',
         detail: `total=${event.total}`,
+        sessionId: event.session_id,
+      };
+    case 'session_alcohol_result':
+      return {
+        kind: 'event',
+        label: 'event:session_alcohol_result',
+        detail: `trigger=${event.trigger_percent ?? 'manual'} alcohol=${event.alcohol_mg_l_x1000 ?? 'failed'}`,
         sessionId: event.session_id,
       };
   }

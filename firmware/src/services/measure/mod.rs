@@ -2,7 +2,7 @@ use core::future::Future;
 
 use crate::devices::alcohol::Status;
 use crate::devices::pulse::Diagnosis;
-use crate::devices::{AlcoholDevice, PulseDevice};
+use crate::devices::{AlcoholDevice, BuzzerDevice, PulseDevice};
 use crate::error::Result;
 use embassy_futures::select::{select, Either};
 pub use measurement::{Measurement, PulseOutcome};
@@ -22,6 +22,22 @@ pub enum PhaseRun<T> {
 }
 
 impl<'d> MeasureService<'d> {
+    pub fn reset_hr_monitor(&mut self) {
+        self.pulse.reset();
+    }
+
+    pub fn sample_hr_monitor(&mut self, elapsed_ms: u32) -> Result<()> {
+        self.pulse.sample_raw(elapsed_ms)?;
+        Ok(())
+    }
+
+    pub fn hr_diagnosis(&self) -> Diagnosis {
+        self.pulse.diagnose()
+    }
+
+    pub fn take_hr_slot(&mut self) -> Option<crate::devices::pulse::ClosedSlot> {
+        self.pulse.take_closed_slot()
+    }
     pub fn new(pulse: PulseDevice<'d>, alcohol: AlcoholDevice<'d>) -> Self {
         Self { pulse, alcohol }
     }
@@ -30,10 +46,11 @@ impl<'d> MeasureService<'d> {
     /// 결과가 없으면 타임아웃 `Err`로 끝나 호출부가 실패 화면으로 넘어간다.
     pub async fn run_alcohol_until_cancelled(
         &mut self,
+        buzzer: &mut BuzzerDevice,
         cancel: impl Future<Output = ()>,
         on_state: impl FnMut(Status),
     ) -> Result<PhaseRun<u16>> {
-        match select(run::alcohol(&mut self.alcohol, on_state), cancel).await {
+        match select(run::alcohol(&mut self.alcohol, buzzer, on_state), cancel).await {
             Either::First(result) => result.map(PhaseRun::Completed),
             Either::Second(()) => {
                 self.alcohol.stop().await?;
@@ -47,9 +64,15 @@ impl<'d> MeasureService<'d> {
     pub async fn run_pulse_until_cancelled(
         &mut self,
         cancel: impl Future<Output = ()>,
+        on_reading: impl FnMut(u32, Diagnosis),
     ) -> Result<PhaseRun<PulseOutcome>> {
         match select(
-            run::pulse(&mut self.pulse, run::PULSE_PHASE_TIMEOUT, |_elapsed_ms, _raw| {}),
+            run::pulse(
+                &mut self.pulse,
+                run::PULSE_PHASE_TIMEOUT,
+                |_elapsed_ms, _raw| {},
+                on_reading,
+            ),
             cancel,
         )
         .await
@@ -65,8 +88,16 @@ impl<'d> MeasureService<'d> {
     }
 
     /// 세션 중 알코올 1건을 측정한다 (30초 타임아웃). 상태 알림은 필요 없어 무시한다.
-    pub async fn measure_alcohol(&mut self) -> Result<u16> {
-        run::alcohol(&mut self.alcohol, |_status| {}).await
+    pub async fn measure_alcohol(&mut self, buzzer: &mut BuzzerDevice) -> Result<u16> {
+        run::alcohol(&mut self.alcohol, buzzer, |_status| {}).await
+    }
+
+    pub async fn measure_session_alcohol(
+        &mut self,
+        buzzer: &mut BuzzerDevice,
+        on_state: impl FnMut(Status),
+    ) -> Result<u16> {
+        run::alcohol(&mut self.alcohol, buzzer, on_state).await
     }
 
     /// 알코올을 빼고 pulse만 연속 스트리밍한다 (개발자 도구 실시간 진단용).

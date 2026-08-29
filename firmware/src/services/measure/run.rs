@@ -1,11 +1,12 @@
 use crate::devices::alcohol::Status;
 use crate::devices::pulse::{Diagnosis, PulseUnavailableReason};
-use crate::devices::{AlcoholDevice, PulseDevice};
+use crate::devices::{AlcoholDevice, BuzzerDevice, PulseDevice};
 use crate::error::{Result, TimeoutKind};
 use crate::services::measure::PulseOutcome;
 use embassy_time::{Duration, Instant, Timer};
 
 const PULSE_SAMPLE: Duration = Duration::from_millis(10);
+const PULSE_MAX_SCHEDULE_LAG: Duration = Duration::from_millis(100);
 const ALCOHOL_POLL: Duration = Duration::from_millis(200);
 const ALCOHOL_RESULT_TIMEOUT: Duration = Duration::from_secs(30);
 /// 이만큼 연속으로 status read가 실패하면 통신 오류로 보고 측정을 실패 처리한다.
@@ -18,6 +19,11 @@ pub const PULSE_PHASE_TIMEOUT: Duration = Duration::from_secs(60);
 const PULSE_STREAM_WARMUP_MS: u32 = 2000;
 /// 스트리밍 진단에서 diagnosis reading을 내보내는 주기다.
 const PULSE_STREAM_READING_INTERVAL_MS: u32 = 1000;
+/// Developer stream serial diagnostics are deliberately much slower than the
+/// BLE/raw sample stream so logging cannot become part of the 100 Hz loop load.
+const PULSE_STREAM_LOG_INTERVAL_MS: u32 = 5000;
+const PULSE_MEASUREMENT_DIAG_INTERVAL_MS: u32 = 500;
+const PULSE_MEASUREMENT_REPORT_INTERVAL_MS: u32 = 5000;
 
 /// pulse를 측정한다. 안정적인 pulse를 `timeout` 안에 못 찾아도 하드웨어 오류가 아닌 이상
 /// `Err`가 아니라 `PulseOutcome::Unavailable`로 귀결된다 — 호출부가 이유를 앱에
@@ -26,34 +32,84 @@ pub async fn pulse(
     device: &mut PulseDevice<'_>,
     timeout: Duration,
     mut on_sample: impl FnMut(u32, u16),
+    mut on_reading: impl FnMut(u32, Diagnosis),
 ) -> Result<PulseOutcome> {
     device.reset();
     let started = Instant::now();
+    let mut last_reading_ms = u32::MAX;
+    let mut last_emitted_ms = u32::MAX;
+    let mut last_reported_phase: Option<&'static str> = None;
+    let mut last_reported_failure: Option<&'static str> = None;
+    let mut any_peak_found = false;
+    let mut next_sample = Instant::now();
+    let mut sample_count = 0_u32;
 
     loop {
         let elapsed_ms = started.elapsed().as_millis().min(u64::from(u32::MAX)) as u32;
 
-        let (raw, analysis) = device.sample(elapsed_ms)?;
+        let raw = device.sample_raw(elapsed_ms)?;
+        sample_count = sample_count.saturating_add(1);
         on_sample(elapsed_ms, raw);
 
-        if let Some(analysis) = analysis {
-            let bpm = analysis.bpm.round().clamp(0.0, u16::MAX as f32) as u16;
-            return Ok(PulseOutcome::Measured {
-                bpm,
-                stable: analysis.stable,
-            });
+        // Same estimator/report cadence as the developer stream, but only a
+        // stable reading can become a saved measurement or resting baseline.
+        if last_reading_ms == u32::MAX
+            || elapsed_ms.saturating_sub(last_reading_ms) >= PULSE_MEASUREMENT_DIAG_INTERVAL_MS
+        {
+            last_reading_ms = elapsed_ms;
+            let diagnosis = device.diagnose();
+            any_peak_found |= diagnosis.peak_count > 0;
+            let stable_bpm = diagnosis.stable.then_some(diagnosis.bpm);
+            let acquiring = matches!(diagnosis.phase, "warmup" | "collecting");
+            let entered_acquisition =
+                acquiring && !matches!(last_reported_phase, Some("warmup" | "collecting"));
+            let state_changed = last_reported_phase != Some(diagnosis.phase)
+                || last_reported_failure != diagnosis.last_failure;
+            let report_due = last_emitted_ms == u32::MAX
+                || elapsed_ms.saturating_sub(last_emitted_ms)
+                    >= PULSE_MEASUREMENT_REPORT_INTERVAL_MS;
+            if state_changed || entered_acquisition || report_due {
+                on_reading(elapsed_ms, diagnosis);
+                last_emitted_ms = elapsed_ms;
+                last_reported_phase = Some(diagnosis.phase);
+                last_reported_failure = diagnosis.last_failure;
+            }
+            if let Some(bpm) = stable_bpm {
+                if last_reported_phase != Some(diagnosis.phase) {
+                    on_reading(elapsed_ms, diagnosis);
+                }
+                log::info!(
+                    "pulse accepted: bpm={:.1}, intervals={}, ibi_stddev_ms={:.1}, sample_hz={:.1}",
+                    diagnosis.bpm,
+                    diagnosis.accepted_intervals,
+                    diagnosis.ibi_stddev_ms,
+                    sample_count as f32 * 1000.0 / elapsed_ms.max(1) as f32
+                );
+                return Ok(PulseOutcome::Measured {
+                    bpm: bpm.round().clamp(0.0, u16::MAX as f32) as u16,
+                    stable: true,
+                });
+            }
         }
 
         if started.elapsed() >= timeout {
-            let reason = if device.any_peak_found() {
+            let reason = if any_peak_found {
                 PulseUnavailableReason::Unstable
             } else {
                 PulseUnavailableReason::NoSignal
             };
+            let diagnosis = device.diagnose();
+            log::warn!(
+                "pulse unavailable: reason={reason:?}, phase={}, intervals={}, last_failure={:?}, sample_hz={:.1}",
+                diagnosis.phase,
+                diagnosis.accepted_intervals,
+                diagnosis.last_failure,
+                sample_count as f32 * 1000.0 / elapsed_ms.max(1) as f32
+            );
             return Ok(PulseOutcome::Unavailable { reason });
         }
 
-        Timer::after(PULSE_SAMPLE).await;
+        wait_for_sample_deadline(&mut next_sample).await;
     }
 }
 
@@ -68,21 +124,42 @@ pub async fn pulse_stream(
     device.reset();
     let started = Instant::now();
     let mut last_reading_ms: u32 = 0;
+    let mut last_log_ms: u32 = 0;
+    let mut next_sample = Instant::now();
+    let mut sample_count = 0_u32;
 
     loop {
         let elapsed_ms = started.elapsed().as_millis().min(u64::from(u32::MAX)) as u32;
 
         let raw = device.sample_raw(elapsed_ms)?;
+        sample_count = sample_count.saturating_add(1);
         on_sample(elapsed_ms, raw);
 
         if elapsed_ms >= PULSE_STREAM_WARMUP_MS
             && elapsed_ms.saturating_sub(last_reading_ms) >= PULSE_STREAM_READING_INTERVAL_MS
         {
             last_reading_ms = elapsed_ms;
-            on_reading(elapsed_ms, device.diagnose());
+            let diagnosis = device.diagnose();
+            on_reading(elapsed_ms, diagnosis);
+            if elapsed_ms.saturating_sub(last_log_ms) >= PULSE_STREAM_LOG_INTERVAL_MS {
+                last_log_ms = elapsed_ms;
+                log::info!(
+                    "[PULSE_STREAM] phase={}, bpm={:.1}, stable={}, peaks={}, intervals={}, ibi_stddev_ms={:.1}, contact={:?}, reason={:?}, last_failure={:?}, sample_hz={:.1}",
+                    diagnosis.phase,
+                    diagnosis.bpm,
+                    diagnosis.stable,
+                    diagnosis.peak_count,
+                    diagnosis.accepted_intervals,
+                    diagnosis.ibi_stddev_ms,
+                    diagnosis.contact_good,
+                    diagnosis.reason,
+                    diagnosis.last_failure,
+                    sample_count as f32 * 1000.0 / elapsed_ms.max(1) as f32,
+                );
+            }
         }
 
-        Timer::after(PULSE_SAMPLE).await;
+        wait_for_sample_deadline(&mut next_sample).await;
     }
 }
 
@@ -90,6 +167,7 @@ pub async fn pulse_stream(
 pub async fn hr_burst(device: &mut PulseDevice<'_>, duration: Duration) -> Result<Diagnosis> {
     device.reset();
     let started = Instant::now();
+    let mut next_sample = Instant::now();
 
     loop {
         let elapsed_ms = started.elapsed().as_millis().min(u64::from(u32::MAX)) as u32;
@@ -99,18 +177,30 @@ pub async fn hr_burst(device: &mut PulseDevice<'_>, duration: Duration) -> Resul
             return Ok(device.diagnose());
         }
 
-        Timer::after(PULSE_SAMPLE).await;
+        wait_for_sample_deadline(&mut next_sample).await;
     }
+}
+
+/// Match the Arduino sketch's `next += 10 ms` scheduler. Processing time does
+/// not get added to every sample period; only a lag over 100 ms resets cadence.
+async fn wait_for_sample_deadline(next: &mut Instant) {
+    *next += PULSE_SAMPLE;
+    let now = Instant::now();
+    if now > *next && now - *next > PULSE_MAX_SCHEDULE_LAG {
+        *next = now + PULSE_SAMPLE;
+    }
+    Timer::at(*next).await;
 }
 
 /// 알코올을 측정한다. `on_state`는 ZE29A 상태가 바뀔 때마다 호출돼(예: Preheating→
 /// WaitBlow) 앱이 "지금 부세요" 타이밍을 안내할 수 있게 한다.
 pub async fn alcohol(
     device: &mut AlcoholDevice<'_>,
+    buzzer: &mut BuzzerDevice,
     on_state: impl FnMut(Status),
 ) -> Result<u16> {
     device.start().await?;
-    let result = alcohol_result(device, on_state).await;
+    let result = alcohol_result(device, buzzer, on_state).await;
 
     if let Err(error) = device.stop().await {
         log::warn!("failed to stop alcohol sensor work mode after measurement: {error}");
@@ -121,6 +211,7 @@ pub async fn alcohol(
 
 async fn alcohol_result(
     device: &mut AlcoholDevice<'_>,
+    buzzer: &mut BuzzerDevice,
     mut on_state: impl FnMut(Status),
 ) -> Result<u16> {
     let started = Instant::now();
@@ -158,6 +249,10 @@ async fn alcohol_result(
             on_state(status);
             if status == Status::WaitBlow {
                 reached_wait_blow = true;
+                // 상태 전환 때만 실행되므로 WaitBlow를 반복 조회해도 한 번만 울린다.
+                if let Err(error) = buzzer.beep_pattern(2, 120, 120) {
+                    log::warn!("failed to signal WaitBlow with buzzer: {error}");
+                }
             }
             last_status = Some(status);
         }

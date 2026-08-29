@@ -15,6 +15,7 @@ export default function RootLayout() {
           options={{ presentation: 'fullScreenModal', headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen name="results/[id]" options={{ title: '측정 결과' }} />
+        <Stack.Screen name="sessions/[id]" options={{ title: '세션 기록' }} />
         <Stack.Protected guard={__DEV__}>
           <Stack.Screen name="dev" options={{ title: '개발자 도구' }} />
         </Stack.Protected>

@@ -14,12 +14,21 @@ pub enum AdvertisingAction {
 #[derive(Default)]
 pub struct Advertising {
     attempts: u8,
+    active: bool,
 }
 
 impl Advertising {
     pub fn begin(&mut self) -> AdvertisingAction {
         self.attempts = 0;
+        self.active = false;
         AdvertisingAction::Configure
+    }
+
+    pub const fn is_active(&self) -> bool {
+        self.active
+    }
+    pub fn mark_inactive(&mut self) {
+        self.active = false;
     }
 
     pub fn next_attempt(&mut self) -> Option<u8> {
@@ -37,6 +46,7 @@ impl Advertising {
             BleGapEvent::AdvertisingConfigured(_) => AdvertisingAction::Configure,
             BleGapEvent::AdvertisingStarted(BtStatus::Success) => {
                 self.attempts = 0;
+                self.active = true;
                 AdvertisingAction::Started
             }
             BleGapEvent::AdvertisingStarted(_) => AdvertisingAction::Configure,

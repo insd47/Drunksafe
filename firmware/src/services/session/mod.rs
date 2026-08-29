@@ -6,18 +6,259 @@
 //! 폰은 세션 동안 꺼져 있어도 되며, 종료 시 앱을 켜서 연결하면 데이터를 받는다.
 
 use crate::devices::pulse::Diagnosis;
-use crate::devices::{BuzzerDevice, ButtonEvent, TriggerDevice};
+use crate::devices::{ButtonEvent, BuzzerDevice, TriggerDevice};
 use crate::services::ble::{self, BleService, PhoneCommand, SessionRecordKind, SessionStateLabel};
 use crate::services::measure::MeasureService;
 use crate::services::screen::{ScreenService, View};
+use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::task::block_on;
 use std::collections::VecDeque;
-use std::thread::sleep;
 use std::time::{Duration, Instant};
+
+mod hr_rise;
+
+/// Fixed one-minute HR monitoring driven by the common pulse engine.
+#[allow(clippy::too_many_arguments)]
+pub fn run_hr_watch(
+    ble: &BleService,
+    measure: &mut MeasureService<'_>,
+    buzzer: &mut BuzzerDevice,
+    screen: &mut ScreenService<'_>,
+    trigger: &mut TriggerDevice,
+    session_id: String,
+    resting_bpm: u16,
+) {
+    // App has already applied the same 60..=90 resting-baseline rule.
+    if !(60..=90).contains(&resting_bpm) {
+        log::warn!("HR watch requires a valid app resting baseline");
+        return;
+    }
+    let start = Instant::now();
+    let mut detector = hr_rise::HrRise::new(resting_bpm);
+    let mut state = SessionStateLabel::Dormant;
+    let mut log = vec![state_entry(0, state)];
+    let mut last_bpm = None;
+    let mut last_report_ms = u32::MAX;
+    let mut last_reported_phase: Option<&'static str> = None;
+    let mut last_reported_state: Option<SessionStateLabel> = None;
+    let mut next_sample = Instant::now();
+    let mut pending_alcohol_triggers = VecDeque::new();
+    measure.reset_hr_monitor();
+    screen.show(View::Session);
+
+    loop {
+        match hr_watch_command(ble) {
+            HrWatchCommand::End => break,
+            HrWatchCommand::MeasureAlcohol => {
+                run_requested_hr_watch_alcohol(
+                    ble,
+                    measure,
+                    buzzer,
+                    screen,
+                    start,
+                    &mut log,
+                    &session_id,
+                    &mut pending_alcohol_triggers,
+                    &mut state,
+                );
+            }
+            HrWatchCommand::None => {}
+        }
+        match trigger.poll() {
+            ButtonEvent::LongPress => break,
+            ButtonEvent::ShortPress if !pending_alcohol_triggers.is_empty() => {
+                run_requested_hr_watch_alcohol(
+                    ble,
+                    measure,
+                    buzzer,
+                    screen,
+                    start,
+                    &mut log,
+                    &session_id,
+                    &mut pending_alcohol_triggers,
+                    &mut state,
+                );
+            }
+            ButtonEvent::ShortPress | ButtonEvent::None => {}
+        }
+        let now = elapsed_ms(start);
+        if let Err(error) = measure.sample_hr_monitor(now) {
+            log::warn!("session pulse sample failed: {error}");
+        }
+        while let Some(slot) = measure.take_hr_slot() {
+            last_bpm = slot.bpm.map(|bpm| bpm.round() as u16);
+            if let Some(bpm) = last_bpm {
+                log.push(heart_entry((slot.index + 1).saturating_mul(60_000), bpm));
+            }
+            if slot.alert_missed {
+                // Two consecutive failed fixed minutes: re-wear warning.
+                let _ = buzzer.beep_pattern(2, 180, 120);
+            }
+            if let Some(percent) = detector.close_minute(slot.bpm) {
+                pending_alcohol_triggers.push_back(percent);
+                if state != SessionStateLabel::Probe {
+                    state = SessionStateLabel::Probe;
+                    log.push(state_entry(now, state));
+                }
+                // 권장 시점만 알린다. 실제 ZE29A 측정은 GPIO0 또는 앱 명령을 기다린다.
+                let _ = buzzer.beep_pattern(2, 250, 150);
+                log::info!("alcohol measurement recommended at baseline +{percent}%");
+                screen.show(View::SessionConfirm);
+            }
+        }
+        let diagnosis = measure.hr_diagnosis();
+        let acquiring = matches!(diagnosis.phase, "warmup" | "collecting");
+        let entered_acquisition =
+            acquiring && !matches!(last_reported_phase, Some("warmup" | "collecting"));
+        // Send real device-side acquisition progress at least every five seconds.
+        // This survives app screen changes and avoids relying only on a local UI timer.
+        let due = last_report_ms == u32::MAX || now.saturating_sub(last_report_ms) >= 5_000;
+        let should_report = entered_acquisition
+            || due
+            || last_reported_state != Some(state)
+            || (!acquiring && last_reported_phase != Some(diagnosis.phase));
+        if should_report {
+            last_report_ms = now;
+            last_reported_phase = Some(diagnosis.phase);
+            last_reported_state = Some(state);
+            notify_event(ble, ble::pulse_reading(session_id.clone(), now, diagnosis));
+            let trend = detector.trend();
+            notify_event(
+                ble,
+                ble::session_hr_status(
+                    session_id.clone(),
+                    state,
+                    now,
+                    log.len().min(u16::MAX as usize) as u16,
+                    resting_bpm,
+                    last_bpm,
+                    trend.valid,
+                    trend.high,
+                    trend.next_percent,
+                    trend.alerted_percent,
+                ),
+            );
+        }
+        if log.len() >= MAX_RECORDS - 1 {
+            break;
+        }
+        next_sample += Duration::from_millis(10);
+        let now_instant = Instant::now();
+        if now_instant > next_sample
+            && now_instant.duration_since(next_sample) > Duration::from_millis(100)
+        {
+            next_sample = now_instant + Duration::from_millis(10);
+        }
+        freertos_delay(next_sample.saturating_duration_since(Instant::now()));
+    }
+    log.push(state_entry(elapsed_ms(start), state));
+    stream_log(ble, &session_id, &log);
+    screen.show(View::Home);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_requested_hr_watch_alcohol(
+    ble: &BleService,
+    measure: &mut MeasureService<'_>,
+    buzzer: &mut BuzzerDevice,
+    screen: &mut ScreenService<'_>,
+    start: Instant,
+    log: &mut Vec<LogEntry>,
+    session_id: &str,
+    pending_triggers: &mut VecDeque<u16>,
+    state: &mut SessionStateLabel,
+) {
+    let trigger_percent = pending_triggers.pop_front();
+
+    // 심박 트리거는 이미 권장 시점에 두 번 울렸다. 트리거 없는 자유 측정만
+    // 시작 확인음을 내고, 두 경우 모두 WaitBlow에서 다시 두 번 울린다.
+    if trigger_percent.is_none() {
+        let _ = buzzer.beep_pattern(2, 120, 120);
+    }
+    measure_hr_watch_alcohol(
+        ble,
+        measure,
+        buzzer,
+        screen,
+        start,
+        log,
+        session_id,
+        trigger_percent,
+    );
+
+    let next_state = if pending_triggers.is_empty() {
+        SessionStateLabel::Dormant
+    } else {
+        SessionStateLabel::Probe
+    };
+    if *state != next_state {
+        *state = next_state;
+        log.push(state_entry(elapsed_ms(start), next_state));
+    }
+    screen.show(if pending_triggers.is_empty() {
+        View::Session
+    } else {
+        View::SessionConfirm
+    });
+}
+
+enum HrWatchCommand {
+    None,
+    End,
+    MeasureAlcohol,
+}
+
+fn hr_watch_command(ble: &BleService) -> HrWatchCommand {
+    let mut requested = HrWatchCommand::None;
+    while let Some(command) = ble.try_recv_command() {
+        match command {
+            PhoneCommand::EndSession => requested = HrWatchCommand::End,
+            PhoneCommand::MeasureSessionAlcohol if !matches!(requested, HrWatchCommand::End) => {
+                requested = HrWatchCommand::MeasureAlcohol;
+            }
+            other => log::debug!("ignoring command during HR watch: {other:?}"),
+        }
+    }
+    requested
+}
+
+#[allow(clippy::too_many_arguments)]
+fn measure_hr_watch_alcohol(
+    ble: &BleService,
+    measure: &mut MeasureService<'_>,
+    buzzer: &mut BuzzerDevice,
+    screen: &mut ScreenService<'_>,
+    start: Instant,
+    log: &mut Vec<LogEntry>,
+    session_id: &str,
+    trigger_percent: Option<u16>,
+) {
+    screen.show(View::Measuring);
+    let alcohol_session_id = session_id.to_owned();
+    let result = block_on(measure.measure_session_alcohol(buzzer, |status| {
+        notify_event(ble, ble::alcohol_state(alcohol_session_id.clone(), status));
+    }));
+    let measured_at = elapsed_ms(start);
+    let value = match result {
+        Ok(value) => {
+            log.push(alcohol_entry(measured_at, value));
+            Some(value)
+        }
+        Err(error) => {
+            log::warn!("session alcohol measurement failed: {error}");
+            None
+        }
+    };
+    notify_event(
+        ble,
+        ble::session_alcohol_result(session_id.to_owned(), measured_at, trigger_percent, value),
+    );
+    screen.show(View::Session);
+}
 
 // --- 튜닝 상수 (기본값) ---
 /// HR 1건을 추정하기 위해 pulse를 샘플링하는 시간이다.
-const HR_BURST: embassy_time::Duration = embassy_time::Duration::from_secs(15);
+const HR_BURST: embassy_time::Duration = embassy_time::Duration::from_secs(25);
 /// 세션 루프의 최소 간격이다.
 const SESSION_TICK: Duration = Duration::from_millis(500);
 /// DORMANT에서 알코올 음성 확인 주기다.
@@ -108,7 +349,8 @@ pub fn run(
                         hr_samples.pop_front();
                     }
 
-                    if state == SessionStateLabel::Dormant && hr_samples.len() >= HR_MA_MIN_SAMPLES {
+                    if state == SessionStateLabel::Dormant && hr_samples.len() >= HR_MA_MIN_SAMPLES
+                    {
                         let moving_avg = moving_average(&hr_samples);
                         let elevated =
                             baseline.is_some_and(|base| moving_avg >= base + HR_RISE_DELTA_BPM);
@@ -148,7 +390,8 @@ pub fn run(
                             rise_since = None;
                             baseline = Some(match baseline {
                                 Some(base) => {
-                                    base * (1.0 - HR_BASELINE_ALPHA) + moving_avg * HR_BASELINE_ALPHA
+                                    base * (1.0 - HR_BASELINE_ALPHA)
+                                        + moving_avg * HR_BASELINE_ALPHA
                                 }
                                 None => moving_avg,
                             });
@@ -158,7 +401,15 @@ pub fn run(
             }
         }
 
-        notify_status(ble, &session_id, state, elapsed_ms(start), log.len(), baseline, last_bpm);
+        notify_status(
+            ble,
+            &session_id,
+            state,
+            elapsed_ms(start),
+            log.len(),
+            baseline,
+            last_bpm,
+        );
 
         // B) 예약된 알코올 측정
         if Instant::now() >= next_alcohol {
@@ -187,7 +438,7 @@ pub fn run(
             break;
         }
 
-        sleep(SESSION_TICK);
+        freertos_delay(SESSION_TICK);
     }
 
     log::info!("session ending: streaming {} records", log.len());
@@ -237,7 +488,15 @@ pub fn run_alcohol_track(
                 };
         }
 
-        notify_status(ble, &session_id, state, elapsed_ms(start), log.len(), None, None);
+        notify_status(
+            ble,
+            &session_id,
+            state,
+            elapsed_ms(start),
+            log.len(),
+            None,
+            None,
+        );
 
         if end_requested(ble) || trigger.poll() == ButtonEvent::LongPress {
             break;
@@ -248,7 +507,7 @@ pub fn run_alcohol_track(
             break;
         }
 
-        sleep(SESSION_TICK);
+        freertos_delay(SESSION_TICK);
     }
 
     log::info!("alcohol-track ending: streaming {} records", log.len());
@@ -268,7 +527,6 @@ fn run_probe(
     log: &mut Vec<LogEntry>,
     session_id: &str,
 ) -> ProbeOutcome {
-    let _ = buzzer.beep_pattern(3, 120, 120);
     screen.show(View::SessionConfirm);
 
     // 진입 즉시 알코올 1회 측정 — 양성이면 버튼 확인 없이 바로 TRACK.
@@ -311,7 +569,7 @@ fn run_probe(
             return ProbeOutcome::Dormant;
         }
 
-        sleep(SESSION_TICK);
+        freertos_delay(SESSION_TICK);
     }
 }
 
@@ -326,7 +584,7 @@ fn measure_alcohol_step(
     let _ = buzzer.beep_pattern(2, 100, 150);
     screen.show(View::Measuring);
 
-    let value = match block_on(measure.measure_alcohol()) {
+    let value = match block_on(measure.measure_alcohol(buzzer)) {
         Ok(value) => {
             log.push(alcohol_entry(elapsed_ms(start), value));
             Some(value)
@@ -378,6 +636,12 @@ fn notify_status(
     }
 }
 
+fn notify_event(ble: &BleService, event: ble::DeviceEvent) {
+    if let Err(error) = ble.notify(&event) {
+        log::warn!("session event notify failed: {error}");
+    }
+}
+
 fn stream_log(ble: &BleService, session_id: &str, log: &[LogEntry]) {
     let total = clamp_u16(log.len());
 
@@ -401,7 +665,7 @@ fn stream_log(ble: &BleService, session_id: &str, log: &[LogEntry]) {
             log::warn!("session record notify failed: {error}");
         }
 
-        sleep(Duration::from_millis(20));
+        freertos_delay(Duration::from_millis(20));
     }
 
     let done = ble::session_complete(session_id.to_string(), total);
@@ -429,6 +693,21 @@ fn elapsed_ms(start: Instant) -> u32 {
 
 fn clamp_u16(value: usize) -> u16 {
     value.min(u16::MAX as usize) as u16
+}
+
+/// `std::thread::sleep` maps to `usleep` on this ESP-IDF target and can keep
+/// CPU0's idle task from running often enough to feed the task watchdog.
+/// FreeRTOS delay blocks the main task and explicitly yields to IDLE0.
+fn freertos_delay(duration: Duration) {
+    let micros = duration.as_micros();
+    if micros == 0 {
+        return;
+    }
+    let millis = micros
+        .saturating_add(999)
+        .saturating_div(1_000)
+        .min(u128::from(u32::MAX)) as u32;
+    FreeRtos::delay_ms(millis);
 }
 
 fn state_entry(t_ms: u32, state: SessionStateLabel) -> LogEntry {

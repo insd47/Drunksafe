@@ -11,6 +11,11 @@ import { StatusRow } from '@/components/status-row';
 import { cn } from '@/lib/utils/cn';
 import { useBleSession } from '@/lib/ble/session';
 import {
+  baselineIssueCopy,
+  baselineIssues,
+  shouldUpdateSoberBaseline,
+} from '@/lib/personalization/baseline-acceptance';
+import {
   formatAlcohol,
   formatBac,
   formatBpm,
@@ -131,7 +136,11 @@ function MeasurementSummary({ record }: { record: MeasurementRecord }) {
       <Details>
         <StatusRow label="호기 알코올" value={formatAlcohol(record.alcohol_mg_l_x1000)} />
         <StatusRow label="BAC 추정" value={formatBac(record.bac_milli_percent)} />
-        <StatusRow label="신뢰도" value={`${record.confidence_percent}%`} />
+        <StatusRow
+          description="통계적 신뢰구간이 아니라 baseline·개인 분해속도·최근 기록·심박 확보 여부를 합산한 내부 분석 완성도 점수입니다."
+          label="분석 완성도(참고)"
+          value={`${record.confidence_percent}%`}
+        />
         <PulseStatusRow record={record} />
         <StatusRow label="측정 시각" value={formatMeasuredAt(record.measured_at_unix_ms)} />
       </Details>
@@ -140,14 +149,40 @@ function MeasurementSummary({ record }: { record: MeasurementRecord }) {
 }
 
 function BaselineSummary({ record }: { record: MeasurementRecord }) {
+  const accepted = shouldUpdateSoberBaseline(record);
+  const issues = baselineIssues({
+    risk: record.risk,
+    alcohol_mg_l_x1000: record.alcohol_mg_l_x1000,
+    pulse_bpm: record.pulse_bpm,
+    pulse_stable: record.pulse_stable,
+  });
   return (
     <>
-      <View className="gap-2 border-2 border-gray-950 p-6">
-        <Text className="text-2xl font-bold text-gray-950">기준값이 기록되었습니다</Text>
+      <View
+        className={cn(
+          'gap-2 border-2 p-6',
+          accepted ? 'border-emerald-600' : 'border-amber-500 bg-amber-50'
+        )}>
+        <Text className="text-2xl font-bold text-gray-950">
+          {accepted ? '기준값이 기록되었습니다' : '기준값으로 사용할 수 없습니다'}
+        </Text>
         <Text className="text-sm leading-6 text-gray-600">
-          술을 마시지 않은 상태의 측정값을 기준으로 삼아 다음 측정 결과를 더 정확하게 계산합니다.
+          {accepted
+            ? '술을 마시지 않은 상태의 측정값을 기준으로 삼아 다음 측정 결과를 더 정확하게 계산합니다.'
+            : '측정 기록은 남기지만 기존 개인 baseline에는 반영하지 않았습니다.'}
         </Text>
       </View>
+      {!accepted
+        ? issues.map((issue) => {
+            const copy = baselineIssueCopy(issue);
+            return (
+              <View className="gap-1 border border-amber-300 bg-amber-50 p-4" key={issue}>
+                <Text className="font-semibold text-amber-950">{copy.title}</Text>
+                <Text className="text-sm leading-6 text-amber-900">{copy.description}</Text>
+              </View>
+            );
+          })
+        : null}
 
       <Details>
         <StatusRow label="호기 알코올" value={formatAlcohol(record.alcohol_mg_l_x1000)} />
@@ -166,9 +201,7 @@ function PulseStatusRow({ record }: { record: MeasurementRecord }) {
   }
 
   const copy = pulseIssueCopy(record.pulse_issue_reason);
-  return (
-    <StatusRow description={`${copy.title} · ${copy.action}`} label="심박수" value={value} />
-  );
+  return <StatusRow description={`${copy.title} · ${copy.action}`} label="심박수" value={value} />;
 }
 
 function VerdictBanner({ risk }: { risk: Risk }) {

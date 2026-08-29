@@ -1,5 +1,5 @@
 {
-  "protocolVersion": 8,
+  "protocolVersion": 12,
   "gatt": {
     "serviceUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12201",
     "deviceEventCharacteristicUuid": "6f5f3f7a-3b0d-4df7-9d17-151b71e12202",
@@ -9,7 +9,14 @@
   "enums": {
     "source": ["board_button", "phone"],
     "measurementKind": ["measurement", "baseline"],
-    "statusKind": ["idle", "connected", "measuring", "result_ready", "error"],
+    "statusKind": [
+      "idle",
+      "connected",
+      "measuring",
+      "awaiting_pulse",
+      "result_ready",
+      "error"
+    ],
     "errorCode": ["alcohol_sensor", "measurement_timeout", "cancelled"]
   },
   "payloadKinds": {
@@ -17,42 +24,57 @@
       "status",
       "measurement_started",
       "measurement_result",
-      "device_error"
+      "device_error",
+      "session_alcohol_result"
     ],
-    "phoneCommand": ["start", "cancel"],
+    "phoneCommand": [
+      "start",
+      "cancel",
+      "start_hr_watch",
+      "measure_session_alcohol"
+    ],
     "transportFrame": ["phone_command_chunk", "device_event_chunk"],
     "transportFrameFields": ["frame", "id", "index", "count", "data"]
   },
   "deviceEvents": [
     {
       "event": "status",
-      "v": 8,
+      "v": 12,
       "status": "connected",
       "active_session_id": null
     },
     {
       "event": "measurement_started",
-      "v": 8,
+      "v": 12,
       "session_id": "fw-fixture-1",
       "source": "phone",
       "kind": "measurement"
     },
     {
       "event": "measurement_result",
-      "v": 8,
+      "v": 12,
       "session_id": "fw-fixture-1",
       "kind": "measurement",
       "alcohol_mg_l_x1000": 165,
       "pulse": {
+        "status": "measured",
         "bpm": 96,
         "stable": true
       }
     },
     {
       "event": "device_error",
-      "v": 8,
+      "v": 12,
       "session_id": "fw-fixture-1",
       "code": "measurement_timeout"
+    },
+    {
+      "event": "session_alcohol_result",
+      "v": 12,
+      "session_id": "fw-hrwatch-1",
+      "elapsed_ms": 600000,
+      "trigger_percent": 20,
+      "alcohol_mg_l_x1000": 132
     }
   ],
   "phoneCommands": [
@@ -63,6 +85,13 @@
     {
       "cmd": "cancel",
       "session_id": "fw-fixture-1"
+    },
+    {
+      "cmd": "start_hr_watch",
+      "resting_bpm": 71
+    },
+    {
+      "cmd": "measure_session_alcohol"
     }
   ],
   "deferred": {

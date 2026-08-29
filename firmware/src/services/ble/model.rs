@@ -2,7 +2,7 @@ use crate::devices::pulse::PulseUnavailableReason;
 use serde::{Deserialize, Serialize};
 
 /// BLE payload schema version이다.
-pub const PROTOCOL_VERSION: u8 = 9;
+pub const PROTOCOL_VERSION: u8 = 12;
 
 /// 측정 세션을 시작한 입력 출처다.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -121,6 +121,26 @@ pub struct PulseReading {
     pub ibi_stddev_ms: f32,
     pub peak_count: u16,
     pub stable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accepted_intervals: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_failure: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contact_good: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot_index: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot_elapsed_ms: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attempt_elapsed_ms: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consecutive_misses: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failed_attempts: Option<u16>,
 }
 
 /// PPG raw sample batch streamed during active measurement.
@@ -165,6 +185,10 @@ pub struct SessionStatus {
     pub records: u16,
     pub r0_bpm: Option<u16>,
     pub last_bpm: Option<u16>,
+    pub valid_minutes: Option<u8>,
+    pub high_minutes: Option<u8>,
+    pub next_threshold_percent: Option<u16>,
+    pub alerted_percent: Option<u16>,
 }
 
 /// 세션 종료 시 저장된 로그를 한 건씩 스트리밍한다. 값은 kind에 따라 채워진다.
@@ -190,20 +214,43 @@ pub struct SessionComplete {
     pub total: u16,
 }
 
+/// 음주 세션 중 자동(+10/+15/+20%) 또는 사용자 요청으로 수행한 알코올 측정 결과다.
+/// `alcohol_mg_l_x1000 == None`이면 해당 시도가 실패했으며 앱에서 다시 요청할 수 있다.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct SessionAlcoholResult {
+    pub v: u8,
+    pub session_id: String,
+    pub elapsed_ms: u32,
+    pub trigger_percent: Option<u16>,
+    pub alcohol_mg_l_x1000: Option<u16>,
+}
+
 /// 앱에서 장치로 쓰는 BLE payload다.
 #[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "cmd")]
 pub enum PhoneCommand {
-    Start { kind: MeasurementKind },
-    Cancel { session_id: String },
+    Start {
+        kind: MeasurementKind,
+    },
+    Cancel {
+        session_id: String,
+    },
     /// 알코올 측정이 끝난 뒤(AwaitingPulse), 이어서 심박 측정 단계를 시작하도록 요청한다.
-    StartPulsePhase { session_id: String },
+    StartPulsePhase {
+        session_id: String,
+    },
     /// 알코올을 빼고 pulse 진단(BPM)을 실시간 스트리밍하도록 요청한다 (개발자 도구).
     /// `stream_raw`가 true일 때만 PPG raw 파형까지 함께 전송한다 (전송량이 많아진다).
-    StartPulseStream { stream_raw: bool },
+    StartPulseStream {
+        stream_raw: bool,
+    },
     /// 진행 중인 pulse 스트리밍을 멈추고 대기 화면으로 돌아가도록 요청한다.
     StopPulseStream,
+    /// Observe resting-HR elevation and recommend alcohol checks at +10/+15/+20% thresholds.
+    StartHrWatch {
+        resting_bpm: u16,
+    },
     /// 음주 세션(3단계 적응형 스케줄)을 시작한다. `resting_bpm`이 있으면 세션의 resting
     /// HR baseline 초기값으로 쓴다(앱 기준값 측정에서 얻은 값). 이후 폰은 꺼져 있어도 된다.
     StartSession {
@@ -213,6 +260,8 @@ pub enum PhoneCommand {
     /// 개발자 도구: 심박/스케줄(DORMANT/PROBE) 없이 알코올 값만 추적한다(분해 곡선 fitting용).
     /// 값이 임계(10)를 넘으면 기존 TRACK처럼 15분 간격으로 측정한다. EndSession으로 종료·다운로드.
     StartAlcoholTrack,
+    /// 진행 중인 HR 관찰 세션에서 사용자가 원하는 시점에 알코올을 측정한다.
+    MeasureSessionAlcohol,
     /// 진행 중인 세션을 종료하고 저장된 로그 다운로드를 시작한다.
     EndSession,
 }
@@ -231,4 +280,5 @@ pub enum DeviceEvent {
     SessionStatus(SessionStatus),
     SessionRecord(SessionRecord),
     SessionComplete(SessionComplete),
+    SessionAlcoholResult(SessionAlcoholResult),
 }

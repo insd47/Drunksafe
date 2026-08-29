@@ -26,8 +26,10 @@ export function ActionButton({
       onPress={onPress}>
       {busy ? <ActivityIndicator color="#9ca3af" size="small" /> : null}
       <Text
+        numberOfLines={2}
+        adjustsFontSizeToFit
         className={cn(
-          'font-semibold',
+          'flex-shrink text-center font-semibold',
           labelSizeClass[size],
           inactive ? 'text-gray-400' : textClass[variant]
         )}>

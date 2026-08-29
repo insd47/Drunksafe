@@ -2,8 +2,8 @@
 pub use model::{
     AlcoholState, AlcoholStateLabel, DeviceError, DeviceEvent, DeviceStatus, ErrorCode,
     MeasurementKind, MeasurementResult, MeasurementStarted, PhoneCommand, PpgSampleBatch,
-    PulseReading, PulseResult, SessionComplete, SessionRecord, SessionRecordKind, SessionStateLabel,
-    SessionStatus, Source, StatusKind,
+    PulseReading, PulseResult, SessionAlcoholResult, SessionComplete, SessionRecord,
+    SessionRecordKind, SessionStateLabel, SessionStatus, Source, StatusKind,
 };
 pub use service::BleService;
 #[allow(unused_imports)]
@@ -86,15 +86,50 @@ pub fn pulse_reading(
         ibi_stddev_ms: diagnosis.ibi_stddev_ms,
         peak_count: diagnosis.peak_count,
         stable: diagnosis.stable,
+        accepted_intervals: Some(diagnosis.accepted_intervals),
+        phase: Some(diagnosis.phase.to_owned()),
+        reason: diagnosis.reason.map(str::to_owned),
+        last_failure: diagnosis.last_failure.map(str::to_owned),
+        contact_good: diagnosis.contact_good,
+        slot_index: Some(diagnosis.slot_index),
+        slot_elapsed_ms: Some(diagnosis.slot_elapsed_ms),
+        attempt_elapsed_ms: Some(diagnosis.attempt_elapsed_ms),
+        consecutive_misses: Some(diagnosis.consecutive_misses),
+        failed_attempts: Some(diagnosis.failed_attempts),
+    })
+}
+
+/// Compact one-frame event for the developer live view. The estimator still
+/// consumes 100 Hz; only fields unused by that screen are omitted from BLE.
+pub fn pulse_live_reading(
+    session_id: String,
+    elapsed_ms: u32,
+    diagnosis: crate::devices::pulse::Diagnosis,
+) -> DeviceEvent {
+    DeviceEvent::PulseReading(PulseReading {
+        v: model::PROTOCOL_VERSION,
+        session_id,
+        elapsed_ms,
+        bpm: diagnosis.bpm,
+        ibi_stddev_ms: diagnosis.ibi_stddev_ms,
+        peak_count: diagnosis.peak_count,
+        stable: diagnosis.stable,
+        accepted_intervals: None,
+        phase: None,
+        reason: None,
+        last_failure: None,
+        contact_good: None,
+        slot_index: None,
+        slot_elapsed_ms: None,
+        attempt_elapsed_ms: None,
+        consecutive_misses: None,
+        failed_attempts: None,
     })
 }
 
 /// ZE29A 상태 변화 이벤트를 만든다 (알코올 측정 중 "지금 부세요" 안내용).
 #[allow(dead_code)]
-pub fn alcohol_state(
-    session_id: String,
-    status: crate::devices::alcohol::Status,
-) -> DeviceEvent {
+pub fn alcohol_state(session_id: String, status: crate::devices::alcohol::Status) -> DeviceEvent {
     use crate::devices::alcohol::Status;
 
     let state = match status {
@@ -133,6 +168,37 @@ pub fn session_status(
         records,
         r0_bpm,
         last_bpm,
+        valid_minutes: None,
+        high_minutes: None,
+        next_threshold_percent: None,
+        alerted_percent: None,
+    })
+}
+
+pub fn session_hr_status(
+    session_id: String,
+    state: SessionStateLabel,
+    elapsed_ms: u32,
+    records: u16,
+    r0_bpm: u16,
+    last_bpm: Option<u16>,
+    valid_minutes: u8,
+    high_minutes: u8,
+    next_threshold_percent: u16,
+    alerted_percent: Option<u16>,
+) -> DeviceEvent {
+    DeviceEvent::SessionStatus(SessionStatus {
+        v: model::PROTOCOL_VERSION,
+        session_id,
+        state,
+        elapsed_ms,
+        records,
+        r0_bpm: Some(r0_bpm),
+        last_bpm,
+        valid_minutes: Some(valid_minutes),
+        high_minutes: Some(high_minutes),
+        next_threshold_percent: Some(next_threshold_percent),
+        alerted_percent,
     })
 }
 
@@ -168,6 +234,21 @@ pub fn session_complete(session_id: String, total: u16) -> DeviceEvent {
         v: model::PROTOCOL_VERSION,
         session_id,
         total,
+    })
+}
+
+pub fn session_alcohol_result(
+    session_id: String,
+    elapsed_ms: u32,
+    trigger_percent: Option<u16>,
+    alcohol_mg_l_x1000: Option<u16>,
+) -> DeviceEvent {
+    DeviceEvent::SessionAlcoholResult(SessionAlcoholResult {
+        v: model::PROTOCOL_VERSION,
+        session_id,
+        elapsed_ms,
+        trigger_percent,
+        alcohol_mg_l_x1000,
     })
 }
 

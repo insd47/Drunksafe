@@ -33,6 +33,21 @@ export async function writeBaseline(baseline: UserBaseline) {
   await writeJson(baselineKey, baseline);
 }
 
+/** Clear only sober reference values; keep separately learned elimination rate. */
+export async function clearSoberBaseline() {
+  const current = await readBaseline();
+  const next: UserBaseline = {
+    ...current,
+    sober_alcohol_mg_l_x1000: null,
+    sober_alcohol_mad_mg_l_x1000: null,
+    resting_bpm: null,
+    sample_count: 0,
+    updated_at_unix_ms: null,
+  };
+  await writeBaseline(next);
+  return next;
+}
+
 export function conservativeEliminationMgLPerHourX1000() {
   return Math.ceil((conservativeBacEliminationMilliPercentPerHour * 100) / 21);
 }

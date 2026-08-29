@@ -10,9 +10,12 @@ import type {
   PpgSampleBatch,
   PulseReading,
   SessionRecord,
+  SessionAlcoholResult,
   SessionStatus,
 } from '@/lib/ble/model';
-import { readBaseline } from '@/lib/storage/profile';
+import { preserveCompletedMinute } from '@/lib/ble/pulse-feedback';
+import { readBaseline, type UserBaseline } from '@/lib/storage/profile';
+import { baselineIssues } from '@/lib/personalization/baseline-acceptance';
 import { persistSessionDownload, type ProcessedSession } from '@/lib/storage/sessions';
 import { MockBleEventSource } from '@/lib/ble/mock';
 import { persistMeasurementResult } from '@/lib/ble/session/persistence';
@@ -48,6 +51,8 @@ export type SessionUiSnapshot = {
   received: number;
   total: number;
   result: ProcessedSession | null;
+  alcoholResults: SessionAlcoholResult[];
+  alcoholMeasurementPending: boolean;
 };
 
 const idleSessionSnapshot: SessionUiSnapshot = {
@@ -56,6 +61,8 @@ const idleSessionSnapshot: SessionUiSnapshot = {
   received: 0,
   total: 0,
   result: null,
+  alcoholResults: [],
+  alcoholMeasurementPending: false,
 };
 
 type SessionBleClient = Pick<
@@ -80,6 +87,7 @@ export class BleSessionStore {
   readonly verification = new BleVerificationStore();
 
   private readonly createClient: BleClientFactory;
+  private readonly readBaselineValue: () => Promise<UserBaseline>;
   private readonly listeners = new Set<() => void>();
   private readonly ppgListeners = new Set<() => void>();
   private readonly pulseReadingListeners = new Set<() => void>();
@@ -98,6 +106,8 @@ export class BleSessionStore {
   private ppgBuffer: PpgPoint[] = [];
   private ppgSnapshot: PpgPoint[] = [];
   private latestPulseReading: PulseReading | null = null;
+  private pulseReadingReceivedAt = 0;
+  private startingHrWatch = false;
   private pulseStreaming = false;
   private readonly pulseStreamingListeners = new Set<() => void>();
   private sessionUi: SessionUiSnapshot = idleSessionSnapshot;
@@ -106,8 +116,15 @@ export class BleSessionStore {
   private alcoholState: AlcoholStateLabel | null = null;
   private readonly alcoholStateListeners = new Set<() => void>();
 
-  constructor({ createClient }: { createClient: BleClientFactory }) {
+  constructor({
+    createClient,
+    baselineReader = readBaseline,
+  }: {
+    createClient: BleClientFactory;
+    baselineReader?: () => Promise<UserBaseline>;
+  }) {
     this.createClient = createClient;
+    this.readBaselineValue = baselineReader;
   }
 
   subscribe = (listener: () => void) => {
@@ -176,17 +193,58 @@ export class BleSessionStore {
     this.sessionListeners.forEach((listener) => listener());
   }
 
-  /** Start an ESP32-run drinking session. The phone may sleep/disconnect afterward. */
+  /** Start HR monitoring with alcohol-check recommendations at +10/+15/+20%. */
   startSession = async () => {
-    this.sessionRecordsBuffer = [];
-    this.setSessionUi({ ...idleSessionSnapshot, phase: 'active' });
-    // Seed the device's resting-HR baseline from the app baseline measurement, if any.
-    const baseline = await readBaseline().catch(() => null);
-    await this.sendCommand({
-      cmd: 'start_session',
-      resting_bpm: baseline?.resting_bpm ?? null,
-    });
+    if (this.startingHrWatch || ['active', 'downloading'].includes(this.sessionUi.phase)) {
+      throw new Error('이미 세션을 시작했거나 진행 중입니다.');
+    }
+    this.startingHrWatch = true;
+    try {
+      const baseline = await this.readBaselineValue();
+      const bpm = baseline.resting_bpm;
+      if (baselineIssues(baseline).length > 0 || bpm === null) {
+        throw new Error(
+          '저장된 baseline을 사용할 수 없습니다. 설정에서 기준값 상태를 확인하고 다시 측정해 주세요.'
+        );
+      }
+      if (!this.client || this.snapshot.connection.phase !== 'connected') {
+        throw new Error('먼저 ESP32 기기를 연결해 주세요.');
+      }
+      this.sessionRecordsBuffer = [];
+      this.setSessionUi({ ...idleSessionSnapshot });
+      const command = { cmd: 'start_hr_watch' as const, resting_bpm: bpm };
+      await this.client.send(command);
+      this.verification.command(command);
+      await this.waitForHrWatchStart();
+    } catch (error) {
+      this.setSessionUi({ ...idleSessionSnapshot });
+      throw error;
+    } finally {
+      this.startingHrWatch = false;
+    }
   };
+
+  private waitForHrWatchStart(): Promise<void> {
+    const acknowledged = () => this.sessionUi.status?.session_id.startsWith('fw-hrwatch-') === true;
+    if (acknowledged()) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        unsubscribe();
+        reject(
+          new Error(
+            '기기 시작 응답이 없습니다. 권장 전용 모드를 지원하는 ESP32 펌웨어로 업데이트해 주세요.'
+          )
+        );
+      }, 8000);
+      const unsubscribe = this.subscribeSession(() => {
+        if (acknowledged()) {
+          clearTimeout(timer);
+          unsubscribe();
+          resolve();
+        }
+      });
+    });
+  }
 
   /** Developer tool: alcohol-only tracking session (no HR/schedule) for descent fitting. */
   startAlcoholTrack = async () => {
@@ -201,15 +259,47 @@ export class BleSessionStore {
     await this.sendCommand({ cmd: 'end_session' });
   };
 
+  /** Request an alcohol measurement at any time during an active HR-watch session. */
+  measureSessionAlcohol = async () => {
+    if (
+      this.sessionUi.phase !== 'active' ||
+      this.sessionUi.status?.session_id.startsWith('fw-hrwatch-') !== true
+    ) {
+      throw new Error('진행 중인 심박 관찰 세션에서 사용할 수 있습니다.');
+    }
+    if (this.sessionUi.alcoholMeasurementPending) {
+      throw new Error('알코올 측정이 이미 진행 중입니다.');
+    }
+    if (!this.client || this.snapshot.connection.phase !== 'connected') {
+      throw new Error('먼저 ESP32 기기를 연결해 주세요.');
+    }
+
+    const command = { cmd: 'measure_session_alcohol' as const };
+    this.setAlcoholState(null);
+    this.setSessionUi({ ...this.sessionUi, alcoholMeasurementPending: true });
+    try {
+      await this.client.send(command);
+      this.verification.command(command);
+    } catch (error) {
+      this.setSessionUi({ ...this.sessionUi, alcoholMeasurementPending: false });
+      throw error;
+    }
+  };
+
   private async processSessionComplete(records: SessionRecord[]) {
     try {
-      const result = await persistSessionDownload(records, Date.now());
+      const result = await persistSessionDownload(
+        records,
+        Date.now(),
+        this.sessionUi.status?.r0_bpm ?? null
+      );
       this.setSessionUi({
+        ...this.sessionUi,
         phase: 'complete',
-        status: this.sessionUi.status,
         received: records.length,
         total: records.length,
         result,
+        alcoholMeasurementPending: false,
       });
     } catch {
       this.setSessionUi({ ...this.sessionUi, phase: 'complete', result: null });
@@ -230,6 +320,7 @@ export class BleSessionStore {
 
   /** Returns the latest live pulse-diagnostic reading (null until one arrives). */
   getPulseReadingSnapshot = (): PulseReading | null => this.latestPulseReading;
+  getPulseReadingReceivedAtSnapshot = (): number => this.pulseReadingReceivedAt;
   initialize = () => {
     void this.dispatch({ type: 'initialize_requested' });
   };
@@ -302,6 +393,8 @@ export class BleSessionStore {
 
   /** 알코올 측정 완료(awaiting_pulse) 후, 이어서 심박 측정 단계를 시작한다. */
   startPulsePhase = async () => {
+    this.latestPulseReading = null;
+    this.pulseReadingListeners.forEach((listener) => listener());
     await this.dispatch({ type: 'start_pulse_phase_requested' });
   };
 
@@ -447,6 +540,9 @@ export class BleSessionStore {
         const message = error?.message ?? 'Drunksafe 장치 연결이 예기치 않게 해제되었습니다.';
         this.clearNotifyReadyWait();
         this.clearMonitors();
+        this.setPulseStreaming(false);
+        this.clearPulseReading();
+        this.clearPpgBuffer();
         void this.dispatch({ type: 'unexpected_disconnect', deviceId, message });
       });
       this.eventSubscription = this.client.monitorEvents(
@@ -524,19 +620,40 @@ export class BleSessionStore {
     }
 
     if (event.event === 'pulse_reading') {
+      const measurement = this.snapshot.measurement;
+      const measurementReading =
+        measurement.phase === 'active' &&
+        measurement.stage === 'pulse' &&
+        measurement.sessionId === event.session_id;
+      const developerReading =
+        event.session_id.startsWith('fw-pulse-') &&
+        measurement.phase !== 'active' &&
+        measurement.phase !== 'awaiting_pulse';
+      const sessionReading =
+        event.session_id.startsWith('fw-hrwatch-') && this.sessionUi.phase === 'active';
+      if (!measurementReading && !developerReading && !sessionReading) return;
+      if (sessionReading && preserveCompletedMinute(this.latestPulseReading, event)) return;
       this.latestPulseReading = event;
+      this.pulseReadingReceivedAt = Date.now();
       this.pulseReadingListeners.forEach((listener) => listener());
-      // A reading means the device is actively streaming — recover the flag even if the
-      // dev screen was remounted after navigating away.
-      this.setPulseStreaming(true);
+      // Only developer-stream events recover its start/stop flag; normal pulse
+      // phase telemetry must not make the developer stop button look active.
+      if (developerReading) this.setPulseStreaming(true);
       return;
     }
 
     if (event.event === 'session_status') {
+      if (this.alcoholState !== null) {
+        this.alcoholState = null;
+        this.alcoholStateListeners.forEach((listener) => listener());
+      }
       this.setSessionUi({
         ...this.sessionUi,
         phase: this.sessionUi.phase === 'idle' ? 'active' : this.sessionUi.phase,
         status: event,
+        // Firmware emits no session status while ZE29A is busy. The first status
+        // afterward also recovers the UI if the terminal result notify was missed.
+        alcoholMeasurementPending: false,
       });
       return;
     }
@@ -558,8 +675,26 @@ export class BleSessionStore {
       return;
     }
 
+    if (event.event === 'session_alcohol_result') {
+      if (event.session_id !== this.sessionUi.status?.session_id) return;
+      this.setAlcoholState(null);
+      this.setSessionUi({
+        ...this.sessionUi,
+        alcoholResults: [...this.sessionUi.alcoholResults, event],
+        alcoholMeasurementPending: false,
+      });
+      this.verification.event(event);
+      return;
+    }
+
     if (event.event === 'alcohol_state') {
       this.setAlcoholState(event.state);
+      if (
+        event.session_id === this.sessionUi.status?.session_id &&
+        !this.sessionUi.alcoholMeasurementPending
+      ) {
+        this.setSessionUi({ ...this.sessionUi, alcoholMeasurementPending: true });
+      }
       this.verification.event(event);
       return;
     }
@@ -569,6 +704,12 @@ export class BleSessionStore {
     if (event.event === 'measurement_started') {
       this.clearPpgBuffer();
       this.setAlcoholState(null);
+    }
+
+    if (event.event === 'status' && event.status === 'idle') {
+      this.setPulseStreaming(false);
+      this.clearPulseReading();
+      this.clearPpgBuffer();
     }
 
     let readyDevice: DrunksafeBleDevice | null = null;

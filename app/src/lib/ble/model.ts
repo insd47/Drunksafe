@@ -1,16 +1,11 @@
-export const protocolVersion = 9;
+export const protocolVersion = 12;
 
 export type Source = 'board_button' | 'phone';
 
 export type MeasurementKind = 'measurement' | 'baseline';
 
 export type StatusKind =
-  | 'idle'
-  | 'connected'
-  | 'measuring'
-  | 'awaiting_pulse'
-  | 'result_ready'
-  | 'error';
+  'idle' | 'connected' | 'measuring' | 'awaiting_pulse' | 'result_ready' | 'error';
 
 export type ErrorCode = 'alcohol_sensor' | 'measurement_timeout' | 'cancelled';
 
@@ -86,6 +81,16 @@ export type PulseReading = {
   ibi_stddev_ms: number;
   peak_count: number;
   stable: boolean;
+  accepted_intervals?: number;
+  phase?: 'waiting_contact' | 'warmup' | 'collecting' | 'waiting_next' | 'missed';
+  reason?: string | null;
+  last_failure?: string | null;
+  contact_good?: boolean | null;
+  slot_index?: number;
+  slot_elapsed_ms?: number;
+  attempt_elapsed_ms?: number;
+  consecutive_misses?: number;
+  failed_attempts?: number;
 };
 
 export type SessionStateLabel = 'dormant' | 'probe' | 'track';
@@ -101,6 +106,10 @@ export type SessionStatus = {
   records: number;
   r0_bpm: number | null;
   last_bpm: number | null;
+  valid_minutes: number | null;
+  high_minutes: number | null;
+  next_threshold_percent: number | null;
+  alerted_percent: number | null;
 };
 
 /** 세션 종료 시 다운로드되는 로그 한 건. 값은 kind에 따라 채워진다. */
@@ -123,6 +132,16 @@ export type SessionComplete = {
   total: number;
 };
 
+export type SessionAlcoholResult = {
+  v: number;
+  session_id: string;
+  elapsed_ms: number;
+  /** null은 사용자가 세션 중 직접 요청한 측정이다. */
+  trigger_percent: number | null;
+  /** null은 timeout/센서 오류로 실패한 시도다. */
+  alcohol_mg_l_x1000: number | null;
+};
+
 export type PhoneCommand =
   | { cmd: 'start'; kind: MeasurementKind }
   | { cmd: 'cancel'; session_id: string }
@@ -130,7 +149,9 @@ export type PhoneCommand =
   | { cmd: 'start_pulse_stream'; stream_raw: boolean }
   | { cmd: 'stop_pulse_stream' }
   | { cmd: 'start_session'; resting_bpm: number | null }
+  | { cmd: 'start_hr_watch'; resting_bpm: number }
   | { cmd: 'start_alcohol_track' }
+  | { cmd: 'measure_session_alcohol' }
   | { cmd: 'end_session' };
 
 export type DeviceEvent =
@@ -143,7 +164,8 @@ export type DeviceEvent =
   | ({ event: 'pulse_reading' } & PulseReading)
   | ({ event: 'session_status' } & SessionStatus)
   | ({ event: 'session_record' } & SessionRecord)
-  | ({ event: 'session_complete' } & SessionComplete);
+  | ({ event: 'session_complete' } & SessionComplete)
+  | ({ event: 'session_alcohol_result' } & SessionAlcoholResult);
 
 export function toPhoneCommandPayload(command: PhoneCommand) {
   if (!isPhoneCommand(command)) {
@@ -189,6 +211,8 @@ function isDeviceEvent(value: unknown): value is DeviceEvent {
       return isSessionRecord(value);
     case 'session_complete':
       return isSessionComplete(value);
+    case 'session_alcohol_result':
+      return isSessionAlcoholResult(value);
     default:
       return false;
   }
@@ -227,9 +251,7 @@ function isDeviceError(value: Record<string, unknown>): value is DeviceEvent {
 
 function isAlcoholState(value: Record<string, unknown>): value is DeviceEvent {
   return (
-    hasProtocolVersion(value) &&
-    isString(value.session_id) &&
-    isAlcoholStateLabel(value.state)
+    hasProtocolVersion(value) && isString(value.session_id) && isAlcoholStateLabel(value.state)
   );
 }
 
@@ -264,7 +286,33 @@ function isPulseReading(value: Record<string, unknown>): value is DeviceEvent {
     isFiniteNumber(value.bpm) &&
     isFiniteNumber(value.ibi_stddev_ms) &&
     isU16(value.peak_count) &&
-    typeof value.stable === 'boolean'
+    typeof value.stable === 'boolean' &&
+    (value.accepted_intervals === undefined || isU16(value.accepted_intervals)) &&
+    (value.phase === undefined || isPulsePhase(value.phase)) &&
+    isOptionalNullableString(value.reason) &&
+    isOptionalNullableString(value.last_failure) &&
+    (value.contact_good === undefined ||
+      value.contact_good === null ||
+      typeof value.contact_good === 'boolean') &&
+    (value.slot_index === undefined || isU32(value.slot_index)) &&
+    (value.slot_elapsed_ms === undefined || isU32(value.slot_elapsed_ms)) &&
+    (value.attempt_elapsed_ms === undefined || isU32(value.attempt_elapsed_ms)) &&
+    (value.consecutive_misses === undefined || isU32(value.consecutive_misses)) &&
+    (value.failed_attempts === undefined || isU16(value.failed_attempts))
+  );
+}
+
+function isOptionalNullableString(value: unknown) {
+  return value === undefined || value === null || isString(value);
+}
+
+function isPulsePhase(value: unknown): value is PulseReading['phase'] {
+  return (
+    value === 'waiting_contact' ||
+    value === 'warmup' ||
+    value === 'collecting' ||
+    value === 'waiting_next' ||
+    value === 'missed'
   );
 }
 
@@ -278,10 +326,7 @@ function isSessionStateLabel(value: unknown): value is SessionStateLabel {
 
 function isSessionRecordKind(value: unknown): value is SessionRecordKind {
   return (
-    value === 'state' ||
-    value === 'alcohol' ||
-    value === 'heart' ||
-    value === 'drink_confirmed'
+    value === 'state' || value === 'alcohol' || value === 'heart' || value === 'drink_confirmed'
   );
 }
 
@@ -297,7 +342,11 @@ function isSessionStatus(value: Record<string, unknown>): value is DeviceEvent {
     isU32(value.elapsed_ms) &&
     isU16(value.records) &&
     isNullableU16(value.r0_bpm) &&
-    isNullableU16(value.last_bpm)
+    isNullableU16(value.last_bpm) &&
+    isNullableU16(value.valid_minutes) &&
+    isNullableU16(value.high_minutes) &&
+    isNullableU16(value.next_threshold_percent) &&
+    isNullableU16(value.alerted_percent)
   );
 }
 
@@ -317,6 +366,16 @@ function isSessionRecord(value: Record<string, unknown>): value is DeviceEvent {
 
 function isSessionComplete(value: Record<string, unknown>): value is DeviceEvent {
   return hasProtocolVersion(value) && isString(value.session_id) && isU16(value.total);
+}
+
+function isSessionAlcoholResult(value: Record<string, unknown>): value is DeviceEvent {
+  return (
+    hasProtocolVersion(value) &&
+    isString(value.session_id) &&
+    isU32(value.elapsed_ms) &&
+    isNullableU16(value.trigger_percent) &&
+    isNullableU16(value.alcohol_mg_l_x1000)
+  );
 }
 
 function isU32(value: unknown): value is number {
@@ -365,8 +424,11 @@ function isPhoneCommand(value: unknown): value is PhoneCommand {
       return typeof value.stream_raw === 'boolean';
     case 'start_session':
       return value.resting_bpm === null || isU16(value.resting_bpm);
+    case 'start_hr_watch':
+      return isU16(value.resting_bpm) && value.resting_bpm >= 40 && value.resting_bpm <= 180;
     case 'stop_pulse_stream':
     case 'start_alcohol_track':
+    case 'measure_session_alcohol':
     case 'end_session':
       return true;
     default:

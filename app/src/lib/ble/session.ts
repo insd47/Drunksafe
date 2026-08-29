@@ -3,11 +3,7 @@ import { useSyncExternalStore } from 'react';
 import { DrunksafeBleClient } from '@/lib/ble/client';
 import type { AlcoholStateLabel, MeasurementKind, PulseReading } from '@/lib/ble/model';
 import type { BleSessionState } from '@/lib/ble/session/reducer';
-import {
-  BleSessionStore,
-  type PpgPoint,
-  type SessionUiSnapshot,
-} from '@/lib/ble/session/store';
+import { BleSessionStore, type PpgPoint, type SessionUiSnapshot } from '@/lib/ble/session/store';
 import type { BleVerificationSnapshot } from '@/lib/ble/session/verification';
 
 export type {
@@ -38,6 +34,7 @@ export type BleSessionHook = BleSessionState & {
   startSession: () => Promise<void>;
   startAlcoholTrack: () => Promise<void>;
   endSession: () => Promise<void>;
+  measureSessionAlcohol: () => Promise<void>;
 };
 
 export function useBleSession(): BleSessionHook {
@@ -64,6 +61,7 @@ export function useBleSession(): BleSessionHook {
     startSession: bleSession.startSession,
     startAlcoholTrack: bleSession.startAlcoholTrack,
     endSession: bleSession.endSession,
+    measureSessionAlcohol: bleSession.measureSessionAlcohol,
   };
 }
 
@@ -93,6 +91,15 @@ export function usePulseReading(): PulseReading | null {
     bleSession.subscribePulseReading,
     bleSession.getPulseReadingSnapshot,
     bleSession.getPulseReadingSnapshot
+  );
+}
+
+/** Arrival time stays in the store so remounting cannot make stale data fresh. */
+export function usePulseReadingReceivedAt(): number {
+  return useSyncExternalStore(
+    bleSession.subscribePulseReading,
+    bleSession.getPulseReadingReceivedAtSnapshot,
+    bleSession.getPulseReadingReceivedAtSnapshot
   );
 }
 

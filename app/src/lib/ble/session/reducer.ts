@@ -553,6 +553,7 @@ function reduceDeviceEvent(
     case 'session_status':
     case 'session_record':
     case 'session_complete':
+    case 'session_alcohol_result':
       // BleSessionStore.receiveDeviceEvent()가 리듀서로 보내기 전에 가로채 각각 알코올
       // 상태 / ppg 링버퍼 / pulse 진단 / 세션 스토어에 직접 반영한다. 여기 도달하면 상태
       // 변화 없이 무시한다 (타입 완전성 확보용).

@@ -14,6 +14,7 @@ import {
   riskTone,
 } from '@/lib/format/measurement';
 import { buildWeeklyHistoryInsight } from '@/lib/personalization/history-insights';
+import { formatSessionMeasurementTitle, sessionMeasurementNumber } from '@/lib/sessions/identity';
 import { readHistory, type MeasurementRecord } from '@/lib/storage/history';
 import { readSessionIndex, type SessionSummary } from '@/lib/storage/sessions';
 
@@ -116,6 +117,7 @@ export default function HistoryRoute() {
         {sessions.map((session) => (
           <SessionRow
             key={session.id}
+            measurementNumber={sessionMeasurementNumber(sessions, session)}
             session={session}
             onPress={() => {
               router.push({ pathname: '/sessions/[id]', params: { id: session.id } });
@@ -127,8 +129,17 @@ export default function HistoryRoute() {
   );
 }
 
-function SessionRow({ session, onPress }: { session: SessionSummary; onPress: () => void }) {
+function SessionRow({
+  session,
+  measurementNumber,
+  onPress,
+}: {
+  session: SessionSummary;
+  measurementNumber: number;
+  onPress: () => void;
+}) {
   const measuredAt = formatMeasuredAt(session.downloaded_at_unix_ms);
+  const title = formatSessionMeasurementTitle(session.downloaded_at_unix_ms, measurementNumber);
   const duration = formatSessionDuration(session.duration_ms ?? 0);
   const elimination = formatEliminationRate(session.elimination_mg_l_per_hour_x1000);
 
@@ -139,7 +150,7 @@ function SessionRow({ session, onPress }: { session: SessionSummary; onPress: ()
       className="flex-row items-center justify-between gap-4 py-3"
       onPress={onPress}>
       <View className="min-w-0 flex-1 gap-1">
-        <Text className="text-sm font-medium text-gray-950">{measuredAt}</Text>
+        <Text className="text-sm font-medium text-gray-950">{title}</Text>
         <Text className="text-xs leading-5 text-gray-500">
           {duration} · 분해속도 {elimination}
         </Text>

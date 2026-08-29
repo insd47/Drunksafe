@@ -60,35 +60,23 @@ export async function persistMeasurementResult(
   }
 }
 
-function baselineAfterResult(baseline: UserBaseline, result: MeasurementRecord): UserBaseline {
-  const previousCount = baseline.sample_count;
-  const sampleCount = Math.min(previousCount + 1, 65535);
+export function baselineAfterResult(
+  baseline: UserBaseline,
+  result: MeasurementRecord
+): UserBaseline {
   const alcohol = result.alcohol_mg_l_x1000;
-  const previousMean = baseline.sober_alcohol_mg_l_x1000;
-  const alcoholDeviation = previousMean === null ? 0 : Math.abs(alcohol - previousMean);
   const stableBpm = result.pulse_stable ? clampU16(Math.round(result.pulse_bpm ?? 0)) : null;
 
   return {
     ...baseline,
-    sober_alcohol_mg_l_x1000: rollingAverage(previousMean, previousCount, alcohol),
-    sober_alcohol_mad_mg_l_x1000: rollingAverage(
-      baseline.sober_alcohol_mad_mg_l_x1000,
-      previousCount,
-      alcoholDeviation
-    ),
-    resting_bpm:
-      stableBpm === null
-        ? baseline.resting_bpm
-        : rollingAverage(baseline.resting_bpm, previousCount, stableBpm),
-    sample_count: sampleCount,
+    // A controlled baseline measurement replaces the reference. Averaging with an
+    // old invalid baseline can pin later valid measurements near that stale value.
+    sober_alcohol_mg_l_x1000: alcohol,
+    sober_alcohol_mad_mg_l_x1000: 0,
+    resting_bpm: stableBpm,
+    sample_count: 1,
     updated_at_unix_ms: result.measured_at_unix_ms,
   };
-}
-
-function rollingAverage(previous: number | null, previousCount: number, next: number) {
-  if (previous === null || previousCount <= 0) return clampU16(next);
-
-  return clampU16(Math.round((previous * previousCount + next) / (previousCount + 1)));
 }
 
 function clampU16(value: number) {

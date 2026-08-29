@@ -25,6 +25,7 @@ struct Connection {
 #[derive(Default)]
 pub struct ConnectionState {
     connection: Option<Connection>,
+    generation: u32,
 }
 
 impl ConnectionState {
@@ -32,7 +33,12 @@ impl ConnectionState {
         self.connection.is_some()
     }
 
+    pub const fn generation(&self) -> u32 {
+        self.generation
+    }
+
     pub fn connected(&mut self, conn_id: ConnectionId, peer: BdAddr) -> ConnectionAction {
+        self.generation = self.generation.wrapping_add(1);
         self.connection = Some(Connection {
             peer,
             conn_id,
@@ -43,15 +49,22 @@ impl ConnectionState {
     }
 
     pub fn disconnected(&mut self, peer: BdAddr) -> ConnectionAction {
-        if !self
-            .connection
-            .as_ref()
-            .is_some_and(|connection| connection.peer == peer)
-        {
+        if self.connection.is_none() {
             return ConnectionAction::None;
         }
 
+        if self
+            .connection
+            .as_ref()
+            .is_some_and(|connection| connection.peer != peer)
+        {
+            log::warn!(
+                "BLE disconnect address differed from tracked peer; clearing the sole connection"
+            );
+        }
+
         self.connection = None;
+        self.generation = self.generation.wrapping_add(1);
         ConnectionAction::BeginAdvertising
     }
 

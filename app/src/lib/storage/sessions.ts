@@ -1,9 +1,13 @@
 import type { SessionRecord, SessionRecordKind, SessionStateLabel } from '@/lib/ble/model';
 import { estimateEliminationMgLPerHourX1000 } from '@/lib/personalization/session-beta';
 import { createSessionStorageId } from '@/lib/sessions/identity';
-import { readJson, writeJson } from '@/lib/storage/json';
+import { readJson, removeJson, writeJson } from '@/lib/storage/json';
 import { readBaseline, writeBaseline } from '@/lib/storage/profile';
-import { fitExponentialProfile, writeFittingProfile } from '@/lib/personalization/fitting-profile';
+import {
+  fitExponentialProfile,
+  removeFittingProfile,
+  writeFittingProfile,
+} from '@/lib/personalization/fitting-profile';
 
 const sessionIndexKey = 'drunksafe.sessions.index.v1';
 /** 이만큼 세션이 모여야 분해속도 평균을 baseline에 반영한다. */
@@ -137,6 +141,19 @@ export async function readSessionIndex(): Promise<SessionSummary[]> {
 /** 저장된 세션 원본(샘플 포함)을 읽는다. 없거나 손상되면 null. */
 export async function readSession(id: string): Promise<StoredSession | null> {
   return readJson<StoredSession | null>(sessionDataKey(id), () => null, isNullableStoredSession);
+}
+
+/** 저장된 fitting profile과 원시 fitting 세션만 삭제한다. 일반 음주 세션은 보존한다. */
+export async function clearStoredFittingData() {
+  const index = await readSessionIndex();
+  const fitting = index.filter((item) => item.id.startsWith('fw-alctrack-'));
+  await Promise.all(fitting.map((item) => removeJson(sessionDataKey(item.id))));
+  await writeJson(
+    sessionIndexKey,
+    index.filter((item) => !item.id.startsWith('fw-alctrack-'))
+  );
+  await removeFittingProfile();
+  return fitting.length;
 }
 
 function sessionDataKey(id: string) {

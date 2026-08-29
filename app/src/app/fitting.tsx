@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/action-button';
@@ -6,11 +7,17 @@ import { Screen } from '@/components/screen';
 import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
 import { useAlcoholState, useBleSession, useSession } from '@/lib/ble/session';
+import {
+  readFittingProfile,
+  type AlcoholFittingProfile,
+} from '@/lib/personalization/fitting-profile';
+import { clearStoredFittingData } from '@/lib/storage/sessions';
 
 export default function FittingRoute() {
   const router = useRouter();
   const ble = useBleSession();
   const session = useSession();
+  const [profile, setProfile] = useState<AlcoholFittingProfile | null>(null);
   const alcoholState = useAlcoholState();
   const connected = ble.connection.phase === 'connected';
   const active = session.phase === 'active' || session.phase === 'downloading';
@@ -24,6 +31,10 @@ export default function FittingRoute() {
     .find((result) => result.alcohol_mg_l_x1000 === null);
   const lockedUntil = lastFailure ? Math.ceil((lastFailure.elapsed_ms + 1) / 600_000) * 600_000 : 0;
   const slotLocked = consecutiveFailures >= 3 && (session.status?.elapsed_ms ?? 0) < lockedUntil;
+  useEffect(() => {
+    if (session.phase === 'active' || session.phase === 'downloading') return;
+    void readFittingProfile().then(setProfile);
+  }, [session.phase]);
   const run = (action: () => Promise<void>) =>
     void action().catch((e) =>
       Alert.alert('작업 실패', e instanceof Error ? e.message : '연결을 확인해 주세요.')
@@ -43,6 +54,14 @@ export default function FittingRoute() {
                   : '완료'
           }
         />
+        <StatusRow
+          label="저장된 k"
+          value={
+            profile
+              ? `${profile.kPerMinute.toFixed(6)}/분 (${profile.kLowPerMinute.toFixed(6)}~${profile.kHighPerMinute.toFixed(6)})`
+              : '없음'
+          }
+        />
         <StatusRow label="측정 수" value={session.status ? String(session.status.records) : '-'} />
         <StatusRow label="현재 구간 실패" value={`${Math.min(3, consecutiveFailures)} / 3`} />
         <StatusRow
@@ -51,7 +70,9 @@ export default function FittingRoute() {
         />
         <Text className="text-sm leading-6 text-gray-600">
           심박은 측정하지 않습니다. 기기가 10분마다 한 번 울리면 GPIO 0 또는 아래 버튼으로 측정을
-          시작하세요. Wait Blow 진입 때 두 번 울립니다.
+          시작하세요. Wait Blow 진입 때 두 번 울립니다. 값이 10에 도달하기 전 종료해도 peak 이후
+          유효 측정점이 4개 이상이면 k를 계산합니다. 새 세션의 fitting이 성공하면 저장된 k를
+          교체하고, 점이 부족하면 기존 k를 유지합니다.
         </Text>
       </Section>
       {alcoholState === 'wait_blow' ? (
@@ -92,6 +113,33 @@ export default function FittingRoute() {
         disabled={!connected || !active}
         label="종료 및 데이터 받기"
         onPress={() => run(ble.endSession)}
+        variant="secondary"
+      />
+      <ActionButton
+        disabled={active}
+        label="기존 fitting 데이터 삭제"
+        onPress={() => {
+          Alert.alert(
+            '기존 fitting 데이터를 삭제할까요?',
+            '저장된 k와 fitting 측정 원본을 삭제합니다. 일반 음주 세션 기록은 유지됩니다.',
+            [
+              { text: '취소', style: 'cancel' },
+              {
+                text: '삭제',
+                style: 'destructive',
+                onPress: () =>
+                  run(async () => {
+                    const removed = await clearStoredFittingData();
+                    setProfile(null);
+                    Alert.alert(
+                      '삭제 완료',
+                      `기존 profile과 fitting 원시 세션 ${removed}개를 삭제했습니다.`
+                    );
+                  }),
+              },
+            ]
+          );
+        }}
         variant="secondary"
       />
       <ActionButton label="닫기" onPress={() => router.back()} variant="secondary" />

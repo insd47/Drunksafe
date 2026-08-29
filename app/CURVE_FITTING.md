@@ -25,6 +25,12 @@ downloaded when the session ends while the connection is available.
 The profile is saved by `src/lib/personalization/fitting-profile.ts`. Developer tools can override the
 central k and bounds for hardware demonstrations.
 
+Reaching `Ct=10` is not a fitting prerequisite. If the user ends a session earlier, all downloaded
+records are still stored and fitting runs whenever at least four valid peak-and-descent points remain.
+A later valid fitting session replaces the active profile; an invalid short session leaves the previous
+profile intact. The fitting screen can explicitly delete both the active profile and stored fitting raw
+sessions without deleting ordinary drinking sessions.
+
 ## Drinking-session prediction
 
 Every alcohol reading `Cm` starts a new prediction curve while retaining the saved personal k range.

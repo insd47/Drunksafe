@@ -21,7 +21,7 @@ function alcohol(index, minutes, value) {
   };
 }
 
-test('curve fitting starts at the first maximum and ignores earlier absorption points', () => {
+test('curve fitting starts at the first maximum without requiring a Ct=10 reading', () => {
   const records = [20, 40, 80, 64, 51, 41, 33, 26].map((value, index) =>
     alcohol(index, index * 10, value)
   );
@@ -32,6 +32,7 @@ test('curve fitting starts at the first maximum and ignores earlier absorption p
   assert.ok(profile.kPerMinute > 0);
   assert.ok(profile.kLowPerMinute <= profile.kPerMinute);
   assert.ok(profile.kHighPerMinute >= profile.kPerMinute);
+  assert.ok(records.every((record) => (record.mg_l_x1000 ?? 0) > 10));
 });
 
 test('missed fitting slots are excluded and Ct=10 prediction is bounded', () => {

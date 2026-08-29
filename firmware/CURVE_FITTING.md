@@ -10,6 +10,8 @@
 - A failed attempt remains in the same slot. After three consecutive failures, or when the 10-minute
   slot expires, an `AlcoholMissed` record is stored and the LCD asks the user to wait for the next slot.
 - `AlcoholMissed` has no concentration and is never passed to curve fitting.
+- The user may end the session before a reading reaches 10. All accumulated records are still streamed;
+  the app decides whether the available peak-and-descent points are sufficient for fitting.
 
 ## GPIO 0 rules
 

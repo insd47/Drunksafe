@@ -1,6 +1,9 @@
 import type { SessionRecord } from '@/lib/ble/model';
 
 const fittingProfileKey = 'drunksafe.alcohol-fitting.v2';
+const deviceFittingProfileKey = 'drunksafe.alcohol-fitting.device.v3';
+const developerFittingProfileKey = 'drunksafe.alcohol-fitting.developer.v3';
+const useDeveloperFittingProfileKey = 'drunksafe.alcohol-fitting.use-developer.v1';
 const relativeError = 0.21;
 const minimumRetention = 0.8;
 const bootstrapRuns = 2000;
@@ -44,19 +47,69 @@ export type ExponentialSoberEstimate = {
 type Point = { tMs: number; value: number; sourceIndex: number };
 
 export async function readFittingProfile() {
+  const [device, developer, useDeveloper] = await Promise.all([
+    readDeviceFittingProfile(),
+    readDeveloperFittingProfile(),
+    readUseDeveloperFittingProfile(),
+  ]);
+  return useDeveloper ? developer : device;
+}
+
+export async function readDeviceFittingProfile() {
   const { readJson } = await import('@/lib/storage/json');
-  return readJson<AlcoholFittingProfile | null>(fittingProfileKey, () => null, isProfile);
+  const stored = await readJson<AlcoholFittingProfile | null>(
+    deviceFittingProfileKey,
+    () => null,
+    isNullableProfile
+  );
+  if (stored) return stored;
+  const legacy = await readLegacyFittingProfile();
+  return legacy?.source === 'device_fitting' || legacy?.source === 'demo' ? legacy : null;
+}
+
+export async function readDeveloperFittingProfile() {
+  const { readJson } = await import('@/lib/storage/json');
+  const stored = await readJson<AlcoholFittingProfile | null>(
+    developerFittingProfileKey,
+    () => null,
+    isNullableProfile
+  );
+  if (stored) return stored;
+  const legacy = await readLegacyFittingProfile();
+  return legacy?.source === 'developer_input' ? legacy : null;
+}
+
+export async function readUseDeveloperFittingProfile() {
+  const { readJson } = await import('@/lib/storage/json');
+  return readJson(useDeveloperFittingProfileKey, () => false, isBoolean);
+}
+
+export async function writeUseDeveloperFittingProfile(useDeveloper: boolean) {
+  const { writeJson } = await import('@/lib/storage/json');
+  await writeJson(useDeveloperFittingProfileKey, useDeveloper);
 }
 
 export async function writeFittingProfile(profile: AlcoholFittingProfile) {
   if (!isProfile(profile)) throw new Error('유효하지 않은 fitting 값입니다.');
   const { writeJson } = await import('@/lib/storage/json');
-  await writeJson(fittingProfileKey, profile);
+  const key =
+    profile.source === 'developer_input' ? developerFittingProfileKey : deviceFittingProfileKey;
+  await writeJson(key, profile);
 }
 
 export async function removeFittingProfile() {
   const { removeJson } = await import('@/lib/storage/json');
-  await removeJson(fittingProfileKey);
+  await Promise.all([
+    removeJson(fittingProfileKey),
+    removeJson(deviceFittingProfileKey),
+    removeJson(developerFittingProfileKey),
+    removeJson(useDeveloperFittingProfileKey),
+  ]);
+}
+
+async function readLegacyFittingProfile() {
+  const { readJson } = await import('@/lib/storage/json');
+  return readJson<AlcoholFittingProfile | null>(fittingProfileKey, () => null, isNullableProfile);
 }
 
 /** PDF 10쪽: Kjoint와 현재 농도의 21% 구간을 함께 적용해 Ct=10 도달 시간을 계산한다. */
@@ -284,6 +337,14 @@ function isProfile(value: unknown): value is AlcoholFittingProfile {
       profile.source === 'demo') &&
     typeof profile.updatedAtUnixMs === 'number'
   );
+}
+
+function isNullableProfile(value: unknown): value is AlcoholFittingProfile | null {
+  return value === null || isProfile(value);
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean';
 }
 
 function positive(value: unknown): value is number {

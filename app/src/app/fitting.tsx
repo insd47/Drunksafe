@@ -8,7 +8,7 @@ import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
 import { useAlcoholState, useBleSession, useSession } from '@/lib/ble/session';
 import {
-  readFittingProfile,
+  readDeviceFittingProfile,
   type AlcoholFittingProfile,
 } from '@/lib/personalization/fitting-profile';
 import { clearStoredFittingData } from '@/lib/storage/sessions';
@@ -33,7 +33,7 @@ export default function FittingRoute() {
   const slotLocked = consecutiveFailures >= 3 && (session.status?.elapsed_ms ?? 0) < lockedUntil;
   useEffect(() => {
     if (session.phase === 'active' || session.phase === 'downloading') return;
-    void readFittingProfile().then(setProfile);
+    void readDeviceFittingProfile().then(setProfile);
   }, [session.phase]);
   const run = (action: () => Promise<void>) =>
     void action().catch((e) =>

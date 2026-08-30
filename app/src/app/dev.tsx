@@ -21,8 +21,11 @@ import {
 import { removeJson } from '@/lib/storage/json';
 import { emptyBaseline, writeBaseline } from '@/lib/storage/profile';
 import {
-  readFittingProfile,
+  readDeveloperFittingProfile,
+  readDeviceFittingProfile,
+  readUseDeveloperFittingProfile,
   writeFittingProfile,
+  writeUseDeveloperFittingProfile,
   type AlcoholFittingProfile,
 } from '@/lib/personalization/fitting-profile';
 import { demoPrediction, fittingDemoUsers } from '@/lib/personalization/fitting-demo';
@@ -276,18 +279,26 @@ function AlcoholTrackSection() {
 
 function FittingProfileSection() {
   const [profile, setProfile] = useState<AlcoholFittingProfile | null>(null);
+  const [deviceProfile, setDeviceProfile] = useState<AlcoholFittingProfile | null>(null);
+  const [useDeveloper, setUseDeveloper] = useState(false);
   const [k, setK] = useState('0.009796');
   const [low, setLow] = useState('0.008680');
   const [high, setHigh] = useState('0.011310');
   const [message, setMessage] = useState('미저장');
   useEffect(() => {
-    void readFittingProfile().then((p) => {
-      if (!p) return;
-      setProfile(p);
-      setK(String(p.kPerMinute));
-      setLow(String(p.kLowPerMinute));
-      setHigh(String(p.kHighPerMinute));
-      setMessage('저장값 불러옴');
+    void Promise.all([
+      readDeveloperFittingProfile(),
+      readDeviceFittingProfile(),
+      readUseDeveloperFittingProfile(),
+    ]).then(([developer, device, selected]) => {
+      setDeviceProfile(device);
+      setUseDeveloper(selected);
+      if (!developer) return;
+      setProfile(developer);
+      setK(String(developer.kPerMinute));
+      setLow(String(developer.kLowPerMinute));
+      setHigh(String(developer.kHighPerMinute));
+      setMessage('개발자 입력값 불러옴');
     });
   }, []);
   const fields: [string, string, (v: string) => void][] = [
@@ -309,6 +320,14 @@ function FittingProfileSection() {
         </View>
       ))}
       <StatusRow label="상태" value={message} />
+      <StatusRow
+        label="fitting 세션 k"
+        value={
+          deviceProfile
+            ? `${deviceProfile.kPerMinute.toFixed(6)} (${deviceProfile.kLowPerMinute.toFixed(6)}~${deviceProfile.kHighPerMinute.toFixed(6)})`
+            : '없음'
+        }
+      />
       {profile?.diagnostics ? (
         <>
           <StatusRow
@@ -355,10 +374,29 @@ function FittingProfileSection() {
           void writeFittingProfile(next)
             .then(() => {
               setProfile(next);
-              setMessage('음주 세션에 적용됨');
+              setMessage(useDeveloper ? '저장 및 이전 기록에 적용됨' : '저장됨 · 현재 미적용');
             })
             .catch((e) => setMessage(e instanceof Error ? e.message : '저장 실패'));
         }}
+      />
+      <CheckboxRow
+        checked={useDeveloper}
+        disabled={!profile}
+        label="이전 기록 예측에 입력한 k 값 사용"
+        onToggle={() => {
+          const next = !useDeveloper;
+          setUseDeveloper(next);
+          void writeUseDeveloperFittingProfile(next)
+            .then(() => setMessage(next ? '개발자 입력 k 적용됨' : 'fitting 세션 k 적용됨'))
+            .catch(() => {
+              setUseDeveloper(!next);
+              setMessage('적용 설정 저장 실패');
+            });
+        }}
+      />
+      <StatusRow
+        label="기록 예측에 적용"
+        value={useDeveloper ? '개발자 입력 k' : 'fitting 세션 k'}
       />
     </Section>
   );

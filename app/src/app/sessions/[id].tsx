@@ -14,8 +14,8 @@ import {
   type AlcoholFittingProfile,
 } from '@/lib/personalization/fitting-profile';
 import { formatSessionMeasurementTitle, sessionMeasurementNumber } from '@/lib/sessions/identity';
-import { readBaseline, type UserBaseline } from '@/lib/storage/profile';
-import { readSession, readSessionIndex, type StoredSession } from '@/lib/storage/sessions';
+import { readBaseline } from '@/lib/storage/profile';
+import { readSession, readSessionIndex } from '@/lib/storage/sessions';
 
 type LoadState =
   | { phase: 'loading' }
@@ -25,7 +25,6 @@ type LoadState =
       insight: SessionInsight;
       downloadedAtUnixMs: number;
       measurementNumber: number;
-      baseline: UserBaseline;
       fittingProfile: AlcoholFittingProfile | null;
     };
 
@@ -63,7 +62,6 @@ export default function SessionDetailRoute() {
             id: session.id,
             downloaded_at_unix_ms: session.downloaded_at_unix_ms,
           }),
-          baseline: sessionEstimateBaseline(session, baseline),
           fittingProfile,
         });
       })
@@ -113,8 +111,6 @@ export default function SessionDetailRoute() {
   const visibleAlcoholMeasurements = showAllAlcoholResults
     ? indexedAlcoholMeasurements
     : indexedAlcoholMeasurements.slice(-1);
-  const fittingProfileRate = fittingRateFromProfile(fittingProfile);
-  const displayedElimination = insight.eliminationMgLPerHourX1000 ?? fittingProfileRate;
   const fittingSourceLabel = fittingProfile
     ? fittingProfile.source === 'developer_input'
       ? '개발자 입력'
@@ -134,8 +130,11 @@ export default function SessionDetailRoute() {
         <Section eyebrow="Session" title="음주 세션 요약">
           <StatusRow label="측정 시간" value={formatDuration(insight.durationMs)} />
           <StatusRow
-            label="분해속도(추정)"
-            value={formatSessionElimination(displayedElimination, fittingSourceLabel)}
+            {...(fittingProfile
+              ? { description: `${fittingSourceLabel} · 범위 ${formatKRange(fittingProfile)}` }
+              : {})}
+            label="적용된 k"
+            value={fittingProfile ? `${fittingProfile.kPerMinute.toFixed(6)}/분` : 'fitting 미설정'}
           />
           <StatusRow label="BAC 상한" value={formatBac(insight.bacUpperMilliPercent)} />
           <StatusRow
@@ -168,11 +167,12 @@ export default function SessionDetailRoute() {
           {visibleAlcoholMeasurements.map(({ measurement, index }) => {
             const estimate = estimateExponentialSoberTime(measurement.mgLX1000, fittingProfile);
             return (
-              <StatusRow
-                description={`${formatMeasuredAt(measurement.measuredAtUnixMs)} · BrAC ${(measurement.mgLX1000 / 1000).toFixed(3)} mg/L${estimate ? ` · 적용 k ${(estimate.kPerMinute * 1000).toFixed(3)}×10⁻3` : ''}`}
+              <MeasurementEstimateRow
+                estimate={estimate}
                 key={`${measurement.elapsedMs}-${index}`}
                 label={`${index + 1}차 알코올 측정`}
-                value={formatSessionEstimate(estimate)}
+                measuredAtUnixMs={measurement.measuredAtUnixMs}
+                mgLX1000={measurement.mgLX1000}
               />
             );
           })}
@@ -214,20 +214,6 @@ export default function SessionDetailRoute() {
   );
 }
 
-function sessionEstimateBaseline(session: StoredSession, current: UserBaseline): UserBaseline {
-  return {
-    ...current,
-    sober_alcohol_mg_l_x1000:
-      session.sober_alcohol_mg_l_x1000_at_start === undefined
-        ? current.sober_alcohol_mg_l_x1000
-        : session.sober_alcohol_mg_l_x1000_at_start,
-    elimination_mg_l_per_hour_x1000:
-      session.elimination_mg_l_per_hour_x1000_at_start === undefined
-        ? current.elimination_mg_l_per_hour_x1000
-        : session.elimination_mg_l_per_hour_x1000_at_start,
-  };
-}
-
 function formatDuration(ms: number) {
   const totalMinutes = Math.round(ms / 60000);
   const hours = Math.floor(totalMinutes / 60);
@@ -236,30 +222,42 @@ function formatDuration(ms: number) {
   return hours > 0 ? `${hours}시간 ${minutes}분` : `${minutes}분`;
 }
 
-function formatSessionElimination(
-  mgLPerHourX1000: number | null,
-  sourceLabel: string | null
-) {
-  if (mgLPerHourX1000 === null) {
-    return 'fitting 미설정';
-  }
-
-  return `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h${sourceLabel ? ` (${sourceLabel})` : ''}`;
+function formatKRange(profile: AlcoholFittingProfile) {
+  return `${profile.kLowPerMinute.toFixed(6)}~${profile.kHighPerMinute.toFixed(6)}/분`;
 }
 
-function fittingRateFromProfile(profile: AlcoholFittingProfile | null) {
-  if (!profile || !profile.diagnostics || profile.diagnostics.c0 <= 0) {
-    return null;
-  }
-
-  const perHour = Math.round(profile.kPerMinute * profile.diagnostics.c0 * 60);
-  return Math.max(0, Math.min(65535, perHour));
-}
-
-function formatSessionEstimate(estimate: ReturnType<typeof estimateExponentialSoberTime>) {
-  if (!estimate) return 'fitting 미설정';
-
-  return `약 ${formatEstimateMinutes(estimate.minutes)} (범위 ${formatEstimateMinutes(estimate.earliestMinutes)}~${formatEstimateMinutes(estimate.latestMinutes)})`;
+function MeasurementEstimateRow({
+  estimate,
+  label,
+  measuredAtUnixMs,
+  mgLX1000,
+}: {
+  estimate: ReturnType<typeof estimateExponentialSoberTime>;
+  label: string;
+  measuredAtUnixMs: number;
+  mgLX1000: number;
+}) {
+  return (
+    <View className="flex-row items-center justify-between gap-4 py-3">
+      <View className="min-w-0 flex-1 gap-1">
+        <Text className="text-sm font-medium text-gray-950">{label}</Text>
+        <Text className="text-xs leading-5 text-gray-500">
+          {formatMeasuredAt(measuredAtUnixMs)} · BrAC {(mgLX1000 / 1000).toFixed(3)} mg/L
+        </Text>
+      </View>
+      <View className="shrink-0 items-end gap-1">
+        <Text className="text-right text-sm font-semibold text-gray-700">
+          {estimate ? `약 ${formatEstimateMinutes(estimate.minutes)}` : 'fitting 미설정'}
+        </Text>
+        {estimate ? (
+          <Text className="text-right text-xs text-gray-500">
+            범위 {formatEstimateMinutes(estimate.earliestMinutes)}~
+            {formatEstimateMinutes(estimate.latestMinutes)}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
 }
 
 function formatBpm(bpm: number | null) {

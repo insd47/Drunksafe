@@ -141,7 +141,6 @@ function SessionRow({
   const measuredAt = formatMeasuredAt(session.downloaded_at_unix_ms);
   const title = formatSessionMeasurementTitle(session.downloaded_at_unix_ms, measurementNumber);
   const duration = formatSessionDuration(session.duration_ms ?? 0);
-  const elimination = formatEliminationRate(session.elimination_mg_l_per_hour_x1000);
 
   return (
     <Pressable
@@ -151,9 +150,7 @@ function SessionRow({
       onPress={onPress}>
       <View className="min-w-0 flex-1 gap-1">
         <Text className="text-sm font-medium text-gray-950">{title}</Text>
-        <Text className="text-xs leading-5 text-gray-500">
-          {duration} · 분해속도 {elimination}
-        </Text>
+        <Text className="text-xs leading-5 text-gray-500">{duration}</Text>
       </View>
       <Text className="shrink-0 text-sm font-semibold text-gray-950">보기 ›</Text>
     </Pressable>
@@ -166,10 +163,6 @@ function formatSessionDuration(ms: number) {
   const minutes = totalMinutes % 60;
 
   return hours > 0 ? `${hours}시간 ${minutes}분` : `${minutes}분`;
-}
-
-function formatEliminationRate(mgLPerHourX1000: number | null) {
-  return mgLPerHourX1000 === null ? '미설정' : `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h`;
 }
 
 function HistoryRecordRow({ record, onPress }: { record: MeasurementRecord; onPress: () => void }) {

@@ -118,7 +118,7 @@ export const initialBleSessionState: BleSessionState = {
   mockMode: false,
 };
 
-const reconnectBackoffMs = [500, 1500] as const;
+const reconnectBackoffMs = [800, 1600, 3200, 5000] as const;
 
 export function reduceBleSession(state: BleSessionState, event: SessionEvent): SessionTransition {
   switch (event.type) {
@@ -234,10 +234,13 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
         return transition(state);
       }
 
-      if (event.reconnectAttempt > 0 && event.reconnectAttempt < reconnectBackoffMs.length) {
+      if (event.reconnectAttempt < reconnectBackoffMs.length) {
         const nextAttempt = event.reconnectAttempt + 1;
         return transition(
-          { ...state, connection: connectingState(state.connection.device, nextAttempt) },
+          {
+            ...state,
+            connection: connectingState(state.connection.device, nextAttempt),
+          },
           { type: 'disconnect_client' },
           { type: 'schedule_reconnect', deviceId: event.deviceId, reconnectAttempt: nextAttempt }
         );
@@ -252,8 +255,26 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
         { type: 'disconnect_client' }
       );
     }
-    case 'notify_ready_timeout':
+    case 'notify_ready_timeout': {
       if (state.connection.phase !== 'connecting') return transition(state);
+
+      const nextAttempt = state.connection.reconnectAttempt + 1;
+
+      if (state.connection.reconnectAttempt < reconnectBackoffMs.length) {
+        return transition(
+          {
+            ...state,
+            connection: connectingState(state.connection.device, nextAttempt),
+            measurement: interruptMeasurement(state.measurement, 'ble_failure', event.message),
+          },
+          { type: 'disconnect_client' },
+          {
+            type: 'schedule_reconnect',
+            deviceId: state.connection.device.id,
+            reconnectAttempt: nextAttempt,
+          }
+        );
+      }
 
       return transition(
         {
@@ -263,6 +284,7 @@ export function reduceBleSession(state: BleSessionState, event: SessionEvent): S
         },
         { type: 'disconnect_client' }
       );
+    }
     case 'bluetooth_changed':
       if (state.mockMode) {
         return transition({ ...state, bluetoothState: event.bluetoothState });

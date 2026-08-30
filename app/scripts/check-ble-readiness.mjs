@@ -30,7 +30,7 @@ test('app keeps a BLE device pending until the first status notify arrives', () 
   );
   assert.match(notifySubscriptionPendingMessage, /notify 구독 확인/);
   assert.match(notifySubscriptionTimeoutMessage, /구독 확인 시간이 초과/);
-  assert.equal(notifySubscriptionReadyTimeoutMs, 10000);
+  assert.equal(notifySubscriptionReadyTimeoutMs, 15000);
 });
 
 test('unauthorized Bluetooth state can still request scan permissions', () => {

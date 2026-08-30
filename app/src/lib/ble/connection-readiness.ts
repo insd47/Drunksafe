@@ -1,6 +1,6 @@
 import type { DrunksafeBleDevice } from '@/lib/ble/client';
 
-export const notifySubscriptionReadyTimeoutMs = 10000;
+export const notifySubscriptionReadyTimeoutMs = 15000;
 export const notifySubscriptionPendingMessage = 'BLE notify 구독 확인을 기다리는 중입니다.';
 export const notifySubscriptionTimeoutMessage = 'BLE notify 구독 확인 시간이 초과됐습니다.';
 

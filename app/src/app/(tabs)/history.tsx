@@ -169,7 +169,7 @@ function formatSessionDuration(ms: number) {
 }
 
 function formatEliminationRate(mgLPerHourX1000: number | null) {
-  return mgLPerHourX1000 === null ? '추정 불가' : `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h`;
+  return mgLPerHourX1000 === null ? '미설정' : `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h`;
 }
 
 function HistoryRecordRow({ record, onPress }: { record: MeasurementRecord; onPress: () => void }) {

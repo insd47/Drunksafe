@@ -8,7 +8,11 @@ import { Section } from '@/components/section';
 import { StatusRow } from '@/components/status-row';
 import { formatBac, formatMeasuredAt } from '@/lib/format/measurement';
 import { analyzeSession, type SessionInsight } from '@/lib/personalization/session-insight';
-import { estimateSessionSoberTime } from '@/lib/personalization/session-sober-time';
+import {
+  estimateExponentialSoberTime,
+  readFittingProfile,
+  type AlcoholFittingProfile,
+} from '@/lib/personalization/fitting-profile';
 import { formatSessionMeasurementTitle, sessionMeasurementNumber } from '@/lib/sessions/identity';
 import { readBaseline, type UserBaseline } from '@/lib/storage/profile';
 import { readSession, readSessionIndex, type StoredSession } from '@/lib/storage/sessions';
@@ -22,6 +26,7 @@ type LoadState =
       downloadedAtUnixMs: number;
       measurementNumber: number;
       baseline: UserBaseline;
+      fittingProfile: AlcoholFittingProfile | null;
     };
 
 export default function SessionDetailRoute() {
@@ -33,8 +38,8 @@ export default function SessionDetailRoute() {
   useEffect(() => {
     let mounted = true;
 
-    Promise.all([readSession(id), readSessionIndex(), readBaseline()])
-      .then(([session, index, baseline]) => {
+    Promise.all([readSession(id), readSessionIndex(), readBaseline(), readFittingProfile()])
+      .then(([session, index, baseline, fittingProfile]) => {
         if (!mounted) {
           return;
         }
@@ -59,6 +64,7 @@ export default function SessionDetailRoute() {
             downloaded_at_unix_ms: session.downloaded_at_unix_ms,
           }),
           baseline: sessionEstimateBaseline(session, baseline),
+          fittingProfile,
         });
       })
       .catch(() => {
@@ -99,7 +105,7 @@ export default function SessionDetailRoute() {
     );
   }
 
-  const { insight, baseline } = state;
+  const { insight, fittingProfile } = state;
   const indexedAlcoholMeasurements = insight.alcoholMeasurements.map((measurement, index) => ({
     measurement,
     index,
@@ -107,6 +113,15 @@ export default function SessionDetailRoute() {
   const visibleAlcoholMeasurements = showAllAlcoholResults
     ? indexedAlcoholMeasurements
     : indexedAlcoholMeasurements.slice(-1);
+  const fittingProfileRate = fittingRateFromProfile(fittingProfile);
+  const displayedElimination = insight.eliminationMgLPerHourX1000 ?? fittingProfileRate;
+  const fittingSourceLabel = fittingProfile
+    ? fittingProfile.source === 'developer_input'
+      ? '개발자 입력'
+      : fittingProfile.source === 'demo'
+        ? '데모'
+        : '기기 fitting'
+    : null;
 
   return (
     <>
@@ -120,7 +135,7 @@ export default function SessionDetailRoute() {
           <StatusRow label="측정 시간" value={formatDuration(insight.durationMs)} />
           <StatusRow
             label="분해속도(추정)"
-            value={formatElimination(insight.eliminationMgLPerHourX1000)}
+            value={formatSessionElimination(displayedElimination, fittingSourceLabel)}
           />
           <StatusRow label="BAC 상한" value={formatBac(insight.bacUpperMilliPercent)} />
           <StatusRow
@@ -151,13 +166,13 @@ export default function SessionDetailRoute() {
             <StatusRow label="알코올 측정" value="기록 없음" />
           ) : null}
           {visibleAlcoholMeasurements.map(({ measurement, index }) => {
-            const estimate = estimateSessionSoberTime(measurement.mgLX1000, baseline);
+            const estimate = estimateExponentialSoberTime(measurement.mgLX1000, fittingProfile);
             return (
               <StatusRow
-                description={`${formatMeasuredAt(measurement.measuredAtUnixMs)} · BrAC ${(measurement.mgLX1000 / 1000).toFixed(3)} mg/L${estimate ? ` · 개인 분해속도 ${(estimate.eliminationMgLPerHourX1000 / 1000).toFixed(3)} mg/L·h 적용` : ''}`}
+                description={`${formatMeasuredAt(measurement.measuredAtUnixMs)} · BrAC ${(measurement.mgLX1000 / 1000).toFixed(3)} mg/L${estimate ? ` · 적용 k ${(estimate.kPerMinute * 1000).toFixed(3)}×10⁻3` : ''}`}
                 key={`${measurement.elapsedMs}-${index}`}
                 label={`${index + 1}차 알코올 측정`}
-                value={estimate ? `약 ${formatEstimateMinutes(estimate.minutes)}` : '추정 불가'}
+                value={formatSessionEstimate(estimate)}
               />
             );
           })}
@@ -221,8 +236,30 @@ function formatDuration(ms: number) {
   return hours > 0 ? `${hours}시간 ${minutes}분` : `${minutes}분`;
 }
 
-function formatElimination(mgLPerHourX1000: number | null) {
-  return mgLPerHourX1000 === null ? '추정 불가' : `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h`;
+function formatSessionElimination(
+  mgLPerHourX1000: number | null,
+  sourceLabel: string | null
+) {
+  if (mgLPerHourX1000 === null) {
+    return 'fitting 미설정';
+  }
+
+  return `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h${sourceLabel ? ` (${sourceLabel})` : ''}`;
+}
+
+function fittingRateFromProfile(profile: AlcoholFittingProfile | null) {
+  if (!profile || !profile.diagnostics || profile.diagnostics.c0 <= 0) {
+    return null;
+  }
+
+  const perHour = Math.round(profile.kPerMinute * profile.diagnostics.c0 * 60);
+  return Math.max(0, Math.min(65535, perHour));
+}
+
+function formatSessionEstimate(estimate: ReturnType<typeof estimateExponentialSoberTime>) {
+  if (!estimate) return 'fitting 미설정';
+
+  return `약 ${formatEstimateMinutes(estimate.minutes)} (범위 ${formatEstimateMinutes(estimate.earliestMinutes)}~${formatEstimateMinutes(estimate.latestMinutes)})`;
 }
 
 function formatBpm(bpm: number | null) {

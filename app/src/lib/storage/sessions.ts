@@ -1,5 +1,4 @@
 import type { SessionRecord, SessionRecordKind, SessionStateLabel } from '@/lib/ble/model';
-import { estimateEliminationMgLPerHourX1000 } from '@/lib/personalization/session-beta';
 import { createSessionStorageId } from '@/lib/sessions/identity';
 import { readJson, removeJson, writeJson } from '@/lib/storage/json';
 import { readBaseline, writeBaseline } from '@/lib/storage/profile';
@@ -86,14 +85,16 @@ export async function persistSessionDownload(
   };
 
   await writeJson(sessionDataKey(id), stored);
+  let elimination: number | null = null;
 
   if (deviceSessionId.startsWith('fw-alctrack-')) {
     const profile = fitExponentialProfile(ordered);
     if (profile) await writeFittingProfile(profile);
+    if (profile) {
+      elimination = fittedSessionEliminationSummary(profile);
+    }
   }
 
-  const elimination = estimateEliminationMgLPerHourX1000(records);
-  const index = await readSessionIndex();
   const summary: SessionSummary = {
     id,
     downloaded_at_unix_ms: downloadedAtUnixMs,
@@ -101,6 +102,7 @@ export async function persistSessionDownload(
     duration_ms: lastT,
     elimination_mg_l_per_hour_x1000: elimination,
   };
+  const index = await readSessionIndex();
   const nextIndex = [summary, ...index.filter((item) => item.id !== id)].slice(
     0,
     maxStoredSessions
@@ -198,4 +200,14 @@ function isSessionSummary(value: unknown): value is SessionSummary {
 
 function clampU16(value: number) {
   return Math.max(0, Math.min(65535, value));
+}
+
+function fittedSessionEliminationSummary(profile: {
+  kPerMinute: number;
+  diagnostics?: {
+    c0?: number;
+  } | null;
+}) {
+  if (!profile.diagnostics?.c0 || profile.diagnostics.c0 <= 0) return null;
+  return clampU16(Math.round(profile.kPerMinute * profile.diagnostics.c0 * 60));
 }

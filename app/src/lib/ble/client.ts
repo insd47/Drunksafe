@@ -251,16 +251,17 @@ export class DrunksafeBleClient {
   }
 
   private async requestPreferredMtu(device: Device) {
+    this.maxWritePayloadBytes = maxBleJsonPayloadBytes;
+
     let mtuDevice: Device;
 
     try {
       mtuDevice = await this.manager.requestMTUForDevice(device.id, preferredMtu);
     } catch {
       if (process.env.EXPO_OS === 'android') {
-        throw new Error('BLE MTU 협상에 실패해 payload를 안정적으로 전송할 수 없습니다.');
+        this.maxWritePayloadBytes = maxBleJsonPayloadBytes;
       }
 
-      this.maxWritePayloadBytes = maxBleJsonPayloadBytes;
       return device;
     }
 

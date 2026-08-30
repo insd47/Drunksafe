@@ -97,10 +97,10 @@ pub fn session(display: &mut DisplayDevice<'_>) -> Result<()> {
 
 pub fn session_confirm(display: &mut DisplayDevice<'_>) -> Result<()> {
     display.draw(|frame| {
-        text::center(frame, 22, "심박 측정");
+        text::center(frame, 22, "알코올 측정");
         icon::separator(frame, 27);
-        text::center(frame, 46, "버튼을");
-        text::center(frame, 60, "눌러주세요");
+        text::center(frame, 46, "알코올 측정 권장");
+        text::center(frame, 60, "버튼/앱에서 시작");
     })?;
     Ok(())
 }

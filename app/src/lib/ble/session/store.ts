@@ -82,7 +82,7 @@ type SessionBleClient = Pick<
 
 export type BleClientFactory = () => SessionBleClient;
 
-const reconnectDelayMs = [500, 1500] as const;
+const reconnectDelayMs = [800, 1600, 3200, 5000] as const;
 
 export class BleSessionStore {
   readonly verification = new BleVerificationStore();
@@ -618,7 +618,7 @@ export class BleSessionStore {
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       void this.applyEffect({ type: 'connect_device', deviceId, reconnectAttempt });
-    }, delayMs);
+    }, delayMs + Math.floor(Math.random() * 300));
   }
 
   private async receiveDeviceEvent(event: DeviceEvent) {

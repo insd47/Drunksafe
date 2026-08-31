@@ -73,7 +73,8 @@ export function createMockResultEvent(
     v: protocolVersion,
     session_id: sessionId,
     kind,
-    alcohol_mg_l_x1000: baseline ? 7 : 165,
+    // BAC 0.02% ~ 0.20% 에 대응하는 brac (mg/L x 1000) 값: 대략 95 ~ 952
+    alcohol_mg_l_x1000: baseline ? 7 : Math.floor(Math.random() * (952 - 95 + 1)) + 95,
     pulse: {
       status: 'measured',
       bpm: baseline ? 71 : 96,

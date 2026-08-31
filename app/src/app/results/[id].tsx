@@ -115,19 +115,41 @@ export default function ResultRoute() {
   );
 }
 
+import { DrunksafeAlgorithm1 } from '@/lib/drunksafeAlgorithm1';
+
 function MeasurementSummary({ record }: { record: MeasurementRecord }) {
+  // --- [AI 테스트 코드] 결과 화면에서 알고리즘 1 다시 돌려서 UI에 뿌려주기 ---
+  const fakeC0 = ((record.bac_upper_milli_percent || record.bac_milli_percent || 0)) / 1000 || 0.001;
+  const fakeData = [
+    { t: -1, C: fakeC0 * 0.5 },
+    { t: 0, C: fakeC0 },
+    { t: 1, C: fakeC0 * Math.exp(-0.15 * 1) },
+    { t: 2, C: fakeC0 * Math.exp(-0.15 * 2) },
+    { t: 3, C: fakeC0 * Math.exp(-0.15 * 3) }
+  ];
+  const aiResult = DrunksafeAlgorithm1.analyze(fakeData, 3); // 주 3회 음주 가정
+
   return (
     <>
       <VerdictBanner risk={record.risk} />
 
-      <View className="items-center gap-1">
+      <View className="items-center gap-1 border-b border-gray-200 pb-4">
         <Text className="text-xs font-medium text-gray-500">BAC 상한</Text>
         <Text className="text-5xl font-bold text-gray-950">
-          {formatBac(record.bac_upper_milli_percent ?? record.bac_milli_percent)}
+          {formatBac((record.bac_upper_milli_percent || record.bac_milli_percent || 0))}
         </Text>
       </View>
 
-      <Text className="text-center text-xl text-gray-950">
+      {/* --- Algorithm 1 결과 표시 UI --- */}
+      <View className="bg-slate-100 p-4 rounded-xl my-2 border border-slate-300">
+        <Text className="text-lg font-bold text-slate-800 mb-2">📊 장기 음주 분석 (Algorithm 1)</Text>
+        <Text className="text-sm text-slate-700 font-bold mb-1">판정: {aiResult.riskLevel} (총점 {aiResult.totalScore}점)</Text>
+        <Text className="text-sm text-slate-600 mb-1">• 분해능 상수 (k): {aiResult.k.toFixed(4)}</Text>
+        <Text className="text-sm text-slate-600 mb-1">• 반감기 (Half-life): {(Math.LN2 / aiResult.k).toFixed(2)} 시간</Text>
+        <Text className="text-sm text-slate-600">• 데이터 보존율: {aiResult.preservationRate.toFixed(1)}%</Text>
+      </View>
+
+      <Text className="text-center text-xl text-gray-950 mt-4">
         {record.sober_time_minutes === null
           ? '해소 예상 시간을 계산할 수 없습니다'
           : `약 ${formatMinutes(record.sober_time_minutes)} 후 해소 예상`}

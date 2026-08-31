@@ -94,6 +94,9 @@ export default function HistoryRoute() {
           if (records.length === 0) {
             return <StatusRow label="분석을 위한 기록이 부족합니다" value="-" />;
           }
+          const uniqueDrinkingDays = new Set(
+            records.map(r => new Date(r.measured_at_unix_ms).toLocaleDateString())
+          ).size;
           const peakBacMilli = records.reduce((max, r) => Math.max(max, r.bac_upper_milli_percent ?? r.bac_milli_percent ?? 0), 0);
           const fakeC0 = peakBacMilli / 1000 || 0.08; 
           const fakeData = [
@@ -103,10 +106,10 @@ export default function HistoryRoute() {
             { t: 2, C: fakeC0 * Math.exp(-0.15 * 2) },
             { t: 3, C: fakeC0 * Math.exp(-0.15 * 3) }
           ];
-          const aiResult = DrunksafeAlgorithm1.analyze(fakeData, insight.totalCount);
+          const aiResult = DrunksafeAlgorithm1.analyze(fakeData, uniqueDrinkingDays);
           
           let scoreA = aiResult.k >= 0.35 ? 1 : aiResult.k >= 0.15 ? 2 : 3;
-          let scoreB = insight.totalCount <= 1 ? 1 : insight.totalCount <= 3 ? 2 : 3;
+          let scoreB = uniqueDrinkingDays <= 1 ? 1 : uniqueDrinkingDays <= 3 ? 2 : 3;
           let scoreC = fakeC0 < 0.03 ? 1 : fakeC0 < 0.08 ? 2 : 3;
 
           return (

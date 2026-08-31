@@ -1,5 +1,5 @@
 import { useState, type PropsWithChildren } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/action-button';
 import { PpgSparkline } from '@/components/ppg-sparkline';
@@ -100,6 +100,7 @@ export default function DevRoute() {
         label="시뮬레이터 데모 기기 연결"
         onPress={() => {
           void ble.connectMockDevice();
+          Alert.alert("알림", "시뮬레이션 데모 기기가 연결되었습니다.");
         }}
       />
       <ActionButton

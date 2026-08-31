@@ -108,3 +108,13 @@ function isNullableU16(value: unknown): value is number | null {
 function isNullableFiniteNumber(value: unknown): value is number | null {
   return value === null || (typeof value === 'number' && Number.isFinite(value));
 }
+
+export async function deleteMeasurementById(id: string) {
+  const history = await readHistory();
+  const next = history.filter(record => record.id !== id && record.session_id !== id);
+  if (next.length !== history.length) {
+    await writeJson(historyKey, next);
+    return true;
+  }
+  return false;
+}

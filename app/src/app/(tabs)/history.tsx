@@ -16,7 +16,7 @@ import {
 } from '@/lib/format/measurement';
 import { buildWeeklyHistoryInsight } from '@/lib/personalization/history-insights';
 import { formatSessionMeasurementTitle, sessionMeasurementNumber } from '@/lib/sessions/identity';
-import { readHistory, type MeasurementRecord } from '@/lib/storage/history';
+import { readHistory, deleteMeasurementById, type MeasurementRecord } from '@/lib/storage/history';
 import { readSessionIndex, type SessionSummary } from '@/lib/storage/sessions';
 
 export default function HistoryRoute() {
@@ -141,6 +141,12 @@ export default function HistoryRoute() {
             onPress={() => {
               router.push({ pathname: '/results/[id]', params: { id: record.id } });
             }}
+            onDelete={async () => {
+              const success = await deleteMeasurementById(record.id);
+              if (success) {
+                setRecords(prev => prev.filter(r => r.id !== record.id));
+              }
+            }}
           />
         ))}
       </Section>
@@ -211,10 +217,11 @@ function formatEliminationRate(mgLPerHourX1000: number | null) {
   return mgLPerHourX1000 === null ? '추정 불가' : `${(mgLPerHourX1000 / 1000).toFixed(3)} mg/L·h`;
 }
 
-function HistoryRecordRow({ record, onPress }: { record: MeasurementRecord; onPress: () => void }) {
+function HistoryRecordRow({ record, onPress, onDelete }: { record: MeasurementRecord; onPress: () => void; onDelete?: () => void }) {
   const bac = formatBac(record.bac_upper_milli_percent ?? record.bac_milli_percent);
   const measuredAt = formatMeasuredAt(record.measured_at_unix_ms);
   const drivingStatus = formatDrivingStatus(record.risk);
+  const isDemo = record.session_id.includes('mock');
 
   return (
     <Pressable
@@ -225,12 +232,19 @@ function HistoryRecordRow({ record, onPress }: { record: MeasurementRecord; onPr
       <View className="min-w-0 flex-1 gap-1">
         <Text className="text-sm font-medium text-gray-950">{measuredAt}</Text>
         <Text className="text-xs leading-5 text-gray-500">
-          {formatRisk(record.risk)} · {bac}
+          {formatRisk(record.risk)} · {bac} {isDemo ? '(데모)' : ''}
         </Text>
       </View>
-      <Text className={`shrink-0 text-sm font-semibold ${toneTextClass[riskTone(record.risk)]}`}>
-        {drivingStatus}
-      </Text>
+      <View className="flex-row items-center gap-3">
+        <Text className={`shrink-0 text-sm font-semibold ${toneTextClass[riskTone(record.risk)]}`}>
+          {drivingStatus}
+        </Text>
+        {isDemo && onDelete && (
+          <Pressable onPress={onDelete} className="px-2 py-1 bg-red-100 rounded-md border border-red-200">
+            <Text className="text-red-700 text-xs font-bold">삭제</Text>
+          </Pressable>
+        )}
+      </View>
     </Pressable>
   );
 }

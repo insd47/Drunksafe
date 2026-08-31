@@ -118,7 +118,7 @@ export default function HistoryRoute() {
                 <Text className="text-lg font-bold text-gray-950 text-center">{aiResult.riskLevel}</Text>
                 <Text className="text-sm font-semibold text-gray-500 text-center mt-1">총합 {aiResult.totalScore}점</Text>
               </View>
-              <StatusRow label="음주 횟수 (주간)" value={`${insight.totalCount}회 (${scoreB}점)`} />
+              <StatusRow label="음주 횟수 (주간)" value={`${uniqueDrinkingDays}회 (${scoreB}점)`} />
               <StatusRow label="최대 음주량 (BAC)" value={`${fakeC0.toFixed(3)}% (${scoreC}점)`} />
               <StatusRow label="간 분해능력" value={`표준 이하 (${scoreA}점)`} />
             </View>

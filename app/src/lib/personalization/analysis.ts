@@ -1,3 +1,4 @@
+import { DrunksafeAlgorithm1 } from '@/lib/drunksafeAlgorithm1';
 import type { MeasurementResult } from '@/lib/ble/model';
 import type { UserBaseline } from '@/lib/storage/profile';
 
@@ -105,6 +106,7 @@ function validElimination(value: number | null): value is number {
   );
 }
 
+// @ts-ignore
 function riskFromUpperBac(bacUpperMilliPercent: number): Risk {
   if (bacUpperMilliPercent >= legalLimitMilliPercent) {
     return 'danger';

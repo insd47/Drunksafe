@@ -62,8 +62,8 @@ export class DrunksafeAlgorithm1 {
     let maxC0 = -1;
     let maxIndex = -1;
     for (let i = 0; i < rawData.length; i++) {
-      if (rawData[i].C > maxC0) {
-        maxC0 = rawData[i].C;
+      if (rawData[i]!.C > maxC0) {
+        maxC0 = rawData[i]!.C;
         maxIndex = i;
       }
     }
@@ -72,7 +72,7 @@ export class DrunksafeAlgorithm1 {
       throw new Error("유효한 측정 데이터가 없습니다.");
     }
 
-    const t0 = rawData[maxIndex].t;
+    const t0 = rawData[maxIndex]!.t;
 
     // 2. 최대값 이전 데이터 삭제 및 t 재설정
     let data = rawData
@@ -94,7 +94,7 @@ export class DrunksafeAlgorithm1 {
       currentData = [...data]; // 초기 데이터부터 다시 시작
       let k = this.calculateK(currentData, maxC0);
       let r2 = this.calculateR2(currentData, maxC0, k);
-      let isTargetMet = false;
+      
 
       // 상대오차 21% 초과점 제거 반복루프
       while (r2 < target) {
@@ -103,10 +103,10 @@ export class DrunksafeAlgorithm1 {
 
         // t=0(기준점)을 제외하고 가장 큰 상대오차(21% 초과) 찾기
         for (let i = 0; i < currentData.length; i++) {
-          if (currentData[i].t === 0) continue;
+          if (currentData[i]!.t === 0) continue;
           
-          const c_hat = maxC0 * Math.exp(-k * currentData[i].t);
-          const error = Math.abs((currentData[i].C - c_hat) / currentData[i].C);
+          const c_hat = maxC0 * Math.exp(-k * currentData[i]!.t);
+          const error = Math.abs((currentData[i]!.C - c_hat) / currentData[i]!.C);
           
           if (error > 0.21 && error > maxError) {
             maxError = error;
@@ -135,7 +135,7 @@ export class DrunksafeAlgorithm1 {
         finalK = k;
         finalR2 = r2;
         finalTargetR2 = target;
-        isTargetMet = true;
+        
         break; // 찾았으므로 탈출!
       }
     }

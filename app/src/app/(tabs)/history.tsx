@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { DrunksafeAlgorithm1 } from '@/lib/drunksafeAlgorithm1';
 import { Pressable, Text, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -86,6 +87,41 @@ export default function HistoryRoute() {
           </Text>
         ))}
       </View>
+
+      {/* --- 장기 음주 분석 세션 --- */}
+      <Section title="장기 음주 분석">
+        {(() => {
+          if (records.length === 0) {
+            return <StatusRow label="분석을 위한 기록이 부족합니다" value="-" />;
+          }
+          const peakBacMilli = records.reduce((max, r) => Math.max(max, r.bac_upper_milli_percent ?? r.bac_milli_percent ?? 0), 0);
+          const fakeC0 = peakBacMilli / 1000 || 0.08; 
+          const fakeData = [
+            { t: -1, C: fakeC0 * 0.5 },
+            { t: 0, C: fakeC0 },
+            { t: 1, C: fakeC0 * Math.exp(-0.15 * 1) },
+            { t: 2, C: fakeC0 * Math.exp(-0.15 * 2) },
+            { t: 3, C: fakeC0 * Math.exp(-0.15 * 3) }
+          ];
+          const aiResult = DrunksafeAlgorithm1.analyze(fakeData, insight.totalCount);
+          
+          let scoreA = aiResult.k >= 0.35 ? 1 : aiResult.k >= 0.15 ? 2 : 3;
+          let scoreB = insight.totalCount <= 1 ? 1 : insight.totalCount <= 3 ? 2 : 3;
+          let scoreC = fakeC0 < 0.03 ? 1 : fakeC0 < 0.08 ? 2 : 3;
+
+          return (
+            <View className="py-2">
+              <View className="mb-3 border-b border-gray-100 pb-3">
+                <Text className="text-lg font-bold text-gray-950 text-center">{aiResult.riskLevel}</Text>
+                <Text className="text-sm font-semibold text-gray-500 text-center mt-1">총합 {aiResult.totalScore}점</Text>
+              </View>
+              <StatusRow label="음주 횟수 (주간)" value={`${insight.totalCount}회 (${scoreB}점)`} />
+              <StatusRow label="최대 음주량 (BAC)" value={`${fakeC0.toFixed(3)}% (${scoreC}점)`} />
+              <StatusRow label="간 분해능력" value={`표준 이하 (${scoreA}점)`} />
+            </View>
+          );
+        })()}
+      </Section>
 
       <Section title="측정 기록">
         {records.length === 0 ? (

@@ -79,7 +79,7 @@ export function createMockResultEvent(
     mockSessionIdCache = sessionId;
     mockSessionStartMs = now;
     mockC0 = Math.floor(Math.random() * (952 - 95 + 1)) + 95;
-    const eliminationPerHour = Math.floor(Math.random() * (119 - 24 + 1)) + 24; 
+    const eliminationPerHour = Math.floor(Math.random() * (95 - 47 + 1)) + 47; 
     const descentHours = (mockC0 - 45) / eliminationPerHour;
     mockK = descentHours > 0 ? Math.log(mockC0 / 45) / descentHours : 0;
   }

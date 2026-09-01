@@ -1,4 +1,4 @@
-import { DrunksafeAlgorithm1 } from '@/lib/drunksafeAlgorithm1';
+
 import type { MeasurementResult } from '@/lib/ble/model';
 import type { UserBaseline } from '@/lib/storage/profile';
 
@@ -23,29 +23,10 @@ export function analyzeMeasurement(
   const bacMilliPercent = bracToBacMilliPercent(correctedAlcohol);
   const bacUpperMilliPercent = Math.max(bracToBacMilliPercent(upperAlcohol), rawBac);
 
-  // --- [AI 테스트 코드] Algorithm 1 시뮬레이션 주입 ---
-  const fakeC0 = bacUpperMilliPercent / 1000 || 0.001; // 0 방지
-  // 폰에 부는 강도를 C0로 잡고, 가상의 하강 곡선 데이터 배열 생성 (k=0.15 일반 간 기준)
-  const fakeData = [
-    { t: -1, C: fakeC0 * 0.5 }, // 알고리즘이 무시해야 할 t<0 데이터
-    { t: 0, C: fakeC0 },
-    { t: 1, C: fakeC0 * Math.exp(-0.15 * 1) },
-    { t: 2, C: fakeC0 * Math.exp(-0.15 * 2) },
-    { t: 3, C: fakeC0 * Math.exp(-0.15 * 3) }
-  ];
-  
-  // 주 3회 음주 가정하고 알고리즘 1 실행
-  const aiResult = DrunksafeAlgorithm1.analyze(fakeData, 3);
-  
-  // 5단계 스코어를 기존 앱의 3단계 화면(safe/caution/danger)에 맞춰서 색깔 반환!
-  let mappedRisk: Risk = 'safe';
-  if (aiResult.totalScore >= 7) mappedRisk = 'danger';     // Level 4~5
-  else if (aiResult.totalScore >= 4) mappedRisk = 'caution'; // Level 2~3
-
   return {
     bac_milli_percent: bacMilliPercent,
     bac_upper_milli_percent: bacUpperMilliPercent,
-    risk: mappedRisk,
+    risk: riskFromUpperBac(bacUpperMilliPercent),
     sober_time_minutes: soberTimeMinutes(
       upperAlcohol,
       bacUpperMilliPercent,

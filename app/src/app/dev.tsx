@@ -110,13 +110,13 @@ export default function DevRoute() {
           run('데모 세션 생성', async () => {
             const now = Date.now();
             const C0 = Math.floor(Math.random() * (952 - 95 + 1)) + 95;
-            const k = 0.15;
+            const eliminationPerHour = 130; // Linear drop of 130 mg/L*1000 per hour
             const fakeRecords: any[] = [
               { v: 12, session_id: 'mock-session', index: 0, total: 5, t_ms: 0, kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * 0.5), bpm: null },
               { v: 12, session_id: 'mock-session', index: 1, total: 5, t_ms: 3600000, kind: 'alcohol', state: 'track', mg_l_x1000: C0, bpm: null },
-              { v: 12, session_id: 'mock-session', index: 2, total: 5, t_ms: 7200000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * Math.exp(-k * 1)), bpm: null },
-              { v: 12, session_id: 'mock-session', index: 3, total: 5, t_ms: 10800000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * Math.exp(-k * 2)), bpm: null },
-              { v: 12, session_id: 'mock-session', index: 4, total: 5, t_ms: 14400000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * Math.exp(-k * 3)), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 2, total: 5, t_ms: 7200000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.max(0, C0 - eliminationPerHour * 1), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 3, total: 5, t_ms: 10800000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.max(0, C0 - eliminationPerHour * 2), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 4, total: 5, t_ms: 14400000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.max(0, C0 - eliminationPerHour * 3), bpm: null },
             ];
             await persistSessionDownload(fakeRecords, now);
             Alert.alert("알림", "데모 음주 세션이 1건 생성되었습니다.\\n기록 탭에서 확인하세요.");

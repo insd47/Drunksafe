@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { DrunksafeAlgorithm1 } from '@/lib/drunksafeAlgorithm1';
+
 import { Pressable, Text, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
@@ -69,38 +69,41 @@ export default function HistoryRoute() {
 
   return (
     <Screen>
-      {/* --- 주간 기록 분석 세션 --- */}
+      {/* --- 주간 기록 분석 --- */}
       <Section title="주간 기록 분석">
         {(() => {
-          if (records.length === 0) {
+          if (records.length === 0 && sessions.length === 0) {
             return <StatusRow label="분석을 위한 기록이 부족합니다" value="-" />;
           }
           const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
           const weeklySessionsCount = sessions.filter(s => s.downloaded_at_unix_ms >= weekStart).length;
           const peakBacMilli = records.reduce((max, r) => Math.max(max, r.bac_upper_milli_percent ?? r.bac_milli_percent ?? 0), 0);
-          const fakeC0 = peakBacMilli / 1000 || 0.08; 
-          const fakeData = [
-            { t: -1, C: fakeC0 * 0.5 },
-            { t: 0, C: fakeC0 },
-            { t: 1, C: fakeC0 * Math.exp(-0.15 * 1) },
-            { t: 2, C: fakeC0 * Math.exp(-0.15 * 2) },
-            { t: 3, C: fakeC0 * Math.exp(-0.15 * 3) }
-          ];
-          const aiResult = DrunksafeAlgorithm1.analyze(fakeData, weeklySessionsCount);
-          
-          let scoreA = aiResult.k >= 0.35 ? 1 : aiResult.k >= 0.15 ? 2 : 3;
+          const validSessions = sessions.filter(s => s.elimination_mg_l_per_hour_x1000 !== null);
+          const avgEliminationX1000 = validSessions.length > 0 
+            ? validSessions.reduce((sum, s) => sum + s.elimination_mg_l_per_hour_x1000!, 0) / validSessions.length 
+            : 0;
+            
+          let scoreA = avgEliminationX1000 < 30 ? 3 : avgEliminationX1000 < 70 ? 2 : 1;
           let scoreB = weeklySessionsCount <= 1 ? 1 : weeklySessionsCount <= 3 ? 2 : 3;
-          let scoreC = fakeC0 < 0.03 ? 1 : fakeC0 < 0.08 ? 2 : 3;
+          let scoreC = peakBacMilli < 30 ? 1 : peakBacMilli < 80 ? 2 : 3;
+          
+          const totalScore = scoreA + scoreB + scoreC;
+          let riskLevel = "";
+          if (totalScore <= 3) riskLevel = "Level 1 [매우 안전]";
+          else if (totalScore <= 5) riskLevel = "Level 2 [주의 요망]";
+          else if (totalScore === 6) riskLevel = "Level 3 [경고]";
+          else if (totalScore <= 8) riskLevel = "Level 4 [위험]";
+          else riskLevel = "Level 5 [초고위험]";
 
           return (
             <View className="py-2">
               <View className="mb-3 border-b border-gray-100 pb-3">
-                <Text className="text-lg font-bold text-gray-950 text-center">{aiResult.riskLevel}</Text>
-                <Text className="text-sm font-semibold text-gray-500 text-center mt-1">총합 {aiResult.totalScore}점</Text>
+                <Text className="text-lg font-bold text-gray-950 text-center">{riskLevel}</Text>
+                <Text className="text-sm font-semibold text-gray-500 text-center mt-1">총합 {totalScore}점</Text>
               </View>
               <StatusRow label="음주 횟수 (주간)" value={`${weeklySessionsCount}회 (${scoreB}점)`} />
-              <StatusRow label="최대 음주량 (BAC)" value={`${fakeC0.toFixed(3)}% (${scoreC}점)`} />
-              <StatusRow label="간 분해능력" value={`표준 이하 (${scoreA}점)`} />
+              <StatusRow label="최대 음주량 (BAC)" value={`${(peakBacMilli / 1000).toFixed(3)}% (${scoreC}점)`} />
+              <StatusRow label="평균 알코올 분해속도" value={avgEliminationX1000 > 0 ? `${(avgEliminationX1000/1000).toFixed(3)} mg/L·h (${scoreA}점)` : `측정 부족 (${scoreA}점)`} />
             </View>
           );
         })()}

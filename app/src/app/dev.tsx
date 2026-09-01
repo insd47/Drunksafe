@@ -123,15 +123,19 @@ export default function DevRoute() {
             // C0에서 targetC(0.01%)까지 떨어지는 데 걸리는 시간(시간 단위)
             const descentHours = (C0 - targetC) / eliminationPerHour;
             const descentMs = descentHours * 3600000;
-            
             const ascentMs = 3600000; // 피크(C0) 도달 시간 1시간 가정
+            
+            // 실제 혈중 알코올 감소는 지수 감쇠(Exponential decay)를 따른다는 기획 의도 반영
+            // C(t) = C0 * e^(-k * t)
+            // t = descentHours 일 때 C(t) = targetC 가 되도록 k(지수 감쇠 상수)를 구함
+            const k = Math.log(C0 / targetC) / descentHours;
 
             const fakeRecords: any[] = [
               { v: 12, session_id: 'mock-session', index: 0, total: 6, t_ms: 0, kind: 'state', state: 'track', mg_l_x1000: null, bpm: null },
               { v: 12, session_id: 'mock-session', index: 1, total: 6, t_ms: 0, kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * 0.5), bpm: null },
               { v: 12, session_id: 'mock-session', index: 2, total: 6, t_ms: ascentMs, kind: 'alcohol', state: 'track', mg_l_x1000: C0, bpm: null },
-              { v: 12, session_id: 'mock-session', index: 3, total: 6, t_ms: Math.round(ascentMs + descentMs / 3), kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 - eliminationPerHour * (descentHours / 3)), bpm: null },
-              { v: 12, session_id: 'mock-session', index: 4, total: 6, t_ms: Math.round(ascentMs + (descentMs * 2) / 3), kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 - eliminationPerHour * (descentHours * 2 / 3)), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 3, total: 6, t_ms: Math.round(ascentMs + descentMs / 3), kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * Math.exp(-k * (descentHours / 3))), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 4, total: 6, t_ms: Math.round(ascentMs + (descentMs * 2) / 3), kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * Math.exp(-k * (descentHours * 2 / 3))), bpm: null },
               { v: 12, session_id: 'mock-session', index: 5, total: 6, t_ms: Math.round(ascentMs + descentMs), kind: 'alcohol', state: 'track', mg_l_x1000: targetC, bpm: null },
             ];
             await persistSessionDownload(fakeRecords, now);

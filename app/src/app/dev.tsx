@@ -20,6 +20,7 @@ import {
 } from '@/lib/ble/session';
 import { removeJson } from '@/lib/storage/json';
 import { emptyBaseline, writeBaseline } from '@/lib/storage/profile';
+import { persistSessionDownload } from '@/lib/storage/sessions';
 
 /** lib/storage/history.ts가 소유한 키 — 개발자 도구에서만 직접 지운다. */
 const historyKey = 'drunksafe.history.v1';
@@ -101,6 +102,23 @@ export default function DevRoute() {
         onPress={() => {
           void ble.connectMockDevice();
           Alert.alert("알림", "시뮬레이션 데모 기기가 연결되었습니다.");
+        }}
+      />
+      <ActionButton
+        label="데모 음주 세션 생성"
+        onPress={() => {
+          run('데모 세션 생성', async () => {
+            const now = Date.now();
+            const fakeRecords: any[] = [
+              { v: 12, session_id: 'mock-session', index: 0, total: 5, t_ms: 0, kind: 'alcohol', state: 'track', mg_l_x1000: 0, bpm: null },
+              { v: 12, session_id: 'mock-session', index: 1, total: 5, t_ms: 3600000, kind: 'alcohol', state: 'track', mg_l_x1000: 900, bpm: null },
+              { v: 12, session_id: 'mock-session', index: 2, total: 5, t_ms: 7200000, kind: 'alcohol', state: 'track', mg_l_x1000: 700, bpm: null },
+              { v: 12, session_id: 'mock-session', index: 3, total: 5, t_ms: 10800000, kind: 'alcohol', state: 'track', mg_l_x1000: 500, bpm: null },
+              { v: 12, session_id: 'mock-session', index: 4, total: 5, t_ms: 14400000, kind: 'alcohol', state: 'track', mg_l_x1000: 300, bpm: null },
+            ];
+            await persistSessionDownload(fakeRecords, now);
+            Alert.alert("알림", "데모 음주 세션이 1건 생성되었습니다.\\n기록 탭에서 확인하세요.");
+          });
         }}
       />
       <ActionButton

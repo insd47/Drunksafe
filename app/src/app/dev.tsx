@@ -109,14 +109,29 @@ export default function DevRoute() {
         onPress={() => {
           run('데모 세션 생성', async () => {
             const now = Date.now();
+            
+            // C0: 0.02% ~ 0.20% BAC (mg_l_x1000 기준 약 95 ~ 952)
             const C0 = Math.floor(Math.random() * (952 - 95 + 1)) + 95;
-            const eliminationPerHour = 130; // Linear drop of 130 mg/L*1000 per hour
+            
+            // 분해 속도: 0.015% ± 0.01% BAC/h (0.005 ~ 0.025)
+            // mg_l_x1000 기준으로 변환 시 시간당 약 24 ~ 119 감소
+            const eliminationPerHour = Math.floor(Math.random() * (119 - 24 + 1)) + 24; 
+            
+            // BAC 0.01% 에 해당하는 mg_l_x1000 수치는 약 45
+            const targetC = 45; 
+            
+            // C0에서 targetC(0.01%)까지 떨어지는 데 걸리는 시간(시간 단위)
+            const descentHours = (C0 - targetC) / eliminationPerHour;
+            const descentMs = descentHours * 3600000;
+            
+            const ascentMs = 3600000; // 피크(C0) 도달 시간 1시간 가정
+
             const fakeRecords: any[] = [
               { v: 12, session_id: 'mock-session', index: 0, total: 5, t_ms: 0, kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 * 0.5), bpm: null },
-              { v: 12, session_id: 'mock-session', index: 1, total: 5, t_ms: 3600000, kind: 'alcohol', state: 'track', mg_l_x1000: C0, bpm: null },
-              { v: 12, session_id: 'mock-session', index: 2, total: 5, t_ms: 7200000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.max(0, C0 - eliminationPerHour * 1), bpm: null },
-              { v: 12, session_id: 'mock-session', index: 3, total: 5, t_ms: 10800000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.max(0, C0 - eliminationPerHour * 2), bpm: null },
-              { v: 12, session_id: 'mock-session', index: 4, total: 5, t_ms: 14400000, kind: 'alcohol', state: 'track', mg_l_x1000: Math.max(0, C0 - eliminationPerHour * 3), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 1, total: 5, t_ms: ascentMs, kind: 'alcohol', state: 'track', mg_l_x1000: C0, bpm: null },
+              { v: 12, session_id: 'mock-session', index: 2, total: 5, t_ms: Math.round(ascentMs + descentMs / 3), kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 - eliminationPerHour * (descentHours / 3)), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 3, total: 5, t_ms: Math.round(ascentMs + (descentMs * 2) / 3), kind: 'alcohol', state: 'track', mg_l_x1000: Math.round(C0 - eliminationPerHour * (descentHours * 2 / 3)), bpm: null },
+              { v: 12, session_id: 'mock-session', index: 4, total: 5, t_ms: Math.round(ascentMs + descentMs), kind: 'alcohol', state: 'track', mg_l_x1000: targetC, bpm: null },
             ];
             await persistSessionDownload(fakeRecords, now);
             Alert.alert("알림", "데모 음주 세션이 1건 생성되었습니다.\\n기록 탭에서 확인하세요.");

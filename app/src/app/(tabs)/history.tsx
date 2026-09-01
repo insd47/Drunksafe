@@ -182,7 +182,7 @@ function SessionRow({
   session: SessionSummary;
   measurementNumber: number;
   onPress: () => void;
-  onDelete?: () => void;
+  onDelete?: (() => void) | (() => Promise<void>) | undefined;
 }) {
   const measuredAt = formatMeasuredAt(session.downloaded_at_unix_ms);
   const title = formatSessionMeasurementTitle(session.downloaded_at_unix_ms, measurementNumber);

@@ -17,7 +17,7 @@ import {
 import { buildWeeklyHistoryInsight } from '@/lib/personalization/history-insights';
 import { formatSessionMeasurementTitle, sessionMeasurementNumber } from '@/lib/sessions/identity';
 import { readHistory, deleteMeasurementById, type MeasurementRecord } from '@/lib/storage/history';
-import { readSessionIndex, type SessionSummary } from '@/lib/storage/sessions';
+import { readSessionIndex, deleteSessionById, type SessionSummary } from '@/lib/storage/sessions';
 
 export default function HistoryRoute() {
   const router = useRouter();
@@ -160,6 +160,12 @@ export default function HistoryRoute() {
             onPress={() => {
               router.push({ pathname: '/sessions/[id]', params: { id: session.id } });
             }}
+            onDelete={session.id.includes('mock') ? async () => {
+              const success = await deleteSessionById(session.id);
+              if (success) {
+                setSessions(prev => prev.filter(s => s.id !== session.id));
+              }
+            } : undefined}
           />
         ))}
       </Section>
@@ -171,10 +177,12 @@ function SessionRow({
   session,
   measurementNumber,
   onPress,
+  onDelete,
 }: {
   session: SessionSummary;
   measurementNumber: number;
   onPress: () => void;
+  onDelete?: () => void;
 }) {
   const measuredAt = formatMeasuredAt(session.downloaded_at_unix_ms);
   const title = formatSessionMeasurementTitle(session.downloaded_at_unix_ms, measurementNumber);
@@ -193,7 +201,14 @@ function SessionRow({
           {duration} · 분해속도 {elimination}
         </Text>
       </View>
-      <Text className="shrink-0 text-sm font-semibold text-gray-950">보기 ›</Text>
+      <View className="flex-row items-center gap-3">
+        <Text className="shrink-0 text-sm font-semibold text-gray-950">보기 ➔</Text>
+        {onDelete && (
+          <Pressable onPress={onDelete} className="px-2 py-1 bg-red-100 rounded-md border border-red-200">
+            <Text className="text-red-700 text-xs font-bold">삭제</Text>
+          </Pressable>
+        )}
+      </View>
     </Pressable>
   );
 }

@@ -128,6 +128,16 @@ export async function readSessionIndex(): Promise<SessionSummary[]> {
   return readJson(sessionIndexKey, () => [], isSessionIndex);
 }
 
+export async function deleteSessionById(id: string): Promise<boolean> {
+  const index = await readSessionIndex();
+  const nextIndex = index.filter(item => item.id !== id);
+  if (index.length === nextIndex.length) {
+    return false;
+  }
+  await writeJson(sessionIndexKey, nextIndex);
+  return true;
+}
+
 /** 저장된 세션 원본(샘플 포함)을 읽는다. 없거나 손상되면 null. */
 export async function readSession(id: string): Promise<StoredSession | null> {
   return readJson<StoredSession | null>(sessionDataKey(id), () => null, isNullableStoredSession);

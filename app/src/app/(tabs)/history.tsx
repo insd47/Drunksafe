@@ -69,34 +69,14 @@ export default function HistoryRoute() {
 
   return (
     <Screen>
-      <View className="gap-1 border border-gray-200 p-4">
-        <Text className="text-xs font-medium text-gray-500">최근 7일</Text>
-        <Text className="text-2xl font-semibold text-gray-950">{insight.totalCount}회 측정</Text>
-        <Text className="text-xs leading-5 text-gray-500">
-          운전 금지 {insight.dangerCount}회 · 운전 보류 {insight.cautionCount}회 · 평균 BAC 상한{' '}
-          {formatBac(insight.averageBacUpperMilliPercent)}
-        </Text>
-      </View>
-
-      <View className="gap-2 border border-gray-200 p-4">
-        <Text className="text-sm font-semibold text-gray-950">{insight.guidanceTitle}</Text>
-        <Text className="text-xs leading-5 text-gray-500">{insight.guidanceBody}</Text>
-        {insight.guidanceActions.map((action) => (
-          <Text className="text-xs leading-5 text-gray-600" key={action.label}>
-            • {action.label} — {action.description}
-          </Text>
-        ))}
-      </View>
-
-      {/* --- 장기 음주 분석 세션 --- */}
-      <Section title="장기 음주 분석">
+      {/* --- 주간 기록 분석 세션 --- */}
+      <Section title="주간 기록 분석">
         {(() => {
           if (records.length === 0) {
             return <StatusRow label="분석을 위한 기록이 부족합니다" value="-" />;
           }
-          const uniqueDrinkingDays = new Set(
-            records.map(r => new Date(r.measured_at_unix_ms).toLocaleDateString())
-          ).size;
+          const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const weeklySessionsCount = sessions.filter(s => s.downloaded_at_unix_ms >= weekStart).length;
           const peakBacMilli = records.reduce((max, r) => Math.max(max, r.bac_upper_milli_percent ?? r.bac_milli_percent ?? 0), 0);
           const fakeC0 = peakBacMilli / 1000 || 0.08; 
           const fakeData = [
@@ -106,10 +86,10 @@ export default function HistoryRoute() {
             { t: 2, C: fakeC0 * Math.exp(-0.15 * 2) },
             { t: 3, C: fakeC0 * Math.exp(-0.15 * 3) }
           ];
-          const aiResult = DrunksafeAlgorithm1.analyze(fakeData, uniqueDrinkingDays);
+          const aiResult = DrunksafeAlgorithm1.analyze(fakeData, weeklySessionsCount);
           
           let scoreA = aiResult.k >= 0.35 ? 1 : aiResult.k >= 0.15 ? 2 : 3;
-          let scoreB = uniqueDrinkingDays <= 1 ? 1 : uniqueDrinkingDays <= 3 ? 2 : 3;
+          let scoreB = weeklySessionsCount <= 1 ? 1 : weeklySessionsCount <= 3 ? 2 : 3;
           let scoreC = fakeC0 < 0.03 ? 1 : fakeC0 < 0.08 ? 2 : 3;
 
           return (
@@ -118,13 +98,23 @@ export default function HistoryRoute() {
                 <Text className="text-lg font-bold text-gray-950 text-center">{aiResult.riskLevel}</Text>
                 <Text className="text-sm font-semibold text-gray-500 text-center mt-1">총합 {aiResult.totalScore}점</Text>
               </View>
-              <StatusRow label="음주 횟수 (주간)" value={`${uniqueDrinkingDays}회 (${scoreB}점)`} />
+              <StatusRow label="음주 횟수 (주간)" value={`${weeklySessionsCount}회 (${scoreB}점)`} />
               <StatusRow label="최대 음주량 (BAC)" value={`${fakeC0.toFixed(3)}% (${scoreC}점)`} />
               <StatusRow label="간 분해능력" value={`표준 이하 (${scoreA}점)`} />
             </View>
           );
         })()}
       </Section>
+
+      <View className="gap-2 border border-gray-200 p-4 mb-4">
+        <Text className="text-sm font-semibold text-gray-950">{insight.guidanceTitle}</Text>
+        <Text className="text-xs leading-5 text-gray-500">{insight.guidanceBody}</Text>
+        {insight.guidanceActions.map((action) => (
+          <Text className="text-xs leading-5 text-gray-600" key={action.label}>
+            • {action.label} — {action.description}
+          </Text>
+        ))}
+      </View>
 
       <Section title="측정 기록">
         {records.length === 0 ? (

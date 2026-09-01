@@ -76,8 +76,17 @@ export default function HistoryRoute() {
             return <StatusRow label="분석을 위한 기록이 부족합니다" value="-" />;
           }
           const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          const weeklySessionsCount = sessions.filter(s => s.downloaded_at_unix_ms >= weekStart).length;
-          const peakBacMilli = records.reduce((max, r) => Math.max(max, r.bac_upper_milli_percent ?? r.bac_milli_percent ?? 0), 0);
+          const weeklySessions = sessions.filter(s => s.downloaded_at_unix_ms >= weekStart);
+          const weeklySessionsCount = weeklySessions.length;
+          
+          let peakBacMilli = records.reduce((max, r) => Math.max(max, r.bac_upper_milli_percent ?? r.bac_milli_percent ?? 0), 0);
+          weeklySessions.forEach(s => {
+            if (s.peak_alcohol_mg_l_x1000 != null) {
+              const sessionBac = Math.floor((s.peak_alcohol_mg_l_x1000 * 21 + 50) / 100);
+              if (sessionBac > peakBacMilli) peakBacMilli = sessionBac;
+            }
+          });
+          
           const validSessions = sessions.filter(s => s.elimination_mg_l_per_hour_x1000 !== null);
           const avgEliminationX1000 = validSessions.length > 0 
             ? validSessions.reduce((sum, s) => sum + s.elimination_mg_l_per_hour_x1000!, 0) / validSessions.length 

@@ -125,7 +125,6 @@ export default function DevRoute() {
             // C0에서 targetC(0.01%)까지 떨어지는 데 걸리는 시간(시간 단위)
             const descentHours = (C0 - targetC) / eliminationPerHour;
             const descentMs = descentHours * 3600000;
-            const ascentMs = 3600000; // 피크(C0) 도달 시간 1시간 가정
             
             // 실제 혈중 알코올 감소는 지수 감쇠(Exponential decay)를 따른다는 기획 의도 반영
             // C(t) = C0 * e^(-k * t)

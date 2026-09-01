@@ -39,6 +39,8 @@ export type SessionSummary = {
   /** 세션 길이(ms). 이전 버전 데이터에는 없을 수 있다. */
   duration_ms?: number;
   elimination_mg_l_per_hour_x1000: number | null;
+  /** 세션 중 측정된 최고 혈중 알코올 농도 (BrAC) */
+  peak_alcohol_mg_l_x1000?: number | null;
 };
 
 export type ProcessedSession = {
@@ -83,6 +85,8 @@ export async function persistSessionDownload(
   await writeJson(sessionDataKey(id), stored);
 
   const elimination = estimateEliminationMgLPerHourX1000(records);
+  const alcoholValues = ordered.map(r => r.mg_l_x1000).filter((v): v is number => v !== null);
+  const peakAlcohol = alcoholValues.length > 0 ? Math.max(...alcoholValues) : null;
   const index = await readSessionIndex();
   const summary: SessionSummary = {
     id,
@@ -90,6 +94,7 @@ export async function persistSessionDownload(
     record_count: ordered.length,
     duration_ms: lastT,
     elimination_mg_l_per_hour_x1000: elimination,
+    peak_alcohol_mg_l_x1000: peakAlcohol,
   };
   const nextIndex = [summary, ...index.filter((item) => item.id !== id)].slice(
     0,

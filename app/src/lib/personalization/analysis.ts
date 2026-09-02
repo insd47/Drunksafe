@@ -58,7 +58,7 @@ function soberBaselineMadMgLX1000(baseline: UserBaseline) {
   return value === null ? null : Math.min(value, maxSoberBaselineMadMgLX1000);
 }
 
-function bracToBacMilliPercent(alcoholMgLX1000: number) {
+export function bracToBacMilliPercent(alcoholMgLX1000: number) {
   return Math.min(65535, Math.floor((alcoholMgLX1000 * 21 + 50) / 100));
 }
 

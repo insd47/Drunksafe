@@ -35,6 +35,7 @@ export type BleSessionHook = BleSessionState & {
   startAlcoholTrack: () => Promise<void>;
   endSession: () => Promise<void>;
   measureSessionAlcohol: () => Promise<void>;
+  sendWarnSignal: () => Promise<void>;
 };
 
 export function useBleSession(): BleSessionHook {
@@ -62,6 +63,7 @@ export function useBleSession(): BleSessionHook {
     startAlcoholTrack: bleSession.startAlcoholTrack,
     endSession: bleSession.endSession,
     measureSessionAlcohol: bleSession.measureSessionAlcohol,
+    sendWarnSignal: bleSession.sendWarnSignal,
   };
 }
 

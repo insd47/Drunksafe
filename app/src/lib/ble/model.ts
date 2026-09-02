@@ -152,7 +152,8 @@ export type PhoneCommand =
   | { cmd: 'start_hr_watch'; resting_bpm: number }
   | { cmd: 'start_alcohol_track' }
   | { cmd: 'measure_session_alcohol' }
-  | { cmd: 'end_session' };
+  | { cmd: 'end_session' }
+  | { cmd: 'warn' };
 
 export type DeviceEvent =
   | ({ event: 'status' } & DeviceStatus)
@@ -430,6 +431,7 @@ function isPhoneCommand(value: unknown): value is PhoneCommand {
     case 'start_alcohol_track':
     case 'measure_session_alcohol':
     case 'end_session':
+    case 'warn':
       return true;
     default:
       return false;

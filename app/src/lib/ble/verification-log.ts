@@ -123,6 +123,13 @@ export function bleCommandLogEntry(command: PhoneCommand): BleVerificationLogInp
         detail: 'phone ended session',
         sessionId: null,
       };
+    case 'warn':
+      return {
+        kind: 'command',
+        label: 'cmd:warn',
+        detail: 'phone triggered device buzzer',
+        sessionId: null,
+      };
   }
 }
 

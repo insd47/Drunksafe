@@ -116,6 +116,15 @@ export default function ResultRoute() {
 }
 
 function MeasurementSummary({ record }: { record: MeasurementRecord }) {
+  const ble = useBleSession();
+
+  useEffect(() => {
+    if (record.risk === 'danger') {
+      // 위험 수준일 경우 BLE 기기로 WARN 신호를 보내 진동과 부저를 울립니다.
+      ble.sendWarnSignal();
+    }
+  }, [record.risk, ble]);
+
   return (
     <>
       <VerdictBanner risk={record.risk} />

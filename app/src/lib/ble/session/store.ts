@@ -246,6 +246,15 @@ export class BleSessionStore {
     });
   }
 
+  sendWarnSignal = async () => {
+    if (!this.client || this.snapshot.connection.phase !== 'connected') return;
+    try {
+      await this.client.send({ cmd: 'warn' });
+    } catch (e) {
+      console.warn('Failed to send warn signal:', e);
+    }
+  };
+
   /** Developer tool: alcohol-only tracking session (no HR/schedule) for descent fitting. */
   startAlcoholTrack = async () => {
     this.sessionRecordsBuffer = [];

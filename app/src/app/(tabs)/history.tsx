@@ -18,6 +18,7 @@ import { buildWeeklyHistoryInsight } from '@/lib/personalization/history-insight
 import { formatSessionMeasurementTitle, sessionMeasurementNumber } from '@/lib/sessions/identity';
 import { readHistory, deleteMeasurementById, type MeasurementRecord } from '@/lib/storage/history';
 import { readSessionIndex, deleteSessionById, type SessionSummary } from '@/lib/storage/sessions';
+import { bracToBacMilliPercent } from '@/lib/personalization/analysis';
 
 export default function HistoryRoute() {
   const router = useRouter();
@@ -82,7 +83,7 @@ export default function HistoryRoute() {
           let peakBacMilli = records.reduce((max, r) => Math.max(max, r.bac_upper_milli_percent ?? r.bac_milli_percent ?? 0), 0);
           weeklySessions.forEach(s => {
             if (s.peak_alcohol_mg_l_x1000 != null) {
-              const sessionBac = Math.floor((s.peak_alcohol_mg_l_x1000 * 21 + 50) / 100);
+              const sessionBac = bracToBacMilliPercent(s.peak_alcohol_mg_l_x1000);
               if (sessionBac > peakBacMilli) peakBacMilli = sessionBac;
             }
           });
@@ -123,9 +124,42 @@ export default function HistoryRoute() {
         <Text className="text-xs leading-5 text-gray-500">{insight.guidanceBody}</Text>
         {insight.guidanceActions.map((action) => (
           <Text className="text-xs leading-5 text-gray-600" key={action.label}>
-            • {action.label} — {action.description}
+            • {action.label} : {action.description}
           </Text>
         ))}
+        
+        <View className="mt-4 pt-4 border-t border-gray-100">
+          <Text className="text-xs font-bold text-gray-900 mb-2">📊 3D 위험도 판정 기준표</Text>
+          
+          <View className="flex-row gap-2 mb-2">
+            <View className="flex-1 bg-gray-50 p-2 rounded">
+              <Text className="text-[10px] font-bold text-gray-700">분해속도(k)</Text>
+              <Text className="text-[9px] text-gray-500">느림 (3점)</Text>
+              <Text className="text-[9px] text-gray-500">보통 (2점)</Text>
+              <Text className="text-[9px] text-gray-500">빠름 (1점)</Text>
+            </View>
+            <View className="flex-1 bg-gray-50 p-2 rounded">
+              <Text className="text-[10px] font-bold text-gray-700">주간빈도</Text>
+              <Text className="text-[9px] text-gray-500">4회 이상 (3점)</Text>
+              <Text className="text-[9px] text-gray-500">2~3회 (2점)</Text>
+              <Text className="text-[9px] text-gray-500">1회 이하 (1점)</Text>
+            </View>
+            <View className="flex-1 bg-gray-50 p-2 rounded">
+              <Text className="text-[10px] font-bold text-gray-700">최대농도</Text>
+              <Text className="text-[9px] text-gray-500">&gt; 0.08% (3점)</Text>
+              <Text className="text-[9px] text-gray-500">&gt; 0.03% (2점)</Text>
+              <Text className="text-[9px] text-gray-500">&lt; 0.03% (1점)</Text>
+            </View>
+          </View>
+          
+          <Text className="text-[10px] text-gray-600 leading-4">
+            • 3점: Level 1 (매우 안전){'\n'}
+            • 4~5점: Level 2 (주의 요망){'\n'}
+            • 6점: Level 3 (경고){'\n'}
+            • 7~8점: Level 4 (위험){'\n'}
+            • 9점: Level 5 (초고위험, 클리닉 연계)
+          </Text>
+        </View>
       </View>
 
       <Section title="측정 기록">
